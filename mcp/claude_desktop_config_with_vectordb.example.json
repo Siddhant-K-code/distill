@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "govectorsync": {
+      "command": "/path/to/govs",
+      "args": [
+        "mcp",
+        "--backend", "pinecone",
+        "--index", "your-index-name",
+        "--namespace", "default"
+      ],
+      "env": {
+        "PINECONE_API_KEY": "your-pinecone-api-key",
+        "OPENAI_API_KEY": "your-openai-api-key"
+      }
+    }
+  }
+}

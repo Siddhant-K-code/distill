@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "govectorsync": {
+      "command": "/path/to/govs",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}
