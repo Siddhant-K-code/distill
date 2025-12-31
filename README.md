@@ -168,6 +168,13 @@ docker build -t distill .
 docker run -p 8080:8080 -e OPENAI_API_KEY=your-key distill api
 ```
 
+### Docker Compose
+
+```bash
+# Start Distill + Qdrant (local vector DB)
+docker-compose up
+```
+
 ### Fly.io
 
 ```bash
@@ -176,9 +183,18 @@ fly secrets set OPENAI_API_KEY=your-key
 fly deploy
 ```
 
-### Railway / Render
+### Render
 
-Use the included `Dockerfile` or connect your repo directly.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Siddhant-K-code/distill)
+
+Or manually:
+1. Connect your GitHub repo
+2. Set environment variables (`OPENAI_API_KEY`)
+3. Deploy
+
+### Railway
+
+Connect your repo and set `OPENAI_API_KEY` in environment variables.
 
 ## Architecture
 

@@ -1,0 +1,20 @@
+# Render Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: distill
+    runtime: go
+    region: oregon
+    plan: free
+    buildCommand: go build -o distill .
+    startCommand: ./distill api --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually in dashboard
+      - key: DISTILL_API_KEYS
+        sync: false  # Optional: comma-separated API keys for auth
+      - key: GO_VERSION
+        value: 1.22.0
+    healthCheckPath: /health
+    autoDeploy: true
