@@ -1,5 +1,9 @@
 # Distill
 
+[![CI](https://github.com/Siddhant-K-code/distill/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddhant-K-code/distill/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Siddhant-K-code/distill)](https://goreportcard.com/report/github.com/Siddhant-K-code/distill)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
 
 ```
@@ -32,11 +36,38 @@ Query → Over-fetch (50) → Cluster → Select → MMR Re-rank (8) → LLM
 
 ## Installation
 
+### Binary (Recommended)
+
+Download from [GitHub Releases](https://github.com/Siddhant-K-code/distill/releases):
+
+```bash
+# macOS (Apple Silicon)
+curl -L https://github.com/Siddhant-K-code/distill/releases/latest/download/distill_Darwin_arm64.tar.gz | tar xz
+
+# macOS (Intel)
+curl -L https://github.com/Siddhant-K-code/distill/releases/latest/download/distill_Darwin_amd64.tar.gz | tar xz
+
+# Linux (amd64)
+curl -L https://github.com/Siddhant-K-code/distill/releases/latest/download/distill_Linux_amd64.tar.gz | tar xz
+
+# Move to PATH
+sudo mv distill /usr/local/bin/
+```
+
+### Go Install
+
 ```bash
 go install github.com/Siddhant-K-code/distill@latest
 ```
 
-Or build from source:
+### Docker
+
+```bash
+docker pull ghcr.io/siddhant-k-code/distill:latest
+docker run -p 8080:8080 -e OPENAI_API_KEY=your-key ghcr.io/siddhant-k-code/distill
+```
+
+### Build from Source
 
 ```bash
 git clone https://github.com/Siddhant-K-code/distill.git
