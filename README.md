@@ -3,7 +3,7 @@
 [![CI](https://github.com/Siddhant-K-code/distill/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddhant-K-code/distill/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Siddhant-K-code/distill)](https://github.com/Siddhant-K-code/distill/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Siddhant-K-code/distill)](https://goreportcard.com/report/github.com/Siddhant-K-code/distill)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
 
@@ -338,9 +338,12 @@ go build -o distill .
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+AGPL-3.0 — see [LICENSE](LICENSE)
+
+For commercial licensing, contact: siddhantkhare2694@gmail.com
 
 ## Links
 
+- [Website](https://distill.siddhantkhare.com)
 - [Blog: Engineering Guide to Context Efficiency](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
