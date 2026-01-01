@@ -20,9 +20,9 @@ LLM outputs are unreliable because context is polluted.
 
 30-40% of context assembled from multiple sources is semantically redundant. Same information from docs, code, memory, and tools competing for attention. This leads to:
 
-- **Non-deterministic outputs** — Same workflow, different results
-- **Confused reasoning** — Signal diluted by repetition
-- **Production failures** — Works in demos, breaks at scale
+- **Non-deterministic outputs** - Same workflow, different results
+- **Confused reasoning** - Signal diluted by repetition
+- **Production failures** - Works in demos, breaks at scale
 
 ## How It Works
 
@@ -30,10 +30,10 @@ LLM outputs are unreliable because context is polluted.
 Query → Over-fetch (50) → Cluster → Select → MMR Re-rank (8) → LLM
 ```
 
-1. **Over-fetch** — Retrieve 3-5x more chunks than needed
-2. **Cluster** — Group semantically similar chunks (agglomerative clustering)
-3. **Select** — Pick best representative from each cluster
-4. **MMR Re-rank** — Balance relevance and diversity
+1. **Over-fetch** - Retrieve 3-5x more chunks than needed
+2. **Cluster** - Group semantically similar chunks (agglomerative clustering)
+3. **Select** - Pick best representative from each cluster
+4. **MMR Re-rank** - Balance relevance and diversity
 
 **Result:** Deterministic, diverse context in ~12ms. No LLM calls. Fully auditable.
 
@@ -243,8 +243,8 @@ If `DISTILL_API_KEYS` is not set, the API is open (suitable for local/internal u
 - Embeddings are used only for similarity comparison, never stored
 
 **Alternatives:**
-- Bring your own embeddings — include `"embedding"` field in chunks
-- Self-host an embedding model — set `EMBEDDING_API_URL` to your endpoint
+- Bring your own embeddings - include `"embedding"` field in chunks
+- Self-host an embedding model - set `EMBEDDING_API_URL` to your endpoint
 
 ### Parameters
 
@@ -329,16 +329,16 @@ Connect your repo and set `OPENAI_API_KEY` in environment variables.
 
 ## Supported Backends
 
-- **Pinecone** — Fully supported
-- **Qdrant** — Fully supported
-- **Weaviate** — Coming soon
+- **Pinecone** - Fully supported
+- **Qdrant** - Fully supported
+- **Weaviate** - Coming soon
 
 ## Use Cases
 
-- **Code Assistants** — Dedupe context from multiple files/repos
-- **RAG Pipelines** — Remove redundant chunks before LLM
-- **Agent Workflows** — Clean up tool outputs + memory + docs
-- **Enterprise** — Deterministic outputs for compliance
+- **Code Assistants** - Dedupe context from multiple files/repos
+- **RAG Pipelines** - Remove redundant chunks before LLM
+- **Agent Workflows** - Clean up tool outputs + memory + docs
+- **Enterprise** - Deterministic outputs for compliance
 
 ## Why Distill?
 
@@ -363,7 +363,7 @@ go build -o distill .
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE)
+AGPL-3.0 - see [LICENSE](LICENSE)
 
 For commercial licensing, contact: siddhantkhare2694@gmail.com
 
