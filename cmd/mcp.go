@@ -20,10 +20,10 @@ import (
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
-	Short: "Start GoVectorSync as an MCP server",
-	Long: `Starts GoVectorSync as a Model Context Protocol (MCP) server.
+	Short: "Start Distill as an MCP server",
+	Long: `Starts Distill as a Model Context Protocol (MCP) server.
 
-This allows AI assistants like Claude, Amp, and Cursor to use GoVectorSync's
+This allows AI assistants like Claude, Amp, and Cursor to use Distill's
 semantic deduplication capabilities directly.
 
 Transports:
@@ -36,23 +36,23 @@ Tools exposed:
   analyze_redundancy    - Analyze chunks for redundancy stats
 
 Resources exposed:
-  govectorsync://system-prompt - System prompt for AI assistants
+  distill://system-prompt - System prompt for AI assistants
 
 Example:
   # Local stdio server (Claude Desktop, Cursor, Amp)
-  govs mcp
+  distill mcp
 
   # Remote HTTP server (hosted deployment)
-  govs mcp --transport http --port 8081
+  distill mcp --transport http --port 8081
 
   # With vector DB backend
-  govs mcp --backend pinecone --index my-index
+  distill mcp --backend pinecone --index my-index
 
 Configure in Claude Desktop (claude_desktop_config.json):
   {
     "mcpServers": {
-      "govectorsync": {
-        "command": "govs",
+      "distill": {
+        "command": "distill",
         "args": ["mcp"]
       }
     }
@@ -61,7 +61,7 @@ Configure in Claude Desktop (claude_desktop_config.json):
 For remote MCP server:
   {
     "mcpServers": {
-      "govectorsync": {
+      "distill": {
         "url": "https://your-server.fly.dev/mcp"
       }
     }
@@ -95,7 +95,7 @@ func init() {
 	mcpCmd.Flags().Float64("lambda", 0.5, "Default MMR lambda")
 }
 
-// MCPServer wraps the MCP server with GoVectorSync capabilities
+// MCPServer wraps the MCP server with Distill capabilities
 type MCPServer struct {
 	broker   *contextlab.Broker
 	embedder retriever.EmbeddingProvider
@@ -209,7 +209,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 
 	// Create MCP server with capabilities
 	s := server.NewMCPServer(
-		"GoVectorSync",
+		"Distill",
 		"1.0.0",
 		server.WithToolCapabilities(false),
 		server.WithResourceCapabilities(true, false),
@@ -230,7 +230,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 
 	case "http":
 		addr := fmt.Sprintf("%s:%d", host, port)
-		fmt.Printf("GoVectorSync MCP server starting on http://%s\n", addr)
+		fmt.Printf("Distill MCP server starting on http://%s\n", addr)
 		fmt.Printf("  Endpoint: http://%s/mcp\n", addr)
 		fmt.Printf("  Health:   http://%s/health\n", addr)
 		fmt.Println()
@@ -241,7 +241,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 		// Health check endpoint
 		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"status":"ok","server":"govectorsync-mcp"}`))
+			_, _ = w.Write([]byte(`{"status":"ok","server":"distill-mcp"}`))
 		})
 
 		// MCP endpoint with stateful sessions
@@ -350,7 +350,7 @@ whether to deduplicate. Returns cluster information and redundancy percentage.`)
 }
 
 // System prompt that guides AI assistants to use deduplication
-const systemPromptContent = `You have access to GoVectorSync, a semantic deduplication tool for RAG context.
+const systemPromptContent = `You have access to Distill, a semantic deduplication tool for RAG context.
 
 IMPORTANT: When you receive multiple chunks from retrieval or search:
 1. Check if chunks might contain overlapping information
@@ -366,8 +366,8 @@ Use analyze_redundancy first if you want to see the redundancy stats before dedu
 func (m *MCPServer) registerResources(s *server.MCPServer) {
 	// System prompt resource - hosts can include this in context
 	systemPrompt := mcp.NewResource(
-		"govectorsync://system-prompt",
-		"GoVectorSync System Prompt",
+		"distill://system-prompt",
+		"Distill System Prompt",
 		mcp.WithResourceDescription("System prompt that guides AI to use deduplication tools effectively"),
 		mcp.WithMIMEType("text/plain"),
 	)
@@ -375,7 +375,7 @@ func (m *MCPServer) registerResources(s *server.MCPServer) {
 	s.AddResource(systemPrompt, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		return []mcp.ResourceContents{
 			mcp.TextResourceContents{
-				URI:      "govectorsync://system-prompt",
+				URI:      "distill://system-prompt",
 				MIMEType: "text/plain",
 				Text:     systemPromptContent,
 			},
@@ -384,8 +384,8 @@ func (m *MCPServer) registerResources(s *server.MCPServer) {
 
 	// Configuration resource - shows current settings
 	configResource := mcp.NewResource(
-		"govectorsync://config",
-		"GoVectorSync Configuration",
+		"distill://config",
+		"Distill Configuration",
 		mcp.WithResourceDescription("Current deduplication configuration and defaults"),
 		mcp.WithMIMEType("application/json"),
 	)
@@ -404,7 +404,7 @@ func (m *MCPServer) registerResources(s *server.MCPServer) {
 		configJSON, _ := json.MarshalIndent(config, "", "  ")
 		return []mcp.ResourceContents{
 			mcp.TextResourceContents{
-				URI:      "govectorsync://config",
+				URI:      "distill://config",
 				MIMEType: "application/json",
 				Text:     string(configJSON),
 			},

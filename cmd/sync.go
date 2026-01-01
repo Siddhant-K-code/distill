@@ -23,7 +23,7 @@ var syncCmd = &cobra.Command{
 and uploads to a Pinecone index using parallel workers.
 
 Example:
-  govs sync --file data.jsonl --index my-index --dedup=true
+  distill sync --file data.jsonl --index my-index --dedup=true
 
 Environment Variables:
   PINECONE_API_KEY    Your Pinecone API key (required)`,

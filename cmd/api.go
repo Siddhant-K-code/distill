@@ -25,7 +25,7 @@ Unlike 'serve', this doesn't require a vector DB connection.
 Clients send chunks directly and receive deduplicated results.
 
 Example:
-  govs api --port 8080
+  distill api --port 8080
 
 The server exposes:
   POST /v1/dedupe   - Deduplicate chunks

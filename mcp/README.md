@@ -1,17 +1,17 @@
-# GoVectorSync MCP Integration
+# Distill MCP Integration
 
-GoVectorSync exposes semantic deduplication as an MCP (Model Context Protocol) server, allowing AI assistants to deduplicate context directly.
+Distill exposes semantic deduplication as an MCP (Model Context Protocol) server, allowing AI assistants to deduplicate context directly.
 
 ## The Problem
 
 When AI assistants assemble context from multiple sources (code, docs, memory, tool outputs), 30-40% is typically redundant. Same information from different sources wastes tokens and confuses the model.
 
-## How GoVectorSync Helps
+## How Distill Helps
 
-GoVectorSync sits between your context sources and the LLM:
+Distill sits between your context sources and the LLM:
 
 ```
-RAG Results → GoVectorSync → Deduplicated Context → LLM
+RAG Results → Distill → Deduplicated Context → LLM
 ```
 
 It clusters semantically similar chunks, picks the best representative from each cluster, and applies MMR for diversity.
@@ -22,17 +22,17 @@ It clusters semantically similar chunks, picks the best representative from each
 
 ```bash
 # Build
-go build -o govs .
+go build -o distill .
 
 # Start MCP server
-./govs mcp
+./distill mcp
 ```
 
 ### Remote (HTTP) - Hosted deployment
 
 ```bash
 # Start HTTP server
-./govs mcp --transport http --port 8081
+./distill mcp --transport http --port 8081
 
 # Or deploy to Fly.io
 fly deploy -c fly.mcp.toml
@@ -76,11 +76,11 @@ Analyze chunks for redundancy without removing any. Use to understand overlap be
 
 ## Resources
 
-### `govectorsync://system-prompt`
+### `distill://system-prompt`
 
 System prompt that guides AI assistants to use deduplication effectively. Host applications can include this in context automatically.
 
-### `govectorsync://config`
+### `distill://config`
 
 Current configuration and defaults (JSON).
 
@@ -106,8 +106,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "govectorsync": {
-      "command": "/path/to/govs",
+    "distill": {
+      "command": "/path/to/distill",
       "args": ["mcp"]
     }
   }
@@ -118,8 +118,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "govectorsync": {
-      "url": "https://govectorsync-mcp.fly.dev/mcp"
+    "distill": {
+      "url": "https://distill-mcp.fly.dev/mcp"
     }
   }
 }
@@ -129,8 +129,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "govectorsync": {
-      "command": "/path/to/govs",
+    "distill": {
+      "command": "/path/to/distill",
       "args": ["mcp", "--backend", "pinecone", "--index", "my-index"],
       "env": {
         "PINECONE_API_KEY": "your-api-key",
@@ -165,25 +165,25 @@ fly secrets set PINECONE_API_KEY=xxx -c fly.mcp.toml
 fly deploy -c fly.mcp.toml
 ```
 
-Your MCP endpoint: `https://govectorsync-mcp.fly.dev/mcp`
+Your MCP endpoint: `https://distill-mcp.fly.dev/mcp`
 
 ### Docker
 
 ```bash
 # Build
-docker build -f Dockerfile.mcp -t govectorsync-mcp .
+docker build -f Dockerfile.mcp -t distill-mcp .
 
 # Run
 docker run -p 8081:8081 \
   -e OPENAI_API_KEY=xxx \
-  govectorsync-mcp
+  distill-mcp
 ```
 
 ### Railway / Render / Other
 
 Use the Dockerfile.mcp and set:
 - Port: 8081
-- Command: `./govs mcp --transport http --port 8081`
+- Command: `./distill mcp --transport http --port 8081`
 
 ## Integration Patterns
 
@@ -192,7 +192,7 @@ Use the Dockerfile.mcp and set:
 The AI reads the system prompt resource and automatically deduplicates when it detects multiple chunks:
 
 ```
-1. Host app includes govectorsync://system-prompt in context
+1. Host app includes distill://system-prompt in context
 2. User asks a question
 3. RAG retrieves chunks
 4. AI recognizes overlap, calls deduplicate_chunks
@@ -234,7 +234,7 @@ AI: "Found 8 diverse results from 50 retrieved"
 The AI decides to call tools based on:
 
 1. **Tool descriptions** - We've written action-oriented descriptions that explain when to use each tool
-2. **System prompt** - The `govectorsync://system-prompt` resource guides the AI to check for redundancy
+2. **System prompt** - The `distill://system-prompt` resource guides the AI to check for redundancy
 3. **User requests** - Explicit requests like "deduplicate these" or "remove redundancy"
 4. **Context patterns** - When the AI sees multiple similar chunks, it may recognize the need
 
@@ -260,8 +260,8 @@ The AI decides to call tools based on:
 
 ## Comparison: MCP vs HTTP Proxy
 
-| Aspect | MCP Server | HTTP Proxy (`govs serve`) |
-|--------|------------|---------------------------|
+| Aspect | MCP Server | HTTP Proxy (`distill serve`) |
+|--------|------------|------------------------------|
 | Invocation | AI decides when to call | Automatic on every query |
 | Integration | MCP-compatible clients | Any HTTP client |
 | Use case | AI assistant workflows | RAG pipeline middleware |

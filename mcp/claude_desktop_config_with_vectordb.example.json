@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "govectorsync": {
-      "command": "/path/to/govs",
+    "distill": {
+      "command": "/path/to/distill",
       "args": [
         "mcp",
         "--backend", "pinecone",

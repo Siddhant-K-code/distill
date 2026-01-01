@@ -12,21 +12,21 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "govs",
-	Short: "GoVectorSync - High-performance vector ingestion with semantic deduplication",
-	Long: `GoVectorSync (govs) is a production-grade CLI tool for ingesting massive 
-datasets of vector embeddings into Pinecone with client-side semantic deduplication.
+	Use:   "distill",
+	Short: "Distill - Reliability layer for LLM context with semantic deduplication",
+	Long: `Distill is a reliability layer for LLM context that removes redundancy
+before it reaches your model, improving output quality and determinism.
 
 Features:
-  - SIMD-accelerated cosine distance calculations (AVX2/AVX-512)
-  - Custom K-Means clustering for semantic deduplication
-  - Worker pool pattern for maximum throughput
-  - Exponential backoff retry logic
+  - Agglomerative clustering for semantic deduplication
+  - MMR re-ranking for diversity
+  - ~12ms latency, no LLM calls
+  - Deterministic, auditable results
 
 Environment Variables:
-  PINECONE_API_KEY    Your Pinecone API key (required for sync)
-  PINECONE_INDEX      Default index name
-  PINECONE_NAMESPACE  Default namespace`,
+  OPENAI_API_KEY      For text → embedding conversion
+  PINECONE_API_KEY    For Pinecone backend
+  QDRANT_URL          For Qdrant backend`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -41,7 +41,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.govs.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.distill.yaml)")
 	rootCmd.PersistentFlags().Bool("verbose", false, "enable verbose output")
 
 	// Bind to viper
@@ -59,7 +59,7 @@ func initConfig() {
 		}
 		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".govs")
+		viper.SetConfigName(".distill")
 	}
 
 	// Read environment variables

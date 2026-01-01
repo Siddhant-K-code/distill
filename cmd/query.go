@@ -25,7 +25,7 @@ var queryCmd = &cobra.Command{
 Useful for testing and tuning ContextLab parameters.
 
 Example:
-  govs query "How do I configure authentication?" --index my-index
+  distill query "How do I configure authentication?" --index my-index
 
 Requires PINECONE_API_KEY and OPENAI_API_KEY environment variables.`,
 	Args: cobra.MinimumNArgs(1),

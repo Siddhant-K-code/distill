@@ -23,7 +23,7 @@ var analyzeCmd = &cobra.Command{
 potential duplicates without uploading to Pinecone.
 
 Example:
-  govs analyze --file data.jsonl --threshold 0.05
+  distill analyze --file data.jsonl --threshold 0.05
 
 The threshold controls duplicate sensitivity:
   - 0.01: Very strict (only near-identical vectors)
@@ -183,7 +183,7 @@ func printAnalysisReport(result *types.DeduplicationResult, verbose bool) {
 	fmt.Println()
 
 	if result.DuplicateCount > 0 {
-		fmt.Println("Recommendation: Use 'govs sync --dedup=true' to upload deduplicated vectors.")
+		fmt.Println("Recommendation: Use 'distill sync --dedup=true' to upload deduplicated vectors.")
 	} else {
 		fmt.Println("No duplicates found. Your dataset is already unique.")
 	}

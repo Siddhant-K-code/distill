@@ -27,7 +27,7 @@ var serveCmd = &cobra.Command{
 for RAG retrieval queries.
 
 Example:
-  govs serve --port 8080 --backend pinecone --index my-index
+  distill serve --port 8080 --backend pinecone --index my-index
 
 The server exposes:
   POST /v1/retrieve  - Deduplicated retrieval endpoint
