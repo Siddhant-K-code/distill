@@ -198,8 +198,31 @@ distill query     # Test a query from command line
 OPENAI_API_KEY      # For text → embedding conversion (see note below)
 PINECONE_API_KEY    # For Pinecone backend
 QDRANT_URL          # For Qdrant backend (default: localhost:6334)
-DISTILL_API_KEYS    # Comma-separated API keys for auth (optional)
+DISTILL_API_KEYS    # Optional: protect your self-hosted instance (see below)
 ```
+
+### Protecting Your Self-Hosted Instance
+
+If you're exposing Distill publicly, set `DISTILL_API_KEYS` to require authentication:
+
+```bash
+# Generate a random API key
+export DISTILL_API_KEYS="sk-$(openssl rand -hex 32)"
+
+# Or multiple keys (comma-separated)
+export DISTILL_API_KEYS="sk-key1,sk-key2,sk-key3"
+```
+
+Then include the key in requests:
+
+```bash
+curl -X POST http://your-server:8080/v1/dedupe \
+  -H "Authorization: Bearer sk-your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"chunks": [...]}'
+```
+
+If `DISTILL_API_KEYS` is not set, the API is open (suitable for local/internal use).
 
 ### About OpenAI API Key
 
