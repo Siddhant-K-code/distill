@@ -96,7 +96,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("index name required (--index)")
 	}
 	if openaiKey == "" {
-		return fmt.Errorf("OpenAI API key required for text queries (--openai-key or OPENAI_API_KEY)")
+		return fmt.Errorf("openai API key required for text queries (--openai-key or OPENAI_API_KEY)")
 	}
 
 	// Setup context with cancellation
@@ -118,7 +118,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	switch backend {
 	case "pinecone":
 		if apiKey == "" {
-			return fmt.Errorf("Pinecone API key required")
+			return fmt.Errorf("pinecone API key required")
 		}
 		ret, err = pcretriever.NewClient(ctx, pcretriever.Config{
 			Config: retriever.Config{
@@ -130,7 +130,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 
 	case "qdrant":
 		if dbHost == "" {
-			return fmt.Errorf("Qdrant host required (--db-host)")
+			return fmt.Errorf("qdrant host required (--db-host)")
 		}
 		ret, err = qdretriever.NewClient(ctx, qdretriever.Config{
 			Config: retriever.Config{

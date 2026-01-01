@@ -78,7 +78,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		apiKey = os.Getenv("PINECONE_API_KEY")
 	}
 	if apiKey == "" {
-		return fmt.Errorf("Pinecone API key is required. Set PINECONE_API_KEY or use --api-key")
+		return fmt.Errorf("pinecone API key is required: set PINECONE_API_KEY or use --api-key")
 	}
 
 	// Resolve index from env if not provided
@@ -86,7 +86,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		indexName = viper.GetString("index")
 	}
 	if indexName == "" {
-		return fmt.Errorf("Pinecone index name is required. Use --index flag")
+		return fmt.Errorf("pinecone index name is required: use --index flag")
 	}
 
 	// Setup context with cancellation

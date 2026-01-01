@@ -166,7 +166,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 		switch backend {
 		case "pinecone":
 			if apiKey == "" {
-				return fmt.Errorf("Pinecone API key required (--api-key or PINECONE_API_KEY)")
+				return fmt.Errorf("pinecone API key required (--api-key or PINECONE_API_KEY)")
 			}
 			ret, err = pcretriever.NewClient(ctx, pcretriever.Config{
 				Config: retriever.Config{
@@ -178,7 +178,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 
 		case "qdrant":
 			if dbHost == "" {
-				return fmt.Errorf("Qdrant host required (--db-host)")
+				return fmt.Errorf("qdrant host required (--db-host)")
 			}
 			ret, err = qdretriever.NewClient(ctx, qdretriever.Config{
 				Config: retriever.Config{

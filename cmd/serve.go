@@ -150,7 +150,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	switch backend {
 	case "pinecone":
 		if apiKey == "" {
-			return fmt.Errorf("Pinecone API key required (--api-key or PINECONE_API_KEY)")
+			return fmt.Errorf("pinecone API key required (--api-key or PINECONE_API_KEY)")
 		}
 		if index == "" {
 			return fmt.Errorf("index name required (--index)")
@@ -165,7 +165,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	case "qdrant":
 		if dbHost == "" {
-			return fmt.Errorf("Qdrant host required (--db-host)")
+			return fmt.Errorf("qdrant host required (--db-host)")
 		}
 		if index == "" {
 			return fmt.Errorf("collection name required (--index)")
