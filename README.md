@@ -7,6 +7,8 @@
 
 A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
 
+**[Learn more →](https://distill.siddhantkhare.com)**
+
 ```
 Data Sources → Distill → LLM
 (docs, code, memory, tools)    (reliable outputs)
