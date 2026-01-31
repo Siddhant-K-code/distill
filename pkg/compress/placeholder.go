@@ -194,9 +194,12 @@ func (p *PlaceholderCompressor) tryCompressXML(text string) (string, bool) {
 		return "", false
 	}
 
-	// Simple XML detection
-	xmlPattern := regexp.MustCompile(`<(\w+)[^>]*>.*</\1>`)
-	if !xmlPattern.MatchString(trimmed) {
+	// Simple XML detection - check for opening and closing tags
+	openTagPattern := regexp.MustCompile(`<(\w+)[^>]*>`)
+	closeTagPattern := regexp.MustCompile(`</(\w+)>`)
+	openMatches := openTagPattern.FindAllString(trimmed, -1)
+	closeMatches := closeTagPattern.FindAllString(trimmed, -1)
+	if len(openMatches) == 0 || len(closeMatches) == 0 {
 		return "", false
 	}
 

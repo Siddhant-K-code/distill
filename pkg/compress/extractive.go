@@ -137,9 +137,10 @@ func (e *ExtractiveCompressor) scoreSentence(sentence string, index, total int) 
 	score := 0.0
 
 	// Position bias: first and last sentences are often important
-	if index == 0 {
+	switch index {
+	case 0:
 		score += 2.0
-	} else if index == total-1 {
+	case total - 1:
 		score += 1.0
 	}
 
