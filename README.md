@@ -8,7 +8,11 @@
 
 [![Build with Ona](https://ona.com/build-with-ona.svg)](https://app.ona.com/#https://github.com/siddhant-k-code/distill)
 
+**Reliable LLM outputs start with clean context.**
+
 A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
+
+Less redundant data. Lower costs. Faster responses. More efficient & deterministic results.
 
 **[Learn more →](https://distill.siddhantkhare.com)**
 
@@ -19,7 +23,7 @@ Context sources → Distill → LLM
 
 ## The Problem
 
-LLM outputs are unreliable because context is polluted.
+LLM outputs are unreliable because context is polluted. "Garbage in, garbage out."
 
 30-40% of context assembled from multiple sources is semantically redundant. Same information from docs, code, memory, and tools competing for attention. This leads to:
 
@@ -27,7 +31,20 @@ LLM outputs are unreliable because context is polluted.
 - **Confused reasoning** — Signal diluted by repetition
 - **Production failures** — Works in demos, breaks at scale
 
+You can't fix unreliable outputs with better prompts. You need to fix the context that goes in.
+
 ## How It Works
+
+Math, not magic. No LLM calls. Fully deterministic.
+
+| Step | What it does | Benefit |
+|------|--------------|---------|
+| **Deduplicate** | Remove redundant information across sources | More reliable outputs |
+| **Compress** | Keep what matters, remove the noise | Lower token costs |
+| **Summarize** | Condense older context intelligently | Longer sessions |
+| **Cache** | Instant retrieval for repeated patterns | Faster responses |
+
+### Pipeline
 
 ```
 Query → Over-fetch (50) → Cluster → Select → MMR Re-rank (8) → LLM
@@ -343,14 +360,28 @@ Connect your repo and set `OPENAI_API_KEY` in environment variables.
 - **Agent Workflows** - Clean up tool outputs + memory + docs
 - **Enterprise** - Deterministic outputs for compliance
 
-## Why Distill?
+## Why not just use an LLM?
+
+LLMs are non-deterministic. Reliability requires deterministic preprocessing.
 
 | | LLM Compression | Distill |
 |---|---|---|
 | Latency | ~500ms | ~12ms |
+| Cost per call | $0.01+ | $0.0001 |
 | Deterministic | No | Yes |
-| Auditable | No | Yes |
 | Lossless | No | Yes |
+| Auditable | No | Yes |
+
+Use LLMs for reasoning. Use deterministic algorithms for reliability.
+
+## Integrations
+
+Works with your existing AI stack:
+
+- **LLM Providers:** OpenAI, Anthropic
+- **Frameworks:** LangChain, LlamaIndex
+- **Vector DBs:** Pinecone, Qdrant, Weaviate, Chroma, pgvector
+- **Tools:** Cursor, Lovable, and more
 
 ## Contributing
 
