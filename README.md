@@ -4,14 +4,15 @@
 [![Release](https://img.shields.io/github/v/release/Siddhant-K-code/distill)](https://github.com/Siddhant-K-code/distill/releases/latest)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Siddhant-K-code/distill)](https://goreportcard.com/report/github.com/Siddhant-K-code/distill)
+[![Build with Ona](https://ona.com/build-with-ona.svg)](https://app.ona.com/#https://github.com/siddhant-k-code/distill)
 
 A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
 
 **[Learn more →](https://distill.siddhantkhare.com)**
 
 ```
-Data Sources → Distill → LLM
-(docs, code, memory, tools)    (reliable outputs)
+Context sources → Distill → LLM
+(RAG, tools, memory, docs)    (reliable outputs)
 ```
 
 ## The Problem
@@ -20,9 +21,9 @@ LLM outputs are unreliable because context is polluted.
 
 30-40% of context assembled from multiple sources is semantically redundant. Same information from docs, code, memory, and tools competing for attention. This leads to:
 
-- **Non-deterministic outputs** - Same workflow, different results
-- **Confused reasoning** - Signal diluted by repetition
-- **Production failures** - Works in demos, breaks at scale
+- **Non-deterministic outputs** — Same workflow, different results
+- **Confused reasoning** — Signal diluted by repetition
+- **Production failures** — Works in demos, breaks at scale
 
 ## How It Works
 
@@ -370,6 +371,6 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 ## Links
 
 - [Website](https://distill.siddhantkhare.com)
-- [Blog: Engineering Guide to Context Efficiency](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
+- [LinkedIn](https://www.linkedin.com/in/siddhantkhare24)
 - [MCP Configuration](mcp/README.md)
 
