@@ -13,7 +13,7 @@ func TestMemoryCache_GetSet(t *testing.T) {
 		MaxSize:    100,
 		DefaultTTL: time.Hour,
 	})
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
@@ -40,11 +40,11 @@ func TestMemoryCache_GetSet(t *testing.T) {
 
 func TestMemoryCache_Delete(t *testing.T) {
 	cache := NewMemoryCache(DefaultConfig())
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
-	cache.Set(ctx, "key1", []byte("value1"), 0)
+	_ = cache.Set(ctx, "key1", []byte("value1"), 0)
 
 	err := cache.Delete(ctx, "key1")
 	if err != nil {
@@ -65,7 +65,7 @@ func TestMemoryCache_Delete(t *testing.T) {
 
 func TestMemoryCache_Has(t *testing.T) {
 	cache := NewMemoryCache(DefaultConfig())
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
@@ -73,7 +73,7 @@ func TestMemoryCache_Has(t *testing.T) {
 		t.Error("expected Has to return false for nonexistent key")
 	}
 
-	cache.Set(ctx, "key1", []byte("value1"), 0)
+	_ = cache.Set(ctx, "key1", []byte("value1"), 0)
 
 	if !cache.Has(ctx, "key1") {
 		t.Error("expected Has to return true for existing key")
@@ -82,13 +82,13 @@ func TestMemoryCache_Has(t *testing.T) {
 
 func TestMemoryCache_Clear(t *testing.T) {
 	cache := NewMemoryCache(DefaultConfig())
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
-	cache.Set(ctx, "key1", []byte("value1"), 0)
-	cache.Set(ctx, "key2", []byte("value2"), 0)
-	cache.Set(ctx, "key3", []byte("value3"), 0)
+	_ = cache.Set(ctx, "key1", []byte("value1"), 0)
+	_ = cache.Set(ctx, "key2", []byte("value2"), 0)
+	_ = cache.Set(ctx, "key3", []byte("value3"), 0)
 
 	err := cache.Clear(ctx)
 	if err != nil {
@@ -106,12 +106,12 @@ func TestMemoryCache_TTL(t *testing.T) {
 		MaxSize:         100,
 		CleanupInterval: 10 * time.Millisecond,
 	})
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
 	// Set with short TTL
-	cache.Set(ctx, "key1", []byte("value1"), 50*time.Millisecond)
+	_ = cache.Set(ctx, "key1", []byte("value1"), 50*time.Millisecond)
 
 	// Should exist immediately
 	if !cache.Has(ctx, "key1") {
@@ -133,20 +133,20 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 		MaxSize:    3,
 		DefaultTTL: time.Hour,
 	})
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
 	// Fill cache
-	cache.Set(ctx, "key1", []byte("value1"), 0)
-	cache.Set(ctx, "key2", []byte("value2"), 0)
-	cache.Set(ctx, "key3", []byte("value3"), 0)
+	_ = cache.Set(ctx, "key1", []byte("value1"), 0)
+	_ = cache.Set(ctx, "key2", []byte("value2"), 0)
+	_ = cache.Set(ctx, "key3", []byte("value3"), 0)
 
 	// Access key1 to make it recently used
-	cache.Get(ctx, "key1")
+	_, _ = cache.Get(ctx, "key1")
 
 	// Add new key, should evict key2 (least recently used)
-	cache.Set(ctx, "key4", []byte("value4"), 0)
+	_ = cache.Set(ctx, "key4", []byte("value4"), 0)
 
 	// key2 should be evicted
 	if cache.Has(ctx, "key2") {
@@ -166,13 +166,13 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 
 func TestMemoryCache_Stats(t *testing.T) {
 	cache := NewMemoryCache(DefaultConfig())
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 
-	cache.Set(ctx, "key1", []byte("value1"), 0)
-	cache.Get(ctx, "key1")
-	cache.Get(ctx, "nonexistent")
+	_ = cache.Set(ctx, "key1", []byte("value1"), 0)
+	_, _ = cache.Get(ctx, "key1")
+	_, _ = cache.Get(ctx, "nonexistent")
 
 	stats := cache.Stats()
 
@@ -354,14 +354,14 @@ func TestEntry_IsExpired(t *testing.T) {
 
 func BenchmarkMemoryCache_Get(b *testing.B) {
 	cache := NewMemoryCache(DefaultConfig())
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
-	cache.Set(ctx, "key", []byte("value"), 0)
+	_ = cache.Set(ctx, "key", []byte("value"), 0)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Get(ctx, "key")
+		_, _ = cache.Get(ctx, "key")
 	}
 }
 
@@ -370,14 +370,14 @@ func BenchmarkMemoryCache_Set(b *testing.B) {
 		MaxSize:    1000000,
 		DefaultTTL: time.Hour,
 	})
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	ctx := context.Background()
 	value := []byte("value")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Set(ctx, "key", value, 0)
+		_ = cache.Set(ctx, "key", value, 0)
 	}
 }
 

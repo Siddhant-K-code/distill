@@ -123,13 +123,13 @@ func (c *RedisCache) Close() error {
 	return nil
 }
 
-// prefixKey adds the configured prefix to a key.
-func (c *RedisCache) prefixKey(key string) string {
+// PrefixKey adds the configured prefix to a key.
+func (c *RedisCache) PrefixKey(key string) string {
 	return c.cfg.KeyPrefix + key
 }
 
-// getTTL returns the TTL to use, falling back to default.
-func (c *RedisCache) getTTL(ttl time.Duration) time.Duration {
+// GetTTL returns the TTL to use, falling back to default.
+func (c *RedisCache) GetTTL(ttl time.Duration) time.Duration {
 	if ttl > 0 {
 		return ttl
 	}
