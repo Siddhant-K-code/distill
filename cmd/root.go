@@ -70,8 +70,8 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	// Also check for PINECONE_API_KEY without prefix
-	viper.BindEnv("pinecone_api_key", "PINECONE_API_KEY")
-	viper.BindEnv("openai_api_key", "OPENAI_API_KEY")
+	_ = viper.BindEnv("pinecone_api_key", "PINECONE_API_KEY")
+	_ = viper.BindEnv("openai_api_key", "OPENAI_API_KEY")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err == nil {
