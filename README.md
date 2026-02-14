@@ -375,6 +375,34 @@ Or manually:
 
 Connect your repo and set `OPENAI_API_KEY` in environment variables.
 
+## Monitoring
+
+Distill exposes a Prometheus-compatible `/metrics` endpoint on both `api` and `serve` commands.
+
+### Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `distill_requests_total` | Counter | Total requests by endpoint and status code |
+| `distill_request_duration_seconds` | Histogram | Request latency distribution |
+| `distill_chunks_processed_total` | Counter | Chunks processed (input/output) |
+| `distill_reduction_ratio` | Histogram | Chunk reduction ratio per request |
+| `distill_active_requests` | Gauge | Currently processing requests |
+| `distill_clusters_formed_total` | Counter | Clusters formed during deduplication |
+
+### Prometheus Scrape Config
+
+```yaml
+scrape_configs:
+  - job_name: distill
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+### Grafana Dashboard
+
+Import the included dashboard from `grafana/dashboard.json` or use dashboard UID `distill-overview`.
+
 ## Architecture
 
 ```

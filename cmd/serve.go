@@ -12,6 +12,7 @@ import (
 
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
+	"github.com/Siddhant-K-code/distill/pkg/metrics"
 	"github.com/Siddhant-K-code/distill/pkg/retriever"
 	pcretriever "github.com/Siddhant-K-code/distill/pkg/retriever/pinecone"
 	qdretriever "github.com/Siddhant-K-code/distill/pkg/retriever/qdrant"
@@ -77,8 +78,9 @@ func init() {
 
 // Server holds the HTTP server state.
 type Server struct {
-	broker *contextlab.Broker
-	cfg    ServerConfig
+	broker  *contextlab.Broker
+	cfg     ServerConfig
+	metrics *metrics.Metrics
 }
 
 // ServerConfig holds server configuration.
@@ -232,6 +234,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { _ = broker.Close() }()
 
+	m := metrics.New()
+
 	// Create server
 	server := &Server{
 		broker: broker,
@@ -239,13 +243,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Host: host,
 			Port: port,
 		},
+		metrics: m,
 	}
 
 	// Setup routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/retrieve", server.handleRetrieve)
+	mux.HandleFunc("/v1/retrieve", m.Middleware("/v1/retrieve", server.handleRetrieve))
 	mux.HandleFunc("/health", server.handleHealth)
-	mux.HandleFunc("/metrics", server.handleMetrics)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		m.Handler().ServeHTTP(w, r)
+	})
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", host, port)
@@ -370,6 +377,9 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Record dedup-specific metrics
+	s.metrics.RecordDedup("/v1/retrieve", result.Stats.Retrieved, result.Stats.Returned, result.Stats.Clustered)
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -377,18 +387,4 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	cfg := s.broker.GetConfig()
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"config": map[string]interface{}{
-			"over_fetch_k": cfg.OverFetchK,
-			"target_k":     cfg.TargetK,
-			"threshold":    cfg.ClusterThreshold,
-			"lambda":       cfg.MMRLambda,
-			"mmr_enabled":  cfg.EnableMMR,
-		},
-	})
 }

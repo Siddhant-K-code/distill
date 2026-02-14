@@ -13,6 +13,7 @@ import (
 
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
+	"github.com/Siddhant-K-code/distill/pkg/metrics"
 	"github.com/Siddhant-K-code/distill/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -93,6 +94,7 @@ type APIServer struct {
 	embedder  *openai.Client
 	validKeys map[string]bool
 	hasAuth   bool
+	metrics   *metrics.Metrics
 }
 
 func runAPI(cmd *cobra.Command, args []string) error {
@@ -135,16 +137,22 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	m := metrics.New()
+
 	server := &APIServer{
 		embedder:  embedder,
 		validKeys: validKeys,
 		hasAuth:   len(validKeys) > 0,
+		metrics:   m,
 	}
 
 	// Setup routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/dedupe", server.handleDedupe)
+	mux.HandleFunc("/v1/dedupe", m.Middleware("/v1/dedupe", server.handleDedupe))
 	mux.HandleFunc("/health", server.handleHealth)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		m.Handler().ServeHTTP(w, r)
+	})
 	mux.HandleFunc("/", server.handleRoot)
 
 	// CORS middleware
@@ -186,6 +194,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	fmt.Println("Endpoints:")
 	fmt.Printf("  POST http://%s/v1/dedupe\n", addr)
 	fmt.Printf("  GET  http://%s/health\n", addr)
+	fmt.Printf("  GET  http://%s/metrics\n", addr)
 	fmt.Println()
 
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
@@ -219,8 +228,9 @@ func (s *APIServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 		"version": "1.0.0",
 		"docs":    "https://distill.siddhantkhare.com/docs",
 		"endpoints": map[string]string{
-			"dedupe": "POST /v1/dedupe",
-			"health": "GET /health",
+			"dedupe":  "POST /v1/dedupe",
+			"health":  "GET /health",
+			"metrics": "GET /metrics",
 		},
 	})
 }
@@ -362,6 +372,9 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 			LatencyMs:    latency.Milliseconds(),
 		},
 	}
+
+	// Record dedup-specific metrics
+	s.metrics.RecordDedup("/v1/dedupe", len(req.Chunks), len(representatives), clusterResult.ClusterCount)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
