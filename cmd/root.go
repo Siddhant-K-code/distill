@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -49,6 +50,7 @@ func init() {
 }
 
 // initConfig reads in config file and ENV variables if set.
+// Config loading priority: CLI flags > environment variables > config file > defaults.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -59,12 +61,17 @@ func initConfig() {
 		}
 		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".distill")
+		viper.SetConfigName("distill")
 	}
 
-	// Read environment variables
-	viper.SetEnvPrefix("PINECONE")
+	// Read environment variables with DISTILL_ prefix
+	viper.SetEnvPrefix("DISTILL")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+
+	// Also check for PINECONE_API_KEY without prefix
+	_ = viper.BindEnv("pinecone_api_key", "PINECONE_API_KEY")
+	_ = viper.BindEnv("openai_api_key", "OPENAI_API_KEY")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err == nil {

@@ -61,9 +61,18 @@ func init() {
 	serveCmd.Flags().Float64("lambda", 0.5, "MMR lambda (relevance vs diversity)")
 	serveCmd.Flags().Bool("enable-mmr", true, "Enable MMR re-ranking")
 
-	// Bind to viper
-	_ = viper.BindPFlag("serve.port", serveCmd.Flags().Lookup("port"))
-	_ = viper.BindPFlag("serve.host", serveCmd.Flags().Lookup("host"))
+	// Bind to viper for config file support
+	_ = viper.BindPFlag("server.port", serveCmd.Flags().Lookup("port"))
+	_ = viper.BindPFlag("server.host", serveCmd.Flags().Lookup("host"))
+	_ = viper.BindPFlag("retriever.backend", serveCmd.Flags().Lookup("backend"))
+	_ = viper.BindPFlag("retriever.index", serveCmd.Flags().Lookup("index"))
+	_ = viper.BindPFlag("retriever.namespace", serveCmd.Flags().Lookup("namespace"))
+	_ = viper.BindPFlag("embedding.model", serveCmd.Flags().Lookup("embedding-model"))
+	_ = viper.BindPFlag("retriever.top_k", serveCmd.Flags().Lookup("over-fetch-k"))
+	_ = viper.BindPFlag("retriever.target_k", serveCmd.Flags().Lookup("target-k"))
+	_ = viper.BindPFlag("dedup.threshold", serveCmd.Flags().Lookup("threshold"))
+	_ = viper.BindPFlag("dedup.lambda", serveCmd.Flags().Lookup("lambda"))
+	_ = viper.BindPFlag("dedup.enable_mmr", serveCmd.Flags().Lookup("enable-mmr"))
 }
 
 // Server holds the HTTP server state.
@@ -117,21 +126,24 @@ type StatsResponse struct {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	// Get flags
-	port, _ := cmd.Flags().GetInt("port")
-	host, _ := cmd.Flags().GetString("host")
-	backend, _ := cmd.Flags().GetString("backend")
-	index, _ := cmd.Flags().GetString("index")
+	// Config file values are used as fallbacks via viper bindings
+	port := viper.GetInt("server.port")
+	host := viper.GetString("server.host")
+	backend := viper.GetString("retriever.backend")
+	index := viper.GetString("retriever.index")
 	apiKey, _ := cmd.Flags().GetString("api-key")
 	dbHost, _ := cmd.Flags().GetString("db-host")
-	namespace, _ := cmd.Flags().GetString("namespace")
+	if dbHost == "" {
+		dbHost = viper.GetString("retriever.host")
+	}
+	namespace := viper.GetString("retriever.namespace")
 	openaiKey, _ := cmd.Flags().GetString("openai-key")
-	embeddingModel, _ := cmd.Flags().GetString("embedding-model")
-	overFetchK, _ := cmd.Flags().GetInt("over-fetch-k")
-	targetK, _ := cmd.Flags().GetInt("target-k")
-	threshold, _ := cmd.Flags().GetFloat64("threshold")
-	lambda, _ := cmd.Flags().GetFloat64("lambda")
-	enableMMR, _ := cmd.Flags().GetBool("enable-mmr")
+	embeddingModel := viper.GetString("embedding.model")
+	overFetchK := viper.GetInt("retriever.top_k")
+	targetK := viper.GetInt("retriever.target_k")
+	threshold := viper.GetFloat64("dedup.threshold")
+	lambda := viper.GetFloat64("dedup.lambda")
+	enableMMR := viper.GetBool("dedup.enable_mmr")
 
 	// Resolve API keys from environment
 	if apiKey == "" {

@@ -15,6 +15,7 @@ import (
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var apiCmd = &cobra.Command{
@@ -41,6 +42,11 @@ func init() {
 	apiCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or use OPENAI_API_KEY)")
 	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
 	apiCmd.Flags().String("api-keys", "", "Comma-separated list of valid API keys (or use DISTILL_API_KEYS)")
+
+	// Bind to viper for config file support
+	_ = viper.BindPFlag("server.port", apiCmd.Flags().Lookup("port"))
+	_ = viper.BindPFlag("server.host", apiCmd.Flags().Lookup("host"))
+	_ = viper.BindPFlag("embedding.model", apiCmd.Flags().Lookup("embedding-model"))
 }
 
 // DedupeRequest is the JSON request body for /v1/dedupe.
@@ -90,10 +96,11 @@ type APIServer struct {
 }
 
 func runAPI(cmd *cobra.Command, args []string) error {
-	port, _ := cmd.Flags().GetInt("port")
-	host, _ := cmd.Flags().GetString("host")
+	// Config file values are used as fallbacks via viper bindings
+	port := viper.GetInt("server.port")
+	host := viper.GetString("server.host")
 	openaiKey, _ := cmd.Flags().GetString("openai-key")
-	embeddingModel, _ := cmd.Flags().GetString("embedding-model")
+	embeddingModel := viper.GetString("embedding.model")
 	apiKeysStr, _ := cmd.Flags().GetString("api-keys")
 
 	// Resolve from environment

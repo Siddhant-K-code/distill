@@ -210,9 +210,60 @@ distill mcp       # Start MCP server for AI assistants
 distill analyze   # Analyze a file for duplicates
 distill sync      # Upload vectors to Pinecone with dedup
 distill query     # Test a query from command line
+distill config    # Manage configuration files
 ```
 
 ## Configuration
+
+### Config File
+
+Distill supports a `distill.yaml` configuration file for persistent settings. Generate a template:
+
+```bash
+distill config init              # Creates distill.yaml in current directory
+distill config init --stdout     # Print template to stdout
+distill config validate          # Validate existing config file
+```
+
+Config file search order: `./distill.yaml`, `$HOME/distill.yaml`.
+
+**Priority:** CLI flags > environment variables > config file > defaults.
+
+Example `distill.yaml`:
+
+```yaml
+server:
+  port: 8080
+  host: 0.0.0.0
+  read_timeout: 30s
+  write_timeout: 60s
+
+embedding:
+  provider: openai
+  model: text-embedding-3-small
+  batch_size: 100
+
+dedup:
+  threshold: 0.15
+  method: agglomerative
+  linkage: average
+  lambda: 0.5
+  enable_mmr: true
+
+retriever:
+  backend: pinecone    # pinecone or qdrant
+  index: my-index
+  host: ""             # required for qdrant
+  namespace: ""
+  top_k: 50
+  target_k: 8
+
+auth:
+  api_keys:
+    - ${DISTILL_API_KEY}
+```
+
+Environment variables can be referenced using `${VAR}` or `${VAR:-default}` syntax.
 
 ### Environment Variables
 
