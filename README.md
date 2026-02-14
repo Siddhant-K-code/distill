@@ -403,27 +403,52 @@ scrape_configs:
 
 Import the included dashboard from `grafana/dashboard.json` or use dashboard UID `distill-overview`.
 
+## Pipeline Modules
+
+### Compression (`pkg/compress`)
+
+Reduces token count while preserving meaning. Three strategies:
+
+- **Extractive** — Scores sentences by position, keyword density, and length; keeps the most salient spans
+- **Placeholder** — Replaces verbose JSON, XML, and table outputs with compact structural summaries
+- **Pruner** — Strips filler phrases, redundant qualifiers, and boilerplate patterns
+
+Strategies can be chained via `compress.Pipeline`. Configure with target reduction ratio (e.g., 0.3 = keep 30% of original).
+
+### Cache (`pkg/cache`)
+
+KV cache for repeated context patterns (system prompts, tool definitions, boilerplate). Sub-millisecond retrieval for cache hits.
+
+- **MemoryCache** — In-memory LRU with TTL, configurable size limits (entries and bytes), background cleanup
+- **PatternDetector** — Identifies cacheable content: system prompts, tool/function definitions, code blocks
+- **RedisCache** — Interface for distributed deployments (requires external Redis)
+
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Your App                           │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│                      Distill                            │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
-│  │ Fetch   │→ │ Cluster │→ │ Select  │→ │  MMR    │    │
-│  │  50     │  │   12    │  │   12    │  │   8     │    │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │
-│       2ms         6ms         <1ms         3ms          │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│                       LLM                               │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                            Your App                                  │
+└──────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                             Distill                                  │
+│                                                                      │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌──────────┐  ┌─────────┐  │
+│  │  Cache  │→ │ Cluster │→ │ Select  │→ │ Compress │→ │  MMR    │  │
+│  │  check  │  │  dedup  │  │  best   │  │  prune   │  │ re-rank │  │
+│  └─────────┘  └─────────┘  └─────────┘  └──────────┘  └─────────┘  │
+│     <1ms          6ms         <1ms          2ms           3ms        │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │  /metrics (Prometheus)  ·  distill.yaml  ·  MCP server      │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                              LLM                                     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Supported Backends
