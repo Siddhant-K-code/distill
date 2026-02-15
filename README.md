@@ -8,11 +8,11 @@
 
 [![Build with Ona](https://ona.com/build-with-ona.svg)](https://app.ona.com/#https://github.com/siddhant-k-code/distill)
 
-**Reliable LLM outputs start with clean context.**
+**Context intelligence layer for AI agents.**
 
-A reliability layer for LLM context. Deterministic deduplication that removes redundancy before it reaches your model.
+Deduplicates, compresses, and manages context across sessions - so your agents produce reliable, deterministic outputs. Today: a dedup pipeline with ~12ms overhead. Next: persistent context memory, code change impact graphs, and session-aware context windows.
 
-Less redundant data. Lower costs. Faster responses. More efficient & deterministic results.
+Less redundant data. Lower costs. Faster responses. Deterministic results.
 
 **[Learn more →](https://distill.siddhantkhare.com)**
 
@@ -212,6 +212,16 @@ distill sync      # Upload vectors to Pinecone with dedup
 distill query     # Test a query from command line
 distill config    # Manage configuration files
 ```
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/dedupe` | Deduplicate chunks |
+| POST | `/v1/dedupe/stream` | SSE streaming dedup with per-stage progress |
+| POST | `/v1/retrieve` | Query vector DB with dedup (requires backend) |
+| GET | `/health` | Health check |
+| GET | `/metrics` | Prometheus metrics |
 
 ## Configuration
 
@@ -465,21 +475,28 @@ KV cache for repeated context patterns (system prompts, tool definitions, boiler
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                            Your App                                  │
+│                         Your App / Agent                             │
 └──────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                             Distill                                  │
 │                                                                      │
+│  Dedup Pipeline (shipped)                                            │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌──────────┐  ┌─────────┐  │
 │  │  Cache  │→ │ Cluster │→ │ Select  │→ │ Compress │→ │  MMR    │  │
 │  │  check  │  │  dedup  │  │  best   │  │  prune   │  │ re-rank │  │
 │  └─────────┘  └─────────┘  └─────────┘  └──────────┘  └─────────┘  │
 │     <1ms          6ms         <1ms          2ms           3ms        │
 │                                                                      │
+│  Context Intelligence (planned)                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
+│  │ Memory Store │  │ Impact Graph │  │ Session Context Windows  │   │
+│  │  (#29)       │  │  (#30)       │  │  (#31)                   │   │
+│  └──────────────┘  └──────────────┘  └──────────────────────────┘   │
+│                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐    │
-│  │  /metrics (Prometheus)  ·  distill.yaml  ·  MCP server      │    │
+│  │  /metrics (Prometheus)  ·  OTEL tracing  ·  MCP server      │    │
 │  └──────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────────┘
                                   │
@@ -500,7 +517,38 @@ KV cache for repeated context patterns (system prompts, tool definitions, boiler
 - **Code Assistants** - Dedupe context from multiple files/repos
 - **RAG Pipelines** - Remove redundant chunks before LLM
 - **Agent Workflows** - Clean up tool outputs + memory + docs
-- **Enterprise** - Deterministic outputs for compliance
+- **Incident Triage** - Find similar past changes that caused outages
+- **Code Review** - Blast radius analysis for PRs
+- **Enterprise** - Deterministic outputs with source attribution
+
+## Roadmap
+
+Distill is evolving from a dedup utility into a context intelligence layer. Here's what's next:
+
+### Context Memory
+
+| Feature | Issue | Description |
+|---------|-------|-------------|
+| **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay (full text -> summary -> keywords -> evicted), token-budgeted recall. |
+| **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Stateful context windows for long-running agents. Push context incrementally, Distill keeps it deduplicated and within budget. |
+
+### Code Intelligence
+
+| Feature | Issue | Description |
+|---------|-------|-------------|
+| **Change Impact Graph** | [#30](https://github.com/Siddhant-K-code/distill/issues/30) | Dependency graph + co-change patterns from git history. "This PR changes auth/jwt.go - here's the blast radius." |
+| **Semantic Commit Analysis** | [#32](https://github.com/Siddhant-K-code/distill/issues/32) | Find similar past changes, predict incidents. "This diff is 82% similar to the one that caused outage #47." |
+
+### Infrastructure
+
+| Feature | Issue | Description |
+|---------|-------|-------------|
+| **Multi-Provider Embeddings** | [#33](https://github.com/Siddhant-K-code/distill/issues/33) | Ollama, Azure OpenAI, Cohere, HuggingFace. Swap providers via config. |
+| **Batch API** | [#11](https://github.com/Siddhant-K-code/distill/issues/11) | Async batch processing for large workloads. |
+| **Python SDK** | [#5](https://github.com/Siddhant-K-code/distill/issues/5) | `pip install distill-ai` with LangChain/LlamaIndex integrations. |
+| **OpenAPI Spec** | [#23](https://github.com/Siddhant-K-code/distill/issues/23) | Swagger UI at `/docs`, auto-generated client SDKs. |
+
+See all open issues: [github.com/Siddhant-K-code/distill/issues](https://github.com/Siddhant-K-code/distill/issues)
 
 ## Why not just use an LLM?
 
@@ -520,21 +568,21 @@ Use LLMs for reasoning. Use deterministic algorithms for reliability.
 
 Works with your existing AI stack:
 
-- **LLM Providers:** OpenAI, Anthropic
-- **Frameworks:** LangChain, LlamaIndex
-- **Vector DBs:** Pinecone, Qdrant, Weaviate, Chroma, pgvector
-- **Tools:** Cursor, Lovable, and more
+- **LLM Providers:** OpenAI, Anthropic (more via [#33](https://github.com/Siddhant-K-code/distill/issues/33))
+- **Frameworks:** LangChain, LlamaIndex (SDKs planned: [#5](https://github.com/Siddhant-K-code/distill/issues/5))
+- **Vector DBs:** Pinecone, Qdrant
+- **AI Assistants:** Claude Desktop, Cursor (via MCP)
+- **Observability:** Prometheus, Grafana, OpenTelemetry (Jaeger, Tempo)
 
 ## Contributing
 
-Contributions welcome! Please read the contributing guidelines first.
+Contributions welcome! Check the [open issues](https://github.com/Siddhant-K-code/distill/issues) for things to work on.
 
 ```bash
-# Run tests
-go test ./...
-
-# Build
+git clone https://github.com/Siddhant-K-code/distill.git
+cd distill
 go build -o distill .
+go test ./...
 ```
 
 ## License
@@ -546,6 +594,8 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 ## Links
 
 - [Website](https://distill.siddhantkhare.com)
-- [LinkedIn](https://www.linkedin.com/in/siddhantkhare24)
+- [Playground](https://distill.siddhantkhare.com/playground)
+- [Blog Post](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
+- [Book a Demo](https://meet.siddhantkhare.com)
 
