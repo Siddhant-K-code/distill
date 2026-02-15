@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestInit_Disabled(t *testing.T) {
@@ -90,7 +91,7 @@ func TestInit_SampleRate(t *testing.T) {
 
 func TestShutdown_NilProvider(t *testing.T) {
 	p := &Provider{
-		tracer: trace.NewNoopTracerProvider().Tracer(tracerName),
+		tracer: noop.NewTracerProvider().Tracer(tracerName),
 	}
 	if err := p.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown should not error on nil provider: %v", err)

@@ -17,6 +17,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const tracerName = "github.com/Siddhant-K-code/distill"
@@ -67,7 +68,7 @@ func Init(ctx context.Context, cfg Config) (*Provider, error) {
 	if !cfg.Enabled {
 		// Return a no-op provider
 		return &Provider{
-			tracer: trace.NewNoopTracerProvider().Tracer(tracerName),
+			tracer: noop.NewTracerProvider().Tracer(tracerName),
 		}, nil
 	}
 
@@ -93,7 +94,7 @@ func Init(ctx context.Context, cfg Config) (*Provider, error) {
 		}
 	case "none", "":
 		return &Provider{
-			tracer: trace.NewNoopTracerProvider().Tracer(tracerName),
+			tracer: noop.NewTracerProvider().Tracer(tracerName),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported exporter: %q (supported: otlp, stdout, none)", cfg.Exporter)
