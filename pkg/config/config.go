@@ -20,6 +20,7 @@ type Config struct {
 	Dedup     DedupConfig     `mapstructure:"dedup"`
 	Retriever RetrieverConfig `mapstructure:"retriever"`
 	Auth      AuthConfig      `mapstructure:"auth"`
+	Telemetry TelemetryConfig `mapstructure:"telemetry"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -61,6 +62,20 @@ type AuthConfig struct {
 	APIKeys []string `mapstructure:"api_keys"`
 }
 
+// TelemetryConfig holds observability settings.
+type TelemetryConfig struct {
+	Tracing TracingConfig `mapstructure:"tracing"`
+}
+
+// TracingConfig holds OpenTelemetry tracing settings.
+type TracingConfig struct {
+	Enabled    bool    `mapstructure:"enabled"`
+	Exporter   string  `mapstructure:"exporter"`
+	Endpoint   string  `mapstructure:"endpoint"`
+	SampleRate float64 `mapstructure:"sample_rate"`
+	Insecure   bool    `mapstructure:"insecure"`
+}
+
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
@@ -89,6 +104,15 @@ func DefaultConfig() *Config {
 		},
 		Auth: AuthConfig{
 			APIKeys: []string{},
+		},
+		Telemetry: TelemetryConfig{
+			Tracing: TracingConfig{
+				Enabled:    false,
+				Exporter:   "otlp",
+				Endpoint:   "localhost:4317",
+				SampleRate: 1.0,
+				Insecure:   true,
+			},
 		},
 	}
 }
@@ -178,6 +202,15 @@ func Validate(cfg *Config) error {
 		errs = append(errs, "retriever.target_k: must be non-negative")
 	}
 
+	// Telemetry validation
+	validExporters := map[string]bool{"otlp": true, "stdout": true, "none": true, "": true}
+	if !validExporters[cfg.Telemetry.Tracing.Exporter] {
+		errs = append(errs, fmt.Sprintf("telemetry.tracing.exporter: unsupported exporter %q (supported: otlp, stdout, none)", cfg.Telemetry.Tracing.Exporter))
+	}
+	if cfg.Telemetry.Tracing.SampleRate < 0 || cfg.Telemetry.Tracing.SampleRate > 1 {
+		errs = append(errs, fmt.Sprintf("telemetry.tracing.sample_rate: must be between 0 and 1, got %f", cfg.Telemetry.Tracing.SampleRate))
+	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("configuration errors:\n  - %s", strings.Join(errs, "\n  - "))
 	}
@@ -229,6 +262,9 @@ func interpolateConfig(cfg *Config) {
 	for i, key := range cfg.Auth.APIKeys {
 		cfg.Auth.APIKeys[i] = InterpolateEnv(key)
 	}
+
+	cfg.Telemetry.Tracing.Exporter = InterpolateEnv(cfg.Telemetry.Tracing.Exporter)
+	cfg.Telemetry.Tracing.Endpoint = InterpolateEnv(cfg.Telemetry.Tracing.Endpoint)
 }
 
 // GenerateTemplate returns a YAML template string with all available
@@ -267,5 +303,13 @@ retriever:
 auth:
   api_keys:
     # - ${DISTILL_API_KEY}
+
+telemetry:
+  tracing:
+    enabled: false
+    exporter: otlp       # otlp, stdout, or none
+    endpoint: localhost:4317
+    sample_rate: 1.0     # 0.0 to 1.0
+    insecure: true
 `
 }

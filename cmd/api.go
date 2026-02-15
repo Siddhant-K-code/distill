@@ -14,6 +14,7 @@ import (
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
+	"github.com/Siddhant-K-code/distill/pkg/telemetry"
 	"github.com/Siddhant-K-code/distill/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -95,6 +96,7 @@ type APIServer struct {
 	validKeys map[string]bool
 	hasAuth   bool
 	metrics   *metrics.Metrics
+	tracing   *telemetry.Provider
 }
 
 func runAPI(cmd *cobra.Command, args []string) error {
@@ -139,11 +141,35 @@ func runAPI(cmd *cobra.Command, args []string) error {
 
 	m := metrics.New()
 
+	// Initialize tracing
+	tracingCfg := telemetry.DefaultConfig()
+	tracingCfg.Enabled = viper.GetBool("telemetry.tracing.enabled")
+	if ep := viper.GetString("telemetry.tracing.endpoint"); ep != "" {
+		tracingCfg.Endpoint = ep
+	}
+	if exp := viper.GetString("telemetry.tracing.exporter"); exp != "" {
+		tracingCfg.Exporter = exp
+	}
+	if sr := viper.GetFloat64("telemetry.tracing.sample_rate"); sr > 0 {
+		tracingCfg.SampleRate = sr
+	}
+
+	tp, err := telemetry.Init(context.Background(), tracingCfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = tp.Shutdown(shutdownCtx)
+	}()
+
 	server := &APIServer{
 		embedder:  embedder,
 		validKeys: validKeys,
 		hasAuth:   len(validKeys) > 0,
 		metrics:   m,
+		tracing:   tp,
 	}
 
 	// Setup routes
@@ -266,6 +292,10 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Start root tracing span
+	ctx, rootSpan := s.tracing.StartRequest(r.Context(), "/v1/dedupe")
+	defer rootSpan.End()
+
 	start := time.Now()
 
 	// Convert to internal types
@@ -291,16 +321,20 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		_, embSpan := s.tracing.StartEmbedding(ctx, len(chunks))
 		texts := make([]string, len(chunks))
 		for i, c := range chunks {
 			texts[i] = c.Text
 		}
 
-		embeddings, err := s.embedder.EmbedBatch(r.Context(), texts)
+		embeddings, err := s.embedder.EmbedBatch(ctx, texts)
 		if err != nil {
+			telemetry.RecordError(embSpan, err)
+			embSpan.End()
 			http.Error(w, fmt.Sprintf("Failed to generate embeddings: %v", err), http.StatusInternalServerError)
 			return
 		}
+		embSpan.End()
 
 		for i := range chunks {
 			chunks[i].Embedding = embeddings[i]
@@ -322,29 +356,38 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cluster
+	_, clusterSpan := s.tracing.StartClustering(ctx, len(chunks), threshold)
 	clusterer := contextlab.NewClusterer(contextlab.ClusterConfig{
 		Threshold: threshold,
 		Linkage:   "average",
 	})
 	clusterResult := clusterer.Cluster(chunks)
+	clusterSpan.End()
 
 	// Select representatives
+	_, selectSpan := s.tracing.StartSelection(ctx, clusterResult.ClusterCount)
 	selectorCfg := contextlab.DefaultSelectorConfig()
 	selectorCfg.Strategy = contextlab.SelectByScore
 	selector := contextlab.NewSelector(selectorCfg)
 	representatives := selector.Select(clusterResult)
+	selectSpan.End()
 
 	// Apply MMR if we have more representatives than target
 	if targetK > 0 && len(representatives) > targetK {
+		_, mmrSpan := s.tracing.StartMMR(ctx, len(representatives), lambda)
 		mmrCfg := contextlab.MMRConfig{
 			Lambda:  lambda,
 			TargetK: targetK,
 		}
 		mmr := contextlab.NewMMR(mmrCfg)
 		representatives = mmr.Rerank(representatives)
+		mmrSpan.End()
 	}
 
 	latency := time.Since(start)
+
+	// Record result on root span
+	telemetry.RecordResult(rootSpan, len(req.Chunks), len(representatives), clusterResult.ClusterCount, latency)
 
 	// Build response
 	outputChunks := make([]DedupeChunkResponse, len(representatives))

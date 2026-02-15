@@ -14,6 +14,7 @@ import (
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
 	"github.com/Siddhant-K-code/distill/pkg/retriever"
+	"github.com/Siddhant-K-code/distill/pkg/telemetry"
 	pcretriever "github.com/Siddhant-K-code/distill/pkg/retriever/pinecone"
 	qdretriever "github.com/Siddhant-K-code/distill/pkg/retriever/qdrant"
 	"github.com/Siddhant-K-code/distill/pkg/types"
@@ -81,6 +82,7 @@ type Server struct {
 	broker  *contextlab.Broker
 	cfg     ServerConfig
 	metrics *metrics.Metrics
+	tracing *telemetry.Provider
 }
 
 // ServerConfig holds server configuration.
@@ -236,6 +238,29 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	m := metrics.New()
 
+	// Initialize tracing
+	tracingCfg := telemetry.DefaultConfig()
+	tracingCfg.Enabled = viper.GetBool("telemetry.tracing.enabled")
+	if ep := viper.GetString("telemetry.tracing.endpoint"); ep != "" {
+		tracingCfg.Endpoint = ep
+	}
+	if exp := viper.GetString("telemetry.tracing.exporter"); exp != "" {
+		tracingCfg.Exporter = exp
+	}
+	if sr := viper.GetFloat64("telemetry.tracing.sample_rate"); sr > 0 {
+		tracingCfg.SampleRate = sr
+	}
+
+	tp, err := telemetry.Init(context.Background(), tracingCfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = tp.Shutdown(shutdownCtx)
+	}()
+
 	// Create server
 	server := &Server{
 		broker: broker,
@@ -244,6 +269,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Port: port,
 		},
 		metrics: m,
+		tracing: tp,
 	}
 
 	// Setup routes
@@ -346,12 +372,20 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		s.broker.SetConfig(cfg)
 	}
 
+	// Start tracing span
+	ctx, rootSpan := s.tracing.StartRequest(r.Context(), "/v1/retrieve")
+	defer rootSpan.End()
+
 	// Execute retrieval
-	result, err := s.broker.Retrieve(r.Context(), retrievalReq)
+	result, err := s.broker.Retrieve(ctx, retrievalReq)
 	if err != nil {
+		telemetry.RecordError(rootSpan, err)
 		http.Error(w, fmt.Sprintf("Retrieval failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	// Record result on root span
+	telemetry.RecordResult(rootSpan, result.Stats.Retrieved, result.Stats.Returned, result.Stats.Clustered, result.Stats.TotalLatency)
 
 	// Build response
 	chunks := make([]ChunkResponse, len(result.Chunks))

@@ -403,6 +403,44 @@ scrape_configs:
 
 Import the included dashboard from `grafana/dashboard.json` or use dashboard UID `distill-overview`.
 
+### OpenTelemetry Tracing
+
+Distill supports distributed tracing via OpenTelemetry. Each pipeline stage (embedding, clustering, selection, MMR) is instrumented as a separate span.
+
+Enable via `distill.yaml`:
+
+```yaml
+telemetry:
+  tracing:
+    enabled: true
+    exporter: otlp         # otlp, stdout, or none
+    endpoint: localhost:4317
+    sample_rate: 1.0
+    insecure: true
+```
+
+Or via environment variables:
+
+```bash
+export DISTILL_TELEMETRY_TRACING_ENABLED=true
+export DISTILL_TELEMETRY_TRACING_ENDPOINT=localhost:4317
+```
+
+Spans emitted per request:
+
+| Span | Attributes |
+|------|------------|
+| `distill.request` | endpoint |
+| `distill.embedding` | chunk_count |
+| `distill.clustering` | input_count, threshold |
+| `distill.selection` | cluster_count |
+| `distill.mmr` | input_count, lambda |
+| `distill.retrieval` | top_k, backend |
+
+Result attributes (`distill.result.*`) are added to the root span: input_count, output_count, cluster_count, latency_ms, reduction_ratio.
+
+W3C Trace Context propagation is enabled by default for cross-service tracing.
+
 ## Pipeline Modules
 
 ### Compression (`pkg/compress`)
