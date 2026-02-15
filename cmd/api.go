@@ -14,6 +14,7 @@ import (
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
+	"github.com/Siddhant-K-code/distill/pkg/sse"
 	"github.com/Siddhant-K-code/distill/pkg/telemetry"
 	"github.com/Siddhant-K-code/distill/pkg/types"
 	"github.com/spf13/cobra"
@@ -175,6 +176,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	// Setup routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/dedupe", m.Middleware("/v1/dedupe", server.handleDedupe))
+	mux.HandleFunc("/v1/dedupe/stream", m.Middleware("/v1/dedupe/stream", server.handleDedupeStream))
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
@@ -219,6 +221,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("Endpoints:")
 	fmt.Printf("  POST http://%s/v1/dedupe\n", addr)
+	fmt.Printf("  POST http://%s/v1/dedupe/stream\n", addr)
 	fmt.Printf("  GET  http://%s/health\n", addr)
 	fmt.Printf("  GET  http://%s/metrics\n", addr)
 	fmt.Println()
@@ -254,9 +257,10 @@ func (s *APIServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 		"version": "1.0.0",
 		"docs":    "https://distill.siddhantkhare.com/docs",
 		"endpoints": map[string]string{
-			"dedupe":  "POST /v1/dedupe",
-			"health":  "GET /health",
-			"metrics": "GET /metrics",
+			"dedupe":        "POST /v1/dedupe",
+			"dedupe_stream": "POST /v1/dedupe/stream",
+			"health":        "GET /health",
+			"metrics":       "GET /metrics",
 		},
 	})
 }
@@ -421,6 +425,192 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check auth if enabled
+	if s.hasAuth {
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			http.Error(w, "Authorization header required", http.StatusUnauthorized)
+			return
+		}
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if !s.validKeys[token] {
+			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	var req DedupeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Chunks) == 0 {
+		http.Error(w, "At least one chunk is required", http.StatusBadRequest)
+		return
+	}
+
+	// Initialize SSE writer
+	sw := sse.NewWriter(w)
+	if sw == nil {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, rootSpan := s.tracing.StartRequest(r.Context(), "/v1/dedupe/stream")
+	defer rootSpan.End()
+
+	start := time.Now()
+
+	// Convert to internal types
+	chunks := make([]types.Chunk, len(req.Chunks))
+	needsEmbedding := false
+
+	for i, c := range req.Chunks {
+		chunks[i] = types.Chunk{
+			ID:        c.ID,
+			Text:      c.Text,
+			Embedding: c.Embedding,
+			Score:     c.Score,
+		}
+		if len(c.Embedding) == 0 {
+			needsEmbedding = true
+		}
+	}
+
+	// Stage 1: Embedding
+	if needsEmbedding {
+		if s.embedder == nil {
+			_ = sw.SendError(sse.StageEmbedding, "Embeddings required but no embedding provider configured. Either provide embeddings in request or configure OPENAI_API_KEY.")
+			return
+		}
+
+		_ = sw.SendProgress(sse.StageEmbedding, 0)
+
+		_, embSpan := s.tracing.StartEmbedding(ctx, len(chunks))
+		texts := make([]string, len(chunks))
+		for i, c := range chunks {
+			texts[i] = c.Text
+		}
+
+		embeddings, err := s.embedder.EmbedBatch(ctx, texts)
+		if err != nil {
+			telemetry.RecordError(embSpan, err)
+			embSpan.End()
+			_ = sw.SendError(sse.StageEmbedding, fmt.Sprintf("Failed to generate embeddings: %v", err))
+			return
+		}
+		embSpan.End()
+
+		for i := range chunks {
+			chunks[i].Embedding = embeddings[i]
+		}
+
+		_ = sw.SendProgress(sse.StageEmbedding, 1.0)
+	}
+
+	// Set defaults
+	threshold := req.Threshold
+	if threshold <= 0 {
+		threshold = 0.15
+	}
+	lambda := req.Lambda
+	if lambda <= 0 {
+		lambda = 0.5
+	}
+	targetK := req.TargetK
+	if targetK <= 0 {
+		targetK = 0
+	}
+
+	// Stage 2: Clustering
+	_ = sw.SendProgress(sse.StageClustering, 0)
+
+	_, clusterSpan := s.tracing.StartClustering(ctx, len(chunks), threshold)
+	clusterer := contextlab.NewClusterer(contextlab.ClusterConfig{
+		Threshold: threshold,
+		Linkage:   "average",
+	})
+	clusterResult := clusterer.Cluster(chunks)
+	clusterSpan.End()
+
+	_ = sw.SendProgressWithStats(sse.StageClustering, 1.0, map[string]interface{}{
+		"clusters_formed": clusterResult.ClusterCount,
+		"input_count":     len(chunks),
+	})
+
+	// Stage 3: Selection
+	_ = sw.SendProgress(sse.StageSelection, 0)
+
+	_, selectSpan := s.tracing.StartSelection(ctx, clusterResult.ClusterCount)
+	selectorCfg := contextlab.DefaultSelectorConfig()
+	selectorCfg.Strategy = contextlab.SelectByScore
+	selector := contextlab.NewSelector(selectorCfg)
+	representatives := selector.Select(clusterResult)
+	selectSpan.End()
+
+	_ = sw.SendProgressWithStats(sse.StageSelection, 1.0, map[string]interface{}{
+		"selected": len(representatives),
+	})
+
+	// Stage 4: MMR (if needed)
+	if targetK > 0 && len(representatives) > targetK {
+		_ = sw.SendProgress(sse.StageMMR, 0)
+
+		_, mmrSpan := s.tracing.StartMMR(ctx, len(representatives), lambda)
+		mmrCfg := contextlab.MMRConfig{
+			Lambda:  lambda,
+			TargetK: targetK,
+		}
+		mmr := contextlab.NewMMR(mmrCfg)
+		representatives = mmr.Rerank(representatives)
+		mmrSpan.End()
+
+		_ = sw.SendProgressWithStats(sse.StageMMR, 1.0, map[string]interface{}{
+			"output_count": len(representatives),
+		})
+	}
+
+	latency := time.Since(start)
+
+	telemetry.RecordResult(rootSpan, len(req.Chunks), len(representatives), clusterResult.ClusterCount, latency)
+
+	// Build response chunks
+	outputChunks := make([]DedupeChunkResponse, len(representatives))
+	for i, c := range representatives {
+		outputChunks[i] = DedupeChunkResponse{
+			ID:        c.ID,
+			Text:      c.Text,
+			Score:     c.Score,
+			ClusterID: c.ClusterID,
+		}
+	}
+
+	reductionPct := 0
+	if len(req.Chunks) > 0 {
+		reductionPct = int((1 - float64(len(representatives))/float64(len(req.Chunks))) * 100)
+	}
+
+	stats := DedupeStats{
+		InputCount:   len(req.Chunks),
+		OutputCount:  len(representatives),
+		ClusterCount: clusterResult.ClusterCount,
+		ReductionPct: reductionPct,
+		LatencyMs:    latency.Milliseconds(),
+	}
+
+	s.metrics.RecordDedup("/v1/dedupe/stream", len(req.Chunks), len(representatives), clusterResult.ClusterCount)
+
+	// Send final complete event
+	_ = sw.SendComplete(outputChunks, stats)
 }
 
 func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
