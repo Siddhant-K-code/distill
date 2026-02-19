@@ -213,6 +213,75 @@ distill query     # Test a query from command line
 distill config    # Manage configuration files
 ```
 
+## Shell Completions
+
+Distill can generate shell completion scripts for Bash, Zsh, Fish, and PowerShell.
+
+If you installed via GitHub Releases, the extracted archive includes pre-generated scripts under `completions/`.
+Otherwise, generate them using `distill completion <shell>`.
+
+### Zsh
+
+```sh
+mkdir -p ~/.zsh/completions
+distill completion zsh > ~/.zsh/completions/_distill
+```
+
+Add this to `~/.zshrc`:
+
+```zsh
+# Distill completions
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+Reload:
+
+```sh
+exec zsh
+```
+
+### Bash
+
+```sh
+sudo mkdir -p /etc/bash_completion.d
+distill completion bash | sudo tee /etc/bash_completion.d/distill >/dev/null
+```
+
+Reload:
+
+```sh
+exec bash
+```
+
+### Fish
+
+```sh
+mkdir -p ~/.config/fish/completions
+distill completion fish > ~/.config/fish/completions/distill.fish
+exec fish
+```
+
+### PowerShell
+
+Add to your PowerShell profile:
+
+```powershell
+distill completion powershell | Out-String | Invoke-Expression
+```
+
+To open/edit your profile:
+
+```powershell
+notepad $PROFILE
+```
+
+### Quick verification
+
+```sh
+distill <TAB>
+```
+
 ## API Endpoints
 
 | Method | Path | Description |
