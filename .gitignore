@@ -28,3 +28,4 @@ Thumbs.db
 # Build
 dist/
 build/
+completions
