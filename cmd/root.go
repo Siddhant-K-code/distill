@@ -41,6 +41,9 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	// Disable the default cobra completion command to avoid duplicate name conflict.
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.distill.yaml)")
 	rootCmd.PersistentFlags().Bool("verbose", false, "enable verbose output")
