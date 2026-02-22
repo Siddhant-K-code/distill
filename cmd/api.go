@@ -173,10 +173,28 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		tracing:   tp,
 	}
 
+	// Setup memory store
+	memDBPath := viper.GetString("memory.db_path")
+	if memDBPath == "" {
+		memDBPath = "distill-memory.db"
+	}
+	memThreshold := viper.GetFloat64("memory.dedup_threshold")
+	if memThreshold == 0 {
+		memThreshold = 0.15
+	}
+	memStore, err := memoryStoreFromConfig(memDBPath, memThreshold)
+	if err != nil {
+		return fmt.Errorf("failed to create memory store: %w", err)
+	}
+	defer memStore.Close()
+
+	memAPI := &MemoryAPI{store: memStore, embedder: embedder}
+
 	// Setup routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/dedupe", m.Middleware("/v1/dedupe", server.handleDedupe))
 	mux.HandleFunc("/v1/dedupe/stream", m.Middleware("/v1/dedupe/stream", server.handleDedupeStream))
+	memAPI.RegisterMemoryRoutes(mux, m.Middleware)
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
