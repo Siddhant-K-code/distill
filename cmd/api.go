@@ -186,7 +186,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create memory store: %w", err)
 	}
-	defer memStore.Close()
+	defer func() { _ = memStore.Close() }()
 
 	memAPI := &MemoryAPI{store: memStore, embedder: embedder}
 

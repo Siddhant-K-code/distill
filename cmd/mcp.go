@@ -150,7 +150,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create memory store: %w", err)
 	}
-	defer memStore.Close()
+	defer func() { _ = memStore.Close() }()
 
 	// Create MCP server wrapper
 	mcpSrv := &MCPServer{

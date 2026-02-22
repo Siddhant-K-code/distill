@@ -34,13 +34,13 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 
 	// Enable WAL mode for better concurrent read performance
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("set WAL mode: %w", err)
 	}
 
 	s := &SQLiteStore{db: db, cfg: cfg}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
@@ -141,7 +141,7 @@ func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (s
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id string
@@ -203,7 +203,7 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	if err != nil {
 		return nil, fmt.Errorf("query memories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var candidates []scored
 	now := time.Now()
@@ -371,7 +371,7 @@ func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var level, count int
 		if err := rows.Scan(&level, &count); err != nil {
@@ -385,7 +385,7 @@ func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows2.Close()
+	defer func() { _ = rows2.Close() }()
 	for rows2.Next() {
 		var source string
 		var count int

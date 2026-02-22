@@ -110,7 +110,7 @@ func runMemoryStore(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	entry := memory.StoreEntry{
 		Text:   text,
@@ -167,7 +167,7 @@ func runMemoryRecall(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	req := memory.RecallRequest{
 		Query:         query,
@@ -216,7 +216,7 @@ func runMemoryForget(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	result, err := store.Forget(context.Background(), memory.ForgetRequest{
 		Tags: tags,
@@ -236,7 +236,7 @@ func runMemoryStats(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	stats, err := store.Stats(context.Background())
 	if err != nil {

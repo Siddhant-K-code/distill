@@ -113,7 +113,7 @@ func (w *DecayWorker) decayRows(ctx context.Context, cutoff string, fromLevel, t
 		}
 		entries = append(entries, e)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	for _, e := range entries {
 		compressed := transform(e.text)
