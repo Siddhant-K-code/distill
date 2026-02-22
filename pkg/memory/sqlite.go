@@ -36,10 +36,16 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 	// and PRAGMAs are per-connection, so pin to a single connection.
 	db.SetMaxOpenConns(1)
 
-	// Enable WAL mode for better concurrent read performance
+	// WAL mode for better read performance if pool size increases later.
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("set WAL mode: %w", err)
+	}
+
+	// Enable foreign keys for CASCADE deletes on memory_tags.
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
 	s := &SQLiteStore{db: db, cfg: cfg}
@@ -76,10 +82,6 @@ func (s *SQLiteStore) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
 	CREATE INDEX IF NOT EXISTS idx_memories_referenced ON memories(last_referenced);
 	`
-	// Enable foreign keys for CASCADE deletes
-	if _, err := s.db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		return fmt.Errorf("enable foreign keys: %w", err)
-	}
 	_, err := s.db.Exec(schema)
 	return err
 }
@@ -158,6 +160,10 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 
 // findDuplicate scans existing embeddings and returns the ID of the first
 // entry within the dedup threshold. Returns "" if no duplicate found.
+//
+// TODO: This does a full table scan (O(n) per insert). Fine for < 10K entries.
+// At larger scale, consider an approximate nearest-neighbor index or caching
+// embeddings in memory.
 func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (string, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT id, embedding FROM memories WHERE embedding IS NOT NULL")
 	if err != nil {
@@ -377,6 +383,8 @@ func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetRes
 }
 
 // Stats returns memory store statistics.
+// Each query is scanned and closed before the next to avoid holding
+// the single SQLite connection across multiple result sets.
 func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 
 	stats := &Stats{
@@ -389,34 +397,44 @@ func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 		return nil, err
 	}
 
-	// By decay level
+	// By decay level - scan and close before next query
 	rows, err := s.db.QueryContext(ctx, "SELECT decay_level, COUNT(*) FROM memories GROUP BY decay_level")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var level, count int
 		if err := rows.Scan(&level, &count); err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
 		stats.ByDecayLevel[level] = count
 	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	_ = rows.Close()
 
-	// By source
-	rows2, err := s.db.QueryContext(ctx, "SELECT source, COUNT(*) FROM memories WHERE source != '' GROUP BY source")
+	// By source - scan and close before next query
+	rows, err = s.db.QueryContext(ctx, "SELECT source, COUNT(*) FROM memories WHERE source != '' GROUP BY source")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows2.Close() }()
-	for rows2.Next() {
+	for rows.Next() {
 		var source string
 		var count int
-		if err := rows2.Scan(&source, &count); err != nil {
+		if err := rows.Scan(&source, &count); err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
 		stats.BySource[source] = count
 	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	_ = rows.Close()
 
 	// Oldest and newest
 	var oldest, newest sql.NullString

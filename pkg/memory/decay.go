@@ -127,16 +127,18 @@ func (w *DecayWorker) decayRows(ctx context.Context, cutoff string, fromLevel, t
 	return nil
 }
 
+// summaryCompressor is reused across decay passes to avoid per-call allocation.
+var summaryCompressor = compress.NewExtractiveCompressor()
+
 // extractSummary produces a shortened version of the text using the
 // extractive compressor's sentence scorer for better quality summaries.
 func extractSummary(text string) string {
-	c := compress.NewExtractiveCompressor()
 	chunks := []types.Chunk{{ID: "decay", Text: text}}
 	opts := compress.Options{
 		TargetReduction: 0.2, // keep ~20% of content
 		MinChunkLength:  20,
 	}
-	result, _, _ := c.Compress(context.Background(), chunks, opts)
+	result, _, _ := summaryCompressor.Compress(context.Background(), chunks, opts)
 	if len(result) > 0 && result[0].Text != "" {
 		return result[0].Text
 	}
@@ -173,17 +175,19 @@ func extractKeywords(text string) string {
 	return strings.Join(keywords, ", ")
 }
 
+// stopWords is the set of common English stop words filtered during keyword extraction.
+var stopWords = map[string]bool{
+	"that": true, "this": true, "with": true, "from": true,
+	"have": true, "been": true, "were": true, "they": true,
+	"their": true, "which": true, "would": true, "there": true,
+	"about": true, "could": true, "other": true, "into": true,
+	"more": true, "some": true, "than": true, "them": true,
+	"very": true, "when": true, "what": true, "your": true,
+	"also": true, "each": true, "does": true, "will": true,
+	"just": true, "should": true, "because": true, "these": true,
+}
+
 // isStopWord returns true for common English stop words.
 func isStopWord(w string) bool {
-	stops := map[string]bool{
-		"that": true, "this": true, "with": true, "from": true,
-		"have": true, "been": true, "were": true, "they": true,
-		"their": true, "which": true, "would": true, "there": true,
-		"about": true, "could": true, "other": true, "into": true,
-		"more": true, "some": true, "than": true, "them": true,
-		"very": true, "when": true, "what": true, "your": true,
-		"also": true, "each": true, "does": true, "will": true,
-		"just": true, "should": true, "because": true, "these": true,
-	}
-	return stops[w]
+	return stopWords[w]
 }

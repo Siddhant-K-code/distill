@@ -258,5 +258,3 @@ func memoryStoreFromConfig(dbPath string, threshold float64) (*memory.SQLiteStor
 	cfg.DedupThreshold = threshold
 	return memory.NewSQLiteStore(dbPath, cfg)
 }
-
-

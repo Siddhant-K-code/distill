@@ -91,6 +91,7 @@ func init() {
 
 	// Memory store
 	mcpCmd.Flags().Bool("memory", false, "Enable persistent memory store")
+	mcpCmd.Flags().String("memory-db", "distill-memory.db", "SQLite database path for memory store")
 
 	// Default deduplication settings
 	mcpCmd.Flags().Int("over-fetch-k", 50, "Default over-fetch count")
@@ -154,9 +155,10 @@ func runMCP(cmd *cobra.Command, args []string) error {
 	// Create memory store (opt-in)
 	enableMemory, _ := cmd.Flags().GetBool("memory")
 	if enableMemory {
+		memDBPath, _ := cmd.Flags().GetString("memory-db")
 		memCfg := memory.DefaultConfig()
 		memCfg.DedupThreshold = threshold
-		memStore, err := memory.NewSQLiteStore("distill-memory.db", memCfg)
+		memStore, err := memory.NewSQLiteStore(memDBPath, memCfg)
 		if err != nil {
 			return fmt.Errorf("failed to create memory store: %w", err)
 		}
