@@ -24,7 +24,7 @@ func newTestStore(t *testing.T) *SQLiteStore {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -283,7 +283,7 @@ func TestDecayWorker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	ctx := context.Background()
 
