@@ -10,7 +10,7 @@
 
 **Context intelligence layer for AI agents.**
 
-Deduplicates, compresses, and manages context across sessions - so your agents produce reliable, deterministic outputs. Today: a dedup pipeline with ~12ms overhead. Next: persistent context memory, code change impact graphs, and session-aware context windows.
+Deduplicates, compresses, and manages context across sessions - so your agents produce reliable, deterministic outputs. Includes a dedup pipeline with ~12ms overhead and persistent context memory with write-time dedup and hierarchical decay.
 
 Less redundant data. Lower costs. Faster responses. Deterministic results.
 
@@ -201,12 +201,82 @@ Add to Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_conf
 
 See [mcp/README.md](mcp/README.md) for more configuration options.
 
+## Context Memory
+
+Persistent memory that accumulates knowledge across agent sessions. Memories are deduplicated on write, ranked by relevance + recency on recall, and compressed over time through hierarchical decay.
+
+Enable with the `--memory` flag on `api` or `mcp` commands.
+
+### CLI
+
+```bash
+# Store a memory
+distill memory store --text "Auth uses JWT with RS256 signing" --tags auth --source docs
+
+# Recall relevant memories
+distill memory recall --query "How does authentication work?" --max-results 5
+
+# Remove outdated memories
+distill memory forget --tags deprecated
+
+# View statistics
+distill memory stats
+```
+
+### API
+
+```bash
+# Start API with memory enabled
+distill api --port 8080 --memory
+
+# Store
+curl -X POST http://localhost:8080/v1/memory/store \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "session-1",
+    "entries": [{"text": "Auth uses JWT with RS256", "tags": ["auth"], "source": "docs"}]
+  }'
+
+# Recall
+curl -X POST http://localhost:8080/v1/memory/recall \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How does auth work?", "max_results": 5}'
+```
+
+### MCP
+
+Memory tools are available in Claude Desktop, Cursor, and other MCP clients when `--memory` is enabled:
+
+```bash
+distill mcp --memory
+```
+
+Tools exposed: `store_memory`, `recall_memory`, `forget_memory`, `memory_stats`.
+
+### How Decay Works
+
+Memories compress over time based on access patterns:
+
+```
+Full text → Summary (~20%) → Keywords (~5%) → Evicted
+  (24h)        (7 days)         (30 days)
+```
+
+Accessing a memory resets its decay clock. Configure ages via `distill.yaml`:
+
+```yaml
+memory:
+  db_path: distill-memory.db
+  dedup_threshold: 0.15
+```
+
 ## CLI Commands
 
 ```bash
 distill api       # Start standalone API server
 distill serve     # Start server with vector DB connection
 distill mcp       # Start MCP server for AI assistants
+distill memory    # Store, recall, and manage persistent context memories
 distill analyze   # Analyze a file for duplicates
 distill sync      # Upload vectors to Pinecone with dedup
 distill query     # Test a query from command line
@@ -220,6 +290,10 @@ distill config    # Manage configuration files
 | POST | `/v1/dedupe` | Deduplicate chunks |
 | POST | `/v1/dedupe/stream` | SSE streaming dedup with per-stage progress |
 | POST | `/v1/retrieve` | Query vector DB with dedup (requires backend) |
+| POST | `/v1/memory/store` | Store memories with write-time dedup (requires `--memory`) |
+| POST | `/v1/memory/recall` | Recall memories by relevance + recency (requires `--memory`) |
+| POST | `/v1/memory/forget` | Remove memories by ID, tag, or age (requires `--memory`) |
+| GET | `/v1/memory/stats` | Memory store statistics (requires `--memory`) |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
 
@@ -489,10 +563,10 @@ KV cache for repeated context patterns (system prompts, tool definitions, boiler
 │  └─────────┘  └─────────┘  └─────────┘  └──────────┘  └─────────┘  │
 │     <1ms          6ms         <1ms          2ms           3ms        │
 │                                                                      │
-│  Context Intelligence (planned)                                      │
+│  Context Intelligence                                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
 │  │ Memory Store │  │ Impact Graph │  │ Session Context Windows  │   │
-│  │  (#29)       │  │  (#30)       │  │  (#31)                   │   │
+│  │  (shipped)   │  │  (#30)       │  │  (#31)                   │   │
 │  └──────────────┘  └──────────────┘  └──────────────────────────┘   │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐    │
@@ -527,10 +601,10 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 
 ### Context Memory
 
-| Feature | Issue | Description |
-|---------|-------|-------------|
-| **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay (full text -> summary -> keywords -> evicted), token-budgeted recall. |
-| **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Stateful context windows for long-running agents. Push context incrementally, Distill keeps it deduplicated and within budget. |
+| Feature | Issue | Status | Description |
+|---------|-------|--------|-------------|
+| **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Shipped | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay, token-budgeted recall. See [Context Memory](#context-memory). |
+| **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Planned | Stateful context windows for long-running agents. Push context incrementally, Distill keeps it deduplicated and within budget. |
 
 ### Code Intelligence
 
