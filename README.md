@@ -576,53 +576,32 @@ Works with your existing AI stack:
 
 ## FAQ
 
-<details>
-<summary>Is this just removing exact duplicates?</summary>
+**Is this just removing exact duplicates?**
+No. Exact dedup is trivial (hash comparison). Distill does *semantic* dedup - it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
 
-No. Exact dedup is trivial (hash comparison). Distill does _semantic_ dedup - it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
-</details>
-
-<details>
-<summary>Why agglomerative clustering instead of K-Means?</summary>
-
+**Why agglomerative clustering instead of K-Means?**
 K-Means requires specifying K upfront and assumes spherical clusters. Agglomerative clustering adapts to the data - it stops merging when the distance between the closest clusters exceeds the threshold. If your 20 chunks have 8 natural groups, you get 8 clusters. If they have 15, you get 15. No tuning required.
-</details>
 
-<details>
-<summary>What does the threshold of 0.15 mean?</summary>
-
+**What does the threshold of 0.15 mean?**
 Cosine distance of 0.15 means cosine similarity of 0.85. Two chunks with 85%+ similarity are considered "saying the same thing." For code, use 0.10 (stricter). For prose, use 0.20 (looser).
-</details>
 
-<details>
-<summary>How does compression work without an LLM?</summary>
+**Why cosine distance and not Euclidean?**
+OpenAI embeddings (and most embedding models) are normalized to unit length. For unit vectors, cosine distance and Euclidean distance are monotonically related, but cosine is more interpretable: 0 = identical direction, 1 = orthogonal, 2 = opposite. The threshold of 0.15 means "chunks whose embeddings point within ~22 degrees of each other."
 
-Three rule-based strategies: (1) **Extractive** - scores sentences by position, length, and keyword signals, keeps the top ones. (2) **Placeholder** - detects JSON/XML/tables and replaces with structural summaries. (3) **Pruner** - removes filler phrases and intensifiers. No API calls needed.
-</details>
+**How does compression work without an LLM?**
+Three rule-based strategies: (1) Extractive - scores sentences by position, length, and keyword signals, keeps the top ones. (2) Placeholder - detects JSON/XML/tables and replaces with structural summaries. (3) Pruner - removes filler phrases and intensifiers. No API calls needed.
 
-<details>
-<summary>How does Distill work with LangChain?</summary>
+**How does Distill work with LangChain?**
+Three paths: (1) MCP - `distill mcp` exposes tools that become LangChain tools via [langchain-mcp-adapters](https://github.com/langchain-ai/langchain-mcp-adapters). (2) HTTP API - call `POST /v1/dedupe` as a post-processing step on retrieval results. (3) Python SDK (planned - [#5](https://github.com/Siddhant-K-code/distill/issues/5)) - a `DistillRetriever` that wraps any LangChain retriever.
 
-Three paths: (1) **MCP** - `distill mcp` exposes tools that become LangChain tools via [`langchain-mcp-adapters`](https://github.com/langchain-ai/langchain-mcp-adapters). (2) **HTTP API** - call `POST /v1/dedupe` as a post-processing step on retrieval results. (3) **Python SDK** (planned - [#5](https://github.com/Siddhant-K-code/distill/issues/5)) - a `DistillRetriever` that wraps any LangChain retriever.
-</details>
+**How is this different from LangChain's built-in MMR?**
+LangChain's `search_type="mmr"` is a single re-ranking step at the vector DB level. Distill runs a multi-stage pipeline: cache, agglomerative clustering, representative selection, compression, then MMR. The clustering step understands group structure, not just pairwise similarity.
 
-<details>
-<summary>How is this different from LangChain's built-in MMR?</summary>
+**What's the time complexity?**
+Distance matrix is O(N^2 x D) where N = chunks and D = embedding dimension. The merge loop is O(N^3) worst case. For typical RAG inputs (N=20-50, D=1536), the full pipeline completes in ~12ms.
 
-LangChain's `search_type="mmr"` is a single re-ranking step at the vector DB level. Distill runs a multi-stage pipeline: cache → agglomerative clustering → representative selection → compression → MMR. The clustering step understands group structure, not just pairwise similarity.
-</details>
-
-<details>
-<summary>What if chunks don't have embeddings?</summary>
-
-If you send text-only chunks, Distill calls OpenAI's `text-embedding-3-small` to generate embeddings. Set `OPENAI_API_KEY` to enable this. If you send chunks with pre-computed embeddings from your vector DB, no OpenAI call is needed - zero additional cost.
-</details>
-
-<details>
-<summary>What's the latency and cost?</summary>
-
-~12ms pipeline overhead. If embeddings are pre-computed: $0. If text-only: $0.02 per 1M tokens via `text-embedding-3-small` (~$0.00004 per typical 20-chunk request).
-</details>
+**Why not just increase the context window?**
+Larger context windows don't solve redundancy. If you stuff 50 chunks into a 128K window and 20 say the same thing, the model still processes all of them. This wastes tokens, increases latency, and can confuse the model. Distill ensures the model sees unique, diverse chunks instead of overlapping ones.
 
 See [FAQ.md](FAQ.md) for the full list.
 
