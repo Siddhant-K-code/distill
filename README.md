@@ -27,9 +27,9 @@ LLM outputs are unreliable because context is polluted. "Garbage in, garbage out
 
 30-40% of context assembled from multiple sources is semantically redundant. Same information from docs, code, memory, and tools competing for attention. This leads to:
 
-- **Non-deterministic outputs** — Same workflow, different results
-- **Confused reasoning** — Signal diluted by repetition
-- **Production failures** — Works in demos, breaks at scale
+- **Non-deterministic outputs** - Same workflow, different results
+- **Confused reasoning** - Signal diluted by repetition
+- **Production failures** - Works in demos, breaks at scale
 
 You can't fix unreliable outputs with better prompts. You need to fix the context that goes in.
 
@@ -457,9 +457,9 @@ W3C Trace Context propagation is enabled by default for cross-service tracing.
 
 Reduces token count while preserving meaning. Three strategies:
 
-- **Extractive** — Scores sentences by position, keyword density, and length; keeps the most salient spans
-- **Placeholder** — Replaces verbose JSON, XML, and table outputs with compact structural summaries
-- **Pruner** — Strips filler phrases, redundant qualifiers, and boilerplate patterns
+- **Extractive** - Scores sentences by position, keyword density, and length; keeps the most salient spans
+- **Placeholder** - Replaces verbose JSON, XML, and table outputs with compact structural summaries
+- **Pruner** - Strips filler phrases, redundant qualifiers, and boilerplate patterns
 
 Strategies can be chained via `compress.Pipeline`. Configure with target reduction ratio (e.g., 0.3 = keep 30% of original).
 
@@ -467,9 +467,9 @@ Strategies can be chained via `compress.Pipeline`. Configure with target reducti
 
 KV cache for repeated context patterns (system prompts, tool definitions, boilerplate). Sub-millisecond retrieval for cache hits.
 
-- **MemoryCache** — In-memory LRU with TTL, configurable size limits (entries and bytes), background cleanup
-- **PatternDetector** — Identifies cacheable content: system prompts, tool/function definitions, code blocks
-- **RedisCache** — Interface for distributed deployments (requires external Redis)
+- **MemoryCache** - In-memory LRU with TTL, configurable size limits (entries and bytes), background cleanup
+- **PatternDetector** - Identifies cacheable content: system prompts, tool/function definitions, code blocks
+- **RedisCache** - Interface for distributed deployments (requires external Redis)
 
 ## Architecture
 
@@ -579,13 +579,13 @@ Works with your existing AI stack:
 <details>
 <summary>Is this just removing exact duplicates?</summary>
 
-No. Exact dedup is trivial (hash comparison). Distill does _semantic_ dedup — it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
+No. Exact dedup is trivial (hash comparison). Distill does _semantic_ dedup - it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
 </details>
 
 <details>
 <summary>Why agglomerative clustering instead of K-Means?</summary>
 
-K-Means requires specifying K upfront and assumes spherical clusters. Agglomerative clustering adapts to the data — it stops merging when the distance between the closest clusters exceeds the threshold. If your 20 chunks have 8 natural groups, you get 8 clusters. If they have 15, you get 15. No tuning required.
+K-Means requires specifying K upfront and assumes spherical clusters. Agglomerative clustering adapts to the data - it stops merging when the distance between the closest clusters exceeds the threshold. If your 20 chunks have 8 natural groups, you get 8 clusters. If they have 15, you get 15. No tuning required.
 </details>
 
 <details>
@@ -597,13 +597,13 @@ Cosine distance of 0.15 means cosine similarity of 0.85. Two chunks with 85%+ si
 <details>
 <summary>How does compression work without an LLM?</summary>
 
-Three rule-based strategies: (1) **Extractive** — scores sentences by position, length, and keyword signals, keeps the top ones. (2) **Placeholder** — detects JSON/XML/tables and replaces with structural summaries. (3) **Pruner** — removes filler phrases and intensifiers. No API calls needed.
+Three rule-based strategies: (1) **Extractive** - scores sentences by position, length, and keyword signals, keeps the top ones. (2) **Placeholder** - detects JSON/XML/tables and replaces with structural summaries. (3) **Pruner** - removes filler phrases and intensifiers. No API calls needed.
 </details>
 
 <details>
 <summary>How does Distill work with LangChain?</summary>
 
-Three paths: (1) **MCP** — `distill mcp` exposes tools that become LangChain tools via [`langchain-mcp-adapters`](https://github.com/langchain-ai/langchain-mcp-adapters). (2) **HTTP API** — call `POST /v1/dedupe` as a post-processing step on retrieval results. (3) **Python SDK** (planned — [#5](https://github.com/Siddhant-K-code/distill/issues/5)) — a `DistillRetriever` that wraps any LangChain retriever.
+Three paths: (1) **MCP** - `distill mcp` exposes tools that become LangChain tools via [`langchain-mcp-adapters`](https://github.com/langchain-ai/langchain-mcp-adapters). (2) **HTTP API** - call `POST /v1/dedupe` as a post-processing step on retrieval results. (3) **Python SDK** (planned - [#5](https://github.com/Siddhant-K-code/distill/issues/5)) - a `DistillRetriever` that wraps any LangChain retriever.
 </details>
 
 <details>
@@ -615,7 +615,7 @@ LangChain's `search_type="mmr"` is a single re-ranking step at the vector DB lev
 <details>
 <summary>What if chunks don't have embeddings?</summary>
 
-If you send text-only chunks, Distill calls OpenAI's `text-embedding-3-small` to generate embeddings. Set `OPENAI_API_KEY` to enable this. If you send chunks with pre-computed embeddings from your vector DB, no OpenAI call is needed — zero additional cost.
+If you send text-only chunks, Distill calls OpenAI's `text-embedding-3-small` to generate embeddings. Set `OPENAI_API_KEY` to enable this. If you send chunks with pre-computed embeddings from your vector DB, no OpenAI call is needed - zero additional cost.
 </details>
 
 <details>

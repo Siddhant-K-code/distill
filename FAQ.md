@@ -4,7 +4,7 @@
 
 ### What does Distill do?
 
-Distill is a post-retrieval processing layer for RAG pipelines. When you fetch chunks from a vector database, 30-40% are typically redundant — same information phrased differently. Distill clusters semantically similar chunks, picks the best representative from each cluster, compresses verbose content, and re-ranks for diversity. Total overhead is ~12ms. No LLM calls.
+Distill is a post-retrieval processing layer for RAG pipelines. When you fetch chunks from a vector database, 30-40% are typically redundant - same information phrased differently. Distill clusters semantically similar chunks, picks the best representative from each cluster, compresses verbose content, and re-ranks for diversity. Total overhead is ~12ms. No LLM calls.
 
 ### Why not just fetch fewer results from the vector DB?
 
@@ -12,7 +12,7 @@ Fetching fewer results risks missing relevant information. The better approach i
 
 ### Is this just removing exact duplicates?
 
-No. Exact dedup is trivial (hash comparison). Distill does _semantic_ dedup — it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
+No. Exact dedup is trivial (hash comparison). Distill does _semantic_ dedup - it identifies chunks that convey the same information in different words. Two paragraphs explaining "how JWT auth works" with different wording will be clustered together, and only the best one is kept.
 
 ### Why not use an LLM for compression?
 
@@ -24,11 +24,11 @@ LLMs are non-deterministic. The same input can produce different compressed outp
 
 ### Why agglomerative clustering instead of K-Means?
 
-K-Means requires specifying K upfront and assumes spherical clusters. Agglomerative clustering adapts to the data — it stops merging when the distance between the closest clusters exceeds the threshold. If your 20 chunks have 8 natural groups, you get 8 clusters. If they have 15, you get 15. No tuning required.
+K-Means requires specifying K upfront and assumes spherical clusters. Agglomerative clustering adapts to the data - it stops merging when the distance between the closest clusters exceeds the threshold. If your 20 chunks have 8 natural groups, you get 8 clusters. If they have 15, you get 15. No tuning required.
 
 ### What does the threshold of 0.15 mean?
 
-Cosine distance of 0.15 means cosine similarity of 0.85. Two chunks with 85%+ similarity are considered "saying the same thing." For code, use 0.10 (stricter — code is more precise). For prose, use 0.20 (looser — natural language has more variation).
+Cosine distance of 0.15 means cosine similarity of 0.85. Two chunks with 85%+ similarity are considered "saying the same thing." For code, use 0.10 (stricter - code is more precise). For prose, use 0.20 (looser - natural language has more variation).
 
 ### How does MMR (Maximal Marginal Relevance) work?
 
@@ -38,9 +38,9 @@ MMR greedily selects chunks that balance relevance and diversity:
 MMR(chunk) = λ × relevance - (1-λ) × max_similarity(chunk, already_selected)
 ```
 
-- `λ = 1.0` — pure relevance (top-K by score)
-- `λ = 0.5` — balanced (default)
-- `λ = 0.0` — pure diversity (maximize distance from selected chunks)
+- `λ = 1.0` - pure relevance (top-K by score)
+- `λ = 0.5` - balanced (default)
+- `λ = 0.0` - pure diversity (maximize distance from selected chunks)
 
 ### What's the time complexity?
 
@@ -50,9 +50,9 @@ Distance matrix computation is O(N² × D) where N = number of chunks and D = em
 
 Three rule-based strategies, chainable via a pipeline:
 
-1. **Extractive** — Scores sentences by position, length, and keyword signals. Keeps the top sentences within a token budget.
-2. **Placeholder** — Detects JSON, XML, and tables. Replaces them with structural summaries (e.g., `[JSON object with 12 keys: id, name, ...]`).
-3. **Pruner** — Removes filler phrases ("as mentioned earlier", "basically", "it is important to note that") and intensifiers.
+1. **Extractive** - Scores sentences by position, length, and keyword signals. Keeps the top sentences within a token budget.
+2. **Placeholder** - Detects JSON, XML, and tables. Replaces them with structural summaries (e.g., `[JSON object with 12 keys: id, name, ...]`).
+3. **Pruner** - Removes filler phrases ("as mentioned earlier", "basically", "it is important to note that") and intensifiers.
 
 No API calls needed.
 
@@ -98,7 +98,7 @@ raw_docs = retriever.invoke("query")  # Over-fetch 20 results
 clean_docs = deduplicate(raw_docs)    # -> ~8 unique results
 ```
 
-**3. Python SDK (planned — [#5](https://github.com/Siddhant-K-code/distill/issues/5)):** A `DistillRetriever` that wraps any LangChain retriever with automatic dedup.
+**3. Python SDK (planned - [#5](https://github.com/Siddhant-K-code/distill/issues/5)):** A `DistillRetriever` that wraps any LangChain retriever with automatic dedup.
 
 ### Does it work with LlamaIndex, CrewAI, AutoGen, etc.?
 
@@ -106,11 +106,11 @@ Yes. The HTTP API is framework-agnostic. MCP works with any MCP-compatible clien
 
 ### How is this different from LangChain's built-in MMR retriever?
 
-LangChain's `search_type="mmr"` applies MMR at the vector DB level — a single re-ranking step. Distill runs a multi-stage pipeline: cache lookup, agglomerative clustering (groups similar chunks), representative selection (picks the best from each group), compression (reduces token count), then MMR (diversity re-ranking). The clustering step is the key difference — it understands group structure, not just pairwise similarity.
+LangChain's `search_type="mmr"` applies MMR at the vector DB level - a single re-ranking step. Distill runs a multi-stage pipeline: cache lookup, agglomerative clustering (groups similar chunks), representative selection (picks the best from each group), compression (reduces token count), then MMR (diversity re-ranking). The clustering step is the key difference - it understands group structure, not just pairwise similarity.
 
 ### Can I use Distill with local models (Ollama, vLLM)?
 
-The dedup pipeline itself doesn't call any LLM — it's pure math (cosine distance, clustering). The only external dependency is for embedding generation when you send text without pre-computed embeddings. Multi-provider embedding support (Ollama, Azure, Cohere, HuggingFace) is planned in [#33](https://github.com/Siddhant-K-code/distill/issues/33).
+The dedup pipeline itself doesn't call any LLM - it's pure math (cosine distance, clustering). The only external dependency is for embedding generation when you send text without pre-computed embeddings. Multi-provider embedding support (Ollama, Azure, Cohere, HuggingFace) is planned in [#33](https://github.com/Siddhant-K-code/distill/issues/33).
 
 ---
 
@@ -162,9 +162,9 @@ distill api --port 8080
 
 ### What observability is available?
 
-- **Prometheus metrics** at `/metrics` — request counts, latency histograms, chunk reduction ratios, cluster counts
-- **OpenTelemetry tracing** — per-stage spans (embedding, clustering, selection, MMR) with W3C Trace Context propagation
-- **Grafana dashboard** — pre-built template in `grafana/`
+- **Prometheus metrics** at `/metrics` - request counts, latency histograms, chunk reduction ratios, cluster counts
+- **OpenTelemetry tracing** - per-stage spans (embedding, clustering, selection, MMR) with W3C Trace Context propagation
+- **Grafana dashboard** - pre-built template in `grafana/`
 
 ---
 
@@ -176,12 +176,12 @@ Larger context windows don't solve redundancy. If you stuff 50 chunks into a 128
 
 ### Is Distill open source?
 
-Yes, AGPL-3.0. The full pipeline, CLI, API server, MCP server, and all algorithms are open source. Commercial licensing is available for closed-source usage — contact siddhantkhare2694@gmail.com.
+Yes, AGPL-3.0. The full pipeline, CLI, API server, MCP server, and all algorithms are open source. Commercial licensing is available for closed-source usage - contact siddhantkhare2694@gmail.com.
 
 ### What's on the roadmap?
 
 Three pillars:
 
-1. **Context Memory** — Persistent deduplicated memory across agent sessions with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29), [#31](https://github.com/Siddhant-K-code/distill/issues/31))
-2. **Code Intelligence** — Dependency graphs, co-change patterns, blast radius analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
-3. **Platform** — Python SDK, multi-provider embeddings, batch API ([#5](https://github.com/Siddhant-K-code/distill/issues/5), [#33](https://github.com/Siddhant-K-code/distill/issues/33), [#11](https://github.com/Siddhant-K-code/distill/issues/11))
+1. **Context Memory** - Persistent deduplicated memory across agent sessions with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29), [#31](https://github.com/Siddhant-K-code/distill/issues/31))
+2. **Code Intelligence** - Dependency graphs, co-change patterns, blast radius analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
+3. **Platform** - Python SDK, multi-provider embeddings, batch API ([#5](https://github.com/Siddhant-K-code/distill/issues/5), [#33](https://github.com/Siddhant-K-code/distill/issues/33), [#11](https://github.com/Siddhant-K-code/distill/issues/11))
