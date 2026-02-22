@@ -162,9 +162,6 @@ type Config struct {
 	// EvictAge is the age after which unreferenced memories are evicted.
 	// Default: 720h (30 days).
 	EvictAge time.Duration
-
-	// MaxMemories is the maximum number of memories to store. 0 = unlimited.
-	MaxMemories int
 }
 
 // DefaultConfig returns sensible defaults.
@@ -176,6 +173,5 @@ func DefaultConfig() Config {
 		SummaryAge:     24 * time.Hour,
 		KeywordsAge:    168 * time.Hour,
 		EvictAge:       720 * time.Hour,
-		MaxMemories:    0,
 	}
 }

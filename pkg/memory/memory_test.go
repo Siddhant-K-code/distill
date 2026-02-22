@@ -143,8 +143,8 @@ func TestForgetByAge(t *testing.T) {
 	now := time.Now().UTC()
 	old := now.Add(-48 * time.Hour).Format(time.RFC3339Nano)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO memories (id, text, source, tags, metadata, decay_level, created_at, last_referenced, access_count)
-		 VALUES (?, ?, '', '[]', '{}', 0, ?, ?, 0)`,
+		`INSERT INTO memories (id, text, source, metadata, decay_level, created_at, last_referenced, access_count)
+		 VALUES (?, ?, '', '{}', 0, ?, ?, 0)`,
 		"old-1", "Old memory", old, old,
 	)
 	if err != nil {

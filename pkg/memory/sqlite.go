@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	distillmath "github.com/Siddhant-K-code/distill/pkg/math"
@@ -14,10 +13,11 @@ import (
 )
 
 // SQLiteStore implements Store using SQLite for local persistent storage.
+// Uses a single connection (SetMaxOpenConns(1)) so SQLite's internal
+// serialization handles concurrency. No application-level mutex needed.
 type SQLiteStore struct {
 	db  *sql.DB
 	cfg Config
-	mu  sync.RWMutex
 }
 
 // NewSQLiteStore creates a new SQLite-backed memory store.
@@ -31,6 +31,10 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+
+	// SQLite doesn't support concurrent connections well with in-memory DBs
+	// and PRAGMAs are per-connection, so pin to a single connection.
+	db.SetMaxOpenConns(1)
 
 	// Enable WAL mode for better concurrent read performance
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
@@ -54,7 +58,6 @@ func (s *SQLiteStore) migrate() error {
 		text            TEXT NOT NULL,
 		embedding       BLOB,
 		source          TEXT DEFAULT '',
-		tags            TEXT DEFAULT '[]',
 		session_id      TEXT DEFAULT '',
 		metadata        TEXT DEFAULT '{}',
 		decay_level     INTEGER DEFAULT 0,
@@ -62,19 +65,27 @@ func (s *SQLiteStore) migrate() error {
 		last_referenced TEXT NOT NULL,
 		access_count    INTEGER DEFAULT 0
 	);
-	CREATE INDEX IF NOT EXISTS idx_memories_tags ON memories(tags);
+	CREATE TABLE IF NOT EXISTS memory_tags (
+		memory_id TEXT NOT NULL,
+		tag       TEXT NOT NULL,
+		PRIMARY KEY (memory_id, tag),
+		FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE
+	);
+	CREATE INDEX IF NOT EXISTS idx_memory_tags_tag ON memory_tags(tag);
 	CREATE INDEX IF NOT EXISTS idx_memories_decay ON memories(decay_level);
 	CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
 	CREATE INDEX IF NOT EXISTS idx_memories_referenced ON memories(last_referenced);
 	`
+	// Enable foreign keys for CASCADE deletes
+	if _, err := s.db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return fmt.Errorf("enable foreign keys: %w", err)
+	}
 	_, err := s.db.Exec(schema)
 	return err
 }
 
 // Store adds entries with write-time deduplication.
 func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	result := &StoreResult{}
 
@@ -107,20 +118,31 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 		id := generateID()
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 
-		tagsJSON, _ := json.Marshal(entry.Tags)
 		metaJSON, _ := json.Marshal(entry.Metadata)
 		embBlob := encodeEmbedding(entry.Embedding)
 
 		sessionID := req.SessionID
 
 		_, err := s.db.ExecContext(ctx,
-			`INSERT INTO memories (id, text, embedding, source, tags, session_id, metadata, decay_level, created_at, last_referenced, access_count)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0)`,
-			id, entry.Text, embBlob, entry.Source, string(tagsJSON), sessionID, string(metaJSON), now, now,
+			`INSERT INTO memories (id, text, embedding, source, session_id, metadata, decay_level, created_at, last_referenced, access_count)
+			 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 0)`,
+			id, entry.Text, embBlob, entry.Source, sessionID, string(metaJSON), now, now,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert memory: %w", err)
 		}
+
+		// Insert tags into junction table
+		for _, tag := range entry.Tags {
+			_, err := s.db.ExecContext(ctx,
+				"INSERT OR IGNORE INTO memory_tags (memory_id, tag) VALUES (?, ?)",
+				id, tag,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("insert tag: %w", err)
+			}
+		}
+
 		result.Stored++
 	}
 
@@ -166,8 +188,6 @@ func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (s
 
 // Recall retrieves memories matching a query, ranked by relevance and recency.
 func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallResult, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	if req.Query == "" && len(req.QueryEmbedding) == 0 {
 		return nil, ErrInvalidQuery
@@ -187,48 +207,59 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	}
 
 	// Build query with optional tag filter
-	query := "SELECT id, text, embedding, source, tags, decay_level, last_referenced FROM memories"
+	query := "SELECT m.id, m.text, m.embedding, m.source, m.decay_level, m.last_referenced FROM memories m"
 	var args []interface{}
 
 	if len(req.Tags) > 0 {
-		clauses := make([]string, len(req.Tags))
+		placeholders := make([]string, len(req.Tags))
 		for i, tag := range req.Tags {
-			clauses[i] = "tags LIKE ?"
-			args = append(args, "%\""+tag+"\"%")
+			placeholders[i] = "?"
+			args = append(args, tag)
 		}
-		query += " WHERE (" + strings.Join(clauses, " OR ") + ")"
+		query += " WHERE m.id IN (SELECT memory_id FROM memory_tags WHERE tag IN (" + strings.Join(placeholders, ",") + "))"
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query memories: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+
+	// Scan all rows first, then close before issuing more queries.
+	// SQLite with MaxOpenConns(1) requires the connection to be free.
+	type rawRow struct {
+		id, text, source, refStr string
+		embBlob                  []byte
+		decayLevel               int
+	}
+	var rawRows []rawRow
+	for rows.Next() {
+		var r rawRow
+		if err := rows.Scan(&r.id, &r.text, &r.embBlob, &r.source, &r.decayLevel, &r.refStr); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		rawRows = append(rawRows, r)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	_ = rows.Close()
 
 	var candidates []scored
 	now := time.Now()
 
-	for rows.Next() {
-		var (
-			id, text, source, tagsStr, refStr string
-			embBlob                           []byte
-			decayLevel                        int
-		)
-		if err := rows.Scan(&id, &text, &embBlob, &source, &tagsStr, &decayLevel, &refStr); err != nil {
-			return nil, err
-		}
-
-		var tags []string
-		_ = json.Unmarshal([]byte(tagsStr), &tags)
-		lastRef, _ := time.Parse(time.RFC3339Nano, refStr)
+	for _, r := range rawRows {
+		tags, _ := s.loadTags(ctx, r.id)
+		lastRef, _ := time.Parse(time.RFC3339Nano, r.refStr)
 
 		// Compute relevance score from embedding similarity
 		var similarity float64
 		if len(req.QueryEmbedding) > 0 {
-			existing := decodeEmbedding(embBlob)
+			existing := decodeEmbedding(r.embBlob)
 			if len(existing) > 0 {
 				dist := distillmath.CosineDistance(req.QueryEmbedding, existing)
-				similarity = 1.0 - dist // Convert distance to similarity
+				similarity = 1.0 - dist
 			}
 		}
 
@@ -239,24 +270,20 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 			recency = 1.0 / (1.0 + age/24.0)
 		}
 
-		// Combined score
 		relevance := (1.0-recencyWeight)*similarity + recencyWeight*recency
 
 		candidates = append(candidates, scored{
 			memory: RecalledMemory{
-				ID:             id,
-				Text:           text,
-				Source:         source,
+				ID:             r.id,
+				Text:           r.text,
+				Source:         r.source,
 				Tags:           tags,
 				Relevance:      relevance,
-				DecayLevel:     DecayLevel(decayLevel),
+				DecayLevel:     DecayLevel(r.decayLevel),
 				LastReferenced: lastRef,
 			},
 			relevance: relevance,
 		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	// Sort by relevance descending
@@ -299,8 +326,6 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 
 // Forget removes memories matching the given criteria.
 func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	var conditions []string
 	var args []interface{}
@@ -315,12 +340,12 @@ func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetRes
 	}
 
 	if len(req.Tags) > 0 {
-		tagClauses := make([]string, len(req.Tags))
+		placeholders := make([]string, len(req.Tags))
 		for i, tag := range req.Tags {
-			tagClauses[i] = "tags LIKE ?"
-			args = append(args, "%\""+tag+"\"%")
+			placeholders[i] = "?"
+			args = append(args, tag)
 		}
-		conditions = append(conditions, "("+strings.Join(tagClauses, " OR ")+")")
+		conditions = append(conditions, "id IN (SELECT memory_id FROM memory_tags WHERE tag IN ("+strings.Join(placeholders, ",")+"))")
 	}
 
 	if !req.OlderThan.IsZero() {
@@ -353,8 +378,6 @@ func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetRes
 
 // Stats returns memory store statistics.
 func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	stats := &Stats{
 		ByDecayLevel: make(map[int]int),
@@ -414,23 +437,36 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
-// touchMemories updates last_referenced and access_count for the given IDs.
-// Called from Recall under a read lock, so we use a separate goroutine.
-func (s *SQLiteStore) touchMemories(ctx context.Context, ids []string) {
-	go func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
+// loadTags returns the tags for a given memory ID.
+func (s *SQLiteStore) loadTags(ctx context.Context, memoryID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT tag FROM memory_tags WHERE memory_id = ?", memoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
 
-		now := time.Now().UTC().Format(time.RFC3339Nano)
-		placeholders := make([]string, len(ids))
-		args := []interface{}{now}
-		for i, id := range ids {
-			placeholders[i] = "?"
-			args = append(args, id)
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, err
 		}
-		query := "UPDATE memories SET last_referenced = ?, access_count = access_count + 1 WHERE id IN (" + strings.Join(placeholders, ",") + ")"
-		_, _ = s.db.ExecContext(ctx, query, args...)
-	}()
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// touchMemories updates last_referenced and access_count for the given IDs.
+func (s *SQLiteStore) touchMemories(ctx context.Context, ids []string) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	placeholders := make([]string, len(ids))
+	args := []interface{}{now}
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	query := "UPDATE memories SET last_referenced = ?, access_count = access_count + 1 WHERE id IN (" + strings.Join(placeholders, ",") + ")"
+	_, _ = s.db.ExecContext(ctx, query, args...)
 }
 
 // scored pairs a recalled memory with its computed relevance.

@@ -89,6 +89,9 @@ func init() {
 	mcpCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or use OPENAI_API_KEY)")
 	mcpCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
 
+	// Memory store
+	mcpCmd.Flags().Bool("memory", false, "Enable persistent memory store")
+
 	// Default deduplication settings
 	mcpCmd.Flags().Int("over-fetch-k", 50, "Default over-fetch count")
 	mcpCmd.Flags().Int("target-k", 8, "Default target chunk count")
@@ -143,19 +146,22 @@ func runMCP(cmd *cobra.Command, args []string) error {
 		IncludeMetadata:   true,
 	}
 
-	// Create memory store
-	memCfg := memory.DefaultConfig()
-	memCfg.DedupThreshold = threshold
-	memStore, err := memory.NewSQLiteStore("distill-memory.db", memCfg)
-	if err != nil {
-		return fmt.Errorf("failed to create memory store: %w", err)
-	}
-	defer func() { _ = memStore.Close() }()
-
 	// Create MCP server wrapper
 	mcpSrv := &MCPServer{
-		cfg:      brokerCfg,
-		memStore: memStore,
+		cfg: brokerCfg,
+	}
+
+	// Create memory store (opt-in)
+	enableMemory, _ := cmd.Flags().GetBool("memory")
+	if enableMemory {
+		memCfg := memory.DefaultConfig()
+		memCfg.DedupThreshold = threshold
+		memStore, err := memory.NewSQLiteStore("distill-memory.db", memCfg)
+		if err != nil {
+			return fmt.Errorf("failed to create memory store: %w", err)
+		}
+		defer func() { _ = memStore.Close() }()
+		mcpSrv.memStore = memStore
 	}
 
 	// Create embedding provider if OpenAI key is provided

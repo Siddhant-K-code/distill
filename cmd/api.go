@@ -45,6 +45,7 @@ func init() {
 	apiCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or use OPENAI_API_KEY)")
 	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
 	apiCmd.Flags().String("api-keys", "", "Comma-separated list of valid API keys (or use DISTILL_API_KEYS)")
+	apiCmd.Flags().Bool("memory", false, "Enable persistent memory store")
 
 	// Bind to viper for config file support
 	_ = viper.BindPFlag("server.port", apiCmd.Flags().Lookup("port"))
@@ -173,28 +174,31 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		tracing:   tp,
 	}
 
-	// Setup memory store
-	memDBPath := viper.GetString("memory.db_path")
-	if memDBPath == "" {
-		memDBPath = "distill-memory.db"
-	}
-	memThreshold := viper.GetFloat64("memory.dedup_threshold")
-	if memThreshold == 0 {
-		memThreshold = 0.15
-	}
-	memStore, err := memoryStoreFromConfig(memDBPath, memThreshold)
-	if err != nil {
-		return fmt.Errorf("failed to create memory store: %w", err)
-	}
-	defer func() { _ = memStore.Close() }()
-
-	memAPI := &MemoryAPI{store: memStore, embedder: embedder}
-
 	// Setup routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/dedupe", m.Middleware("/v1/dedupe", server.handleDedupe))
 	mux.HandleFunc("/v1/dedupe/stream", m.Middleware("/v1/dedupe/stream", server.handleDedupeStream))
-	memAPI.RegisterMemoryRoutes(mux, m.Middleware)
+
+	// Setup memory store (opt-in)
+	enableMemory, _ := cmd.Flags().GetBool("memory")
+	if enableMemory {
+		memDBPath := viper.GetString("memory.db_path")
+		if memDBPath == "" {
+			memDBPath = "distill-memory.db"
+		}
+		memThreshold := viper.GetFloat64("memory.dedup_threshold")
+		if memThreshold == 0 {
+			memThreshold = 0.15
+		}
+		memStore, err := memoryStoreFromConfig(memDBPath, memThreshold)
+		if err != nil {
+			return fmt.Errorf("failed to create memory store: %w", err)
+		}
+		defer func() { _ = memStore.Close() }()
+
+		memAPI := &MemoryAPI{store: memStore, embedder: embedder}
+		memAPI.RegisterMemoryRoutes(mux, m.Middleware)
+	}
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
@@ -236,6 +240,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Distill API server starting on %s\n", addr)
 	fmt.Printf("  Embeddings: %v\n", embedder != nil)
 	fmt.Printf("  Auth: %v (%d keys)\n", server.hasAuth, len(validKeys))
+	fmt.Printf("  Memory: %v\n", enableMemory)
 	fmt.Println()
 	fmt.Println("Endpoints:")
 	fmt.Printf("  POST http://%s/v1/dedupe\n", addr)

@@ -8,18 +8,13 @@ import (
 	"time"
 
 	"github.com/Siddhant-K-code/distill/pkg/memory"
+	"github.com/Siddhant-K-code/distill/pkg/retriever"
 )
 
 // MemoryAPI handles memory-related HTTP endpoints.
 type MemoryAPI struct {
 	store    *memory.SQLiteStore
-	embedder embeddingProvider
-}
-
-// embeddingProvider is a minimal interface for generating embeddings.
-type embeddingProvider interface {
-	Embed(ctx context.Context, text string) ([]float32, error)
-	EmbedBatch(ctx context.Context, texts []string) ([][]float32, error)
+	embedder retriever.EmbeddingProvider
 }
 
 // RegisterMemoryRoutes adds memory endpoints to the given mux.

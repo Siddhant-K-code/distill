@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Siddhant-K-code/distill/pkg/compress"
+	"github.com/Siddhant-K-code/distill/pkg/types"
 )
 
 // DecayWorker runs periodic compression of aging memories.
@@ -58,8 +61,6 @@ func (w *DecayWorker) RunOnce(ctx context.Context) error {
 }
 
 func (w *DecayWorker) runOnce(ctx context.Context) error {
-	w.store.mu.Lock()
-	defer w.store.mu.Unlock()
 
 	now := time.Now().UTC()
 
@@ -126,34 +127,20 @@ func (w *DecayWorker) decayRows(ctx context.Context, cutoff string, fromLevel, t
 	return nil
 }
 
-// extractSummary produces a shortened version of the text.
-// Keeps the first and last sentences, targeting ~20% of original length.
+// extractSummary produces a shortened version of the text using the
+// extractive compressor's sentence scorer for better quality summaries.
 func extractSummary(text string) string {
-	sentences := splitSentences(text)
-	if len(sentences) <= 2 {
-		return text
+	c := compress.NewExtractiveCompressor()
+	chunks := []types.Chunk{{ID: "decay", Text: text}}
+	opts := compress.Options{
+		TargetReduction: 0.2, // keep ~20% of content
+		MinChunkLength:  20,
 	}
-
-	// Target ~20% of sentences, minimum 2
-	target := len(sentences) / 5
-	if target < 2 {
-		target = 2
+	result, _, _ := c.Compress(context.Background(), chunks, opts)
+	if len(result) > 0 && result[0].Text != "" {
+		return result[0].Text
 	}
-
-	// Keep first half from the beginning, second half from the end
-	firstHalf := target / 2
-	if firstHalf < 1 {
-		firstHalf = 1
-	}
-	secondHalf := target - firstHalf
-
-	var parts []string
-	parts = append(parts, sentences[:firstHalf]...)
-	if secondHalf > 0 && len(sentences)-secondHalf > firstHalf {
-		parts = append(parts, sentences[len(sentences)-secondHalf:]...)
-	}
-
-	return strings.Join(parts, " ")
+	return text
 }
 
 // extractKeywords produces a keyword-only representation.
@@ -184,30 +171,6 @@ func extractKeywords(text string) string {
 	}
 
 	return strings.Join(keywords, ", ")
-}
-
-// splitSentences splits text on sentence boundaries.
-func splitSentences(text string) []string {
-	var sentences []string
-	var current strings.Builder
-
-	for _, r := range text {
-		current.WriteRune(r)
-		if r == '.' || r == '!' || r == '?' {
-			s := strings.TrimSpace(current.String())
-			if s != "" {
-				sentences = append(sentences, s)
-			}
-			current.Reset()
-		}
-	}
-
-	// Remaining text
-	if s := strings.TrimSpace(current.String()); s != "" {
-		sentences = append(sentences, s)
-	}
-
-	return sentences
 }
 
 // isStopWord returns true for common English stop words.
