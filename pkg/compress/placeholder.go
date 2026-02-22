@@ -224,7 +224,7 @@ func (p *PlaceholderCompressor) tryCompressXML(text string) (string, bool) {
 			break
 		}
 		if count > 1 {
-			summary.WriteString(fmt.Sprintf("%s(×%d)", elem, count))
+			fmt.Fprintf(&summary, "%s(×%d)", elem, count)
 		} else {
 			summary.WriteString(elem)
 		}
