@@ -595,6 +595,7 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 
 - [Website](https://distill.siddhantkhare.com)
 - [Playground](https://distill.siddhantkhare.com/playground)
+- [FAQ](FAQ.md)
 - [Blog Post](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
 - [Book a Demo](https://meet.siddhantkhare.com)
