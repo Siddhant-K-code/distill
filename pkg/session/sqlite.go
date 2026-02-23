@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -110,7 +111,8 @@ func (s *SQLiteStore) Create(ctx context.Context, req CreateRequest) (*Session, 
 		preserveRecent = s.cfg.DefaultPreserveRecent
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	nowTime := time.Now().UTC()
+	now := nowTime.Format(time.RFC3339Nano)
 
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO sessions (id, max_tokens, dedup_threshold, preserve_recent, created_at, updated_at)
@@ -129,8 +131,8 @@ func (s *SQLiteStore) Create(ctx context.Context, req CreateRequest) (*Session, 
 		MaxTokens:     maxTokens,
 		CurrentTokens: 0,
 		EntryCount:    0,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
+		CreatedAt:     nowTime,
+		UpdatedAt:     nowTime,
 	}, nil
 }
 
@@ -199,13 +201,18 @@ func (s *SQLiteStore) Push(ctx context.Context, req PushRequest) (*PushResult, e
 		result.Accepted++
 	}
 
-	// Enforce token budget - compress and evict as needed
-	compressed, evicted, err := s.enforceBudget(ctx, req.SessionID, sess)
-	if err != nil {
-		return nil, fmt.Errorf("enforce budget: %w", err)
+	// Enforce token budget - loop until within budget or no progress
+	for {
+		c, e, err := s.enforceBudget(ctx, req.SessionID, sess)
+		if err != nil {
+			return nil, fmt.Errorf("enforce budget: %w", err)
+		}
+		result.Compressed += c
+		result.Evicted += e
+		if c == 0 && e == 0 {
+			break // no progress possible
+		}
 	}
-	result.Compressed = compressed
-	result.Evicted = evicted
 
 	// Update session timestamp
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -298,7 +305,7 @@ func (s *SQLiteStore) Context(ctx context.Context, req ContextRequest) (*Context
 		levels[r.level]++
 	}
 
-	// Compute dedup savings
+	// Compute compression savings (original tokens - current tokens)
 	var totalOriginalTokens int
 	_ = s.db.QueryRowContext(ctx,
 		"SELECT COALESCE(SUM(LENGTH(original_content)+3)/4, 0) FROM session_entries WHERE session_id = ?",
@@ -308,10 +315,10 @@ func (s *SQLiteStore) Context(ctx context.Context, req ContextRequest) (*Context
 	return &ContextResult{
 		Entries: entries,
 		Stats: ContextStats{
-			TotalEntries:      len(entries),
-			TotalTokens:       tokenCount,
-			CompressionLevels: levels,
-			DedupSavings:      totalOriginalTokens - tokenCount,
+			TotalEntries:       len(entries),
+			TotalTokens:        tokenCount,
+			CompressionLevels:  levels,
+			CompressionSavings: totalOriginalTokens - tokenCount,
 		},
 	}, nil
 }
@@ -396,6 +403,9 @@ func (s *SQLiteStore) loadSessionConfig(ctx context.Context, sessionID string) (
 }
 
 // isDuplicate checks if an embedding is within threshold of any existing entry.
+//
+// TODO: Full table scan (O(n) per entry). Fine for typical session sizes
+// (< 1K entries). For larger sessions, consider caching embeddings in memory.
 func (s *SQLiteStore) isDuplicate(ctx context.Context, sessionID string, embedding []float32, threshold float64) (bool, error) {
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT embedding FROM session_entries WHERE session_id = ? AND embedding IS NOT NULL",
@@ -577,9 +587,16 @@ func compressToLevel(text string, level CompressionLevel) string {
 				return text[:i+1]
 			}
 		}
-		// No sentence boundary - truncate to ~50 chars
+		// No sentence boundary - truncate at word boundary near 50 chars
 		if len(text) > 50 {
-			return text[:50] + "..."
+			cut := 50
+			for cut > 0 && text[cut] != ' ' {
+				cut--
+			}
+			if cut == 0 {
+				cut = 50 // no space found, hard cut
+			}
+			return strings.TrimSpace(text[:cut]) + "..."
 		}
 		return text
 	case LevelKeywords:
@@ -632,15 +649,9 @@ type compressCandidate struct {
 
 // sortCandidates sorts by importance ASC (least important first).
 func sortCandidates(c []compressCandidate) {
-	for i := 1; i < len(c); i++ {
-		key := c[i]
-		j := i - 1
-		for j >= 0 && c[j].importance > key.importance {
-			c[j+1] = c[j]
-			j--
-		}
-		c[j+1] = key
-	}
+	sort.Slice(c, func(i, j int) bool {
+		return c[i].importance < c[j].importance
+	})
 }
 
 // --- helpers ---

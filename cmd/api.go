@@ -209,7 +209,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		if sessDBPath == "" {
 			sessDBPath = "distill-sessions.db"
 		}
-		sessStore, err := sessionStoreFromConfig(sessDBPath)
+		sessStore, err := newSessionStore(sessDBPath)
 		if err != nil {
 			return fmt.Errorf("failed to create session store: %w", err)
 		}

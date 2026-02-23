@@ -184,28 +184,12 @@ func sessionStoreFromFlags(cmd *cobra.Command) (*session.SQLiteStore, error) {
 	if dbPath == "" {
 		dbPath = viper.GetString("session.db_path")
 	}
-	if dbPath == "" {
-		dbPath = "distill-sessions.db"
-	}
-
-	cfg := session.DefaultConfig()
-
-	threshold := viper.GetFloat64("session.dedup_threshold")
-	if threshold > 0 {
-		cfg.DefaultDedupThreshold = threshold
-	}
-
-	maxTokens := viper.GetInt("session.max_tokens")
-	if maxTokens > 0 {
-		cfg.DefaultMaxTokens = maxTokens
-	}
-
-	return session.NewSQLiteStore(dbPath, cfg)
+	return newSessionStore(dbPath)
 }
 
-// sessionStoreFromConfig creates a session store from viper config.
-// Used by the API server and MCP server.
-func sessionStoreFromConfig(dbPath string) (*session.SQLiteStore, error) {
+// newSessionStore creates a session store with the given DB path,
+// applying viper config overrides. Used by CLI, API, and MCP.
+func newSessionStore(dbPath string) (*session.SQLiteStore, error) {
 	if dbPath == "" {
 		dbPath = "distill-sessions.db"
 	}
@@ -223,5 +207,3 @@ func sessionStoreFromConfig(dbPath string) (*session.SQLiteStore, error) {
 
 	return session.NewSQLiteStore(dbPath, cfg)
 }
-
-

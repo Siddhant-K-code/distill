@@ -13,7 +13,6 @@ import (
 var (
 	ErrSessionNotFound = errors.New("session not found")
 	ErrSessionExists   = errors.New("session already exists")
-	ErrEmptyContent    = errors.New("entry content is empty")
 	ErrOverBudget      = errors.New("single entry exceeds token budget")
 )
 
@@ -115,7 +114,7 @@ type ContextStats struct {
 	TotalEntries      int            `json:"total_entries"`
 	TotalTokens       int            `json:"total_tokens"`
 	CompressionLevels map[int]int    `json:"compression_levels"`
-	DedupSavings      int            `json:"dedup_savings"` // tokens saved by dedup
+	CompressionSavings int           `json:"compression_savings"` // tokens saved by compression
 }
 
 // DeleteResult is the output of deleting a session.
@@ -146,10 +145,6 @@ type Config struct {
 	// DefaultPreserveRecent is how many recent entries to keep uncompressed.
 	// Default: 10.
 	DefaultPreserveRecent int
-
-	// CompressAge is how old an entry must be before compression starts.
-	// Default: 0 (compress immediately when over budget).
-	CompressAge time.Duration
 }
 
 // DefaultConfig returns sensible defaults.
@@ -158,6 +153,5 @@ func DefaultConfig() Config {
 		DefaultMaxTokens:      128000,
 		DefaultDedupThreshold: 0.15,
 		DefaultPreserveRecent: 10,
-		CompressAge:           0,
 	}
 }
