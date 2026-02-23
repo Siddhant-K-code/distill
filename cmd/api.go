@@ -46,6 +46,8 @@ func init() {
 	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
 	apiCmd.Flags().String("api-keys", "", "Comma-separated list of valid API keys (or use DISTILL_API_KEYS)")
 	apiCmd.Flags().Bool("memory", false, "Enable persistent memory store")
+	apiCmd.Flags().Bool("session", false, "Enable session management")
+	apiCmd.Flags().String("session-db", "distill-sessions.db", "SQLite database path for session store")
 
 	// Bind to viper for config file support
 	_ = viper.BindPFlag("server.port", apiCmd.Flags().Lookup("port"))
@@ -199,6 +201,24 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		memAPI := &MemoryAPI{store: memStore, embedder: embedder}
 		memAPI.RegisterMemoryRoutes(mux, m.Middleware)
 	}
+
+	// Setup session store (opt-in)
+	enableSession, _ := cmd.Flags().GetBool("session")
+	if enableSession {
+		sessDBPath, _ := cmd.Flags().GetString("session-db")
+		if sessDBPath == "" {
+			sessDBPath = "distill-sessions.db"
+		}
+		sessStore, err := sessionStoreFromConfig(sessDBPath)
+		if err != nil {
+			return fmt.Errorf("failed to create session store: %w", err)
+		}
+		defer func() { _ = sessStore.Close() }()
+
+		sessAPI := &SessionAPI{store: sessStore}
+		sessAPI.RegisterSessionRoutes(mux, m.Middleware)
+	}
+
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
@@ -241,6 +261,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Embeddings: %v\n", embedder != nil)
 	fmt.Printf("  Auth: %v (%d keys)\n", server.hasAuth, len(validKeys))
 	fmt.Printf("  Memory: %v\n", enableMemory)
+	fmt.Printf("  Sessions: %v\n", enableSession)
 	fmt.Println()
 	fmt.Println("Endpoints:")
 	fmt.Printf("  POST http://%s/v1/dedupe\n", addr)

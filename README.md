@@ -270,6 +270,77 @@ memory:
   dedup_threshold: 0.15
 ```
 
+## Session Management
+
+Token-budgeted context windows for long-running agent sessions. Push context incrementally - Distill deduplicates, compresses aging entries, and evicts when the budget is exceeded.
+
+Enable with the `--session` flag on `api` or `mcp` commands.
+
+### CLI
+
+```bash
+# Create a session with 128K token budget
+distill session create --session-id task-42 --max-tokens 128000
+
+# Push context as the agent works
+distill session push --session-id task-42 --role user --content "Fix the JWT validation bug"
+distill session push --session-id task-42 --role tool --content "$(cat auth/jwt.go)" --source file_read --importance 0.8
+
+# Read the current context window
+distill session context --session-id task-42
+
+# Clean up when done
+distill session delete --session-id task-42
+```
+
+### API
+
+```bash
+# Start API with sessions enabled
+distill api --port 8080 --session
+
+# Create session
+curl -X POST http://localhost:8080/v1/session/create \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "task-42", "max_tokens": 128000}'
+
+# Push entries
+curl -X POST http://localhost:8080/v1/session/push \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "task-42",
+    "entries": [
+      {"role": "tool", "content": "file contents...", "source": "file_read", "importance": 0.8}
+    ]
+  }'
+
+# Read context window
+curl -X POST http://localhost:8080/v1/session/context \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "task-42"}'
+```
+
+### MCP
+
+Session tools are available when `--session` is enabled:
+
+```bash
+distill mcp --session
+```
+
+Tools exposed: `create_session`, `push_session`, `session_context`, `delete_session`.
+
+### How Budget Enforcement Works
+
+When a push exceeds the token budget:
+
+1. **Compress** oldest entries (outside the `preserve_recent` window) through levels:
+   - Full text → Summary (~20%) → Single sentence (~5%) → Keywords (~1%)
+2. **Evict** entries that are already at keyword level
+3. Lowest-importance entries are compressed/evicted first
+
+The `preserve_recent` setting (default: 10) keeps the most recent entries at full fidelity.
+
 ## CLI Commands
 
 ```bash
@@ -277,6 +348,7 @@ distill api       # Start standalone API server
 distill serve     # Start server with vector DB connection
 distill mcp       # Start MCP server for AI assistants
 distill memory    # Store, recall, and manage persistent context memories
+distill session   # Manage token-budgeted context windows for agent sessions
 distill analyze   # Analyze a file for duplicates
 distill sync      # Upload vectors to Pinecone with dedup
 distill query     # Test a query from command line
@@ -294,6 +366,11 @@ distill config    # Manage configuration files
 | POST | `/v1/memory/recall` | Recall memories by relevance + recency (requires `--memory`) |
 | POST | `/v1/memory/forget` | Remove memories by ID, tag, or age (requires `--memory`) |
 | GET | `/v1/memory/stats` | Memory store statistics (requires `--memory`) |
+| POST | `/v1/session/create` | Create a session with token budget (requires `--session`) |
+| POST | `/v1/session/push` | Push entries with dedup + budget enforcement (requires `--session`) |
+| POST | `/v1/session/context` | Read current context window (requires `--session`) |
+| POST | `/v1/session/delete` | Delete a session (requires `--session`) |
+| GET | `/v1/session/get` | Get session metadata (requires `--session`) |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
 
@@ -566,7 +643,7 @@ KV cache for repeated context patterns (system prompts, tool definitions, boiler
 │  Context Intelligence                                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
 │  │ Memory Store │  │ Impact Graph │  │ Session Context Windows  │   │
-│  │  (shipped)   │  │  (#30)       │  │  (#31)                   │   │
+│  │  (shipped)   │  │  (#30)       │  │  (shipped)               │   │
 │  └──────────────┘  └──────────────┘  └──────────────────────────┘   │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐    │
@@ -604,7 +681,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | Feature | Issue | Status | Description |
 |---------|-------|--------|-------------|
 | **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Shipped | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay, token-budgeted recall. See [Context Memory](#context-memory). |
-| **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Planned | Stateful context windows for long-running agents. Push context incrementally, Distill keeps it deduplicated and within budget. |
+| **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Shipped | Stateful context windows with token budgets, hierarchical compression, and importance-based eviction. See [Session Management](#session-management). |
 
 ### Code Intelligence
 

@@ -11,6 +11,7 @@ import (
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/memory"
 	"github.com/Siddhant-K-code/distill/pkg/retriever"
+	"github.com/Siddhant-K-code/distill/pkg/session"
 	pcretriever "github.com/Siddhant-K-code/distill/pkg/retriever/pinecone"
 	qdretriever "github.com/Siddhant-K-code/distill/pkg/retriever/qdrant"
 	"github.com/Siddhant-K-code/distill/pkg/types"
@@ -92,6 +93,8 @@ func init() {
 	// Memory store
 	mcpCmd.Flags().Bool("memory", false, "Enable persistent memory store")
 	mcpCmd.Flags().String("memory-db", "distill-memory.db", "SQLite database path for memory store")
+	mcpCmd.Flags().Bool("session", false, "Enable session management")
+	mcpCmd.Flags().String("session-db", "distill-sessions.db", "SQLite database path for session store")
 
 	// Default deduplication settings
 	mcpCmd.Flags().Int("over-fetch-k", 50, "Default over-fetch count")
@@ -102,10 +105,11 @@ func init() {
 
 // MCPServer wraps the MCP server with Distill capabilities
 type MCPServer struct {
-	broker   *contextlab.Broker
-	embedder retriever.EmbeddingProvider
-	cfg      contextlab.BrokerConfig
-	memStore *memory.SQLiteStore
+	broker    *contextlab.Broker
+	embedder  retriever.EmbeddingProvider
+	cfg       contextlab.BrokerConfig
+	memStore  *memory.SQLiteStore
+	sessStore *session.SQLiteStore
 }
 
 func runMCP(cmd *cobra.Command, args []string) error {
@@ -164,6 +168,20 @@ func runMCP(cmd *cobra.Command, args []string) error {
 		}
 		defer func() { _ = memStore.Close() }()
 		mcpSrv.memStore = memStore
+	}
+
+	// Create session store (opt-in)
+	enableSession, _ := cmd.Flags().GetBool("session")
+	if enableSession {
+		sessDBPath, _ := cmd.Flags().GetString("session-db")
+		sessCfg := session.DefaultConfig()
+		sessCfg.DefaultDedupThreshold = threshold
+		sessStore, err := session.NewSQLiteStore(sessDBPath, sessCfg)
+		if err != nil {
+			return fmt.Errorf("failed to create session store: %w", err)
+		}
+		defer func() { _ = sessStore.Close() }()
+		mcpSrv.sessStore = sessStore
 	}
 
 	// Create embedding provider if OpenAI key is provided
@@ -429,6 +447,70 @@ Use this to clean up outdated or incorrect memories.`),
 			mcp.WithDescription("Get statistics about the persistent memory store."),
 		)
 		s.AddTool(memoryStatsTool, m.handleMemoryStats)
+	}
+
+	// Session tools (opt-in via --session)
+	if m.sessStore != nil {
+		createSessionTool := mcp.NewTool("create_session",
+			mcp.WithDescription(`Create a new context window session with a token budget.
+
+Use this at the start of a task to track context incrementally.`),
+			mcp.WithString("session_id",
+				mcp.Description("Session ID (auto-generated if empty)"),
+			),
+			mcp.WithNumber("max_tokens",
+				mcp.Description("Token budget for the session (default: 128000)"),
+			),
+		)
+		s.AddTool(createSessionTool, m.handleCreateSession)
+
+		pushSessionTool := mcp.NewTool("push_session",
+			mcp.WithDescription(`Push context entries to a session. Entries are deduplicated
+and the token budget is enforced via compression and eviction.`),
+			mcp.WithString("session_id",
+				mcp.Description("Session ID"),
+				mcp.Required(),
+			),
+			mcp.WithString("content",
+				mcp.Description("Entry content"),
+				mcp.Required(),
+			),
+			mcp.WithString("role",
+				mcp.Description("Entry role: user, assistant, tool, system (default: tool)"),
+			),
+			mcp.WithString("source",
+				mcp.Description("Entry source (e.g. file_read, search)"),
+			),
+			mcp.WithNumber("importance",
+				mcp.Description("Entry importance 0-1 (default: 0.5, higher = harder to evict)"),
+			),
+		)
+		s.AddTool(pushSessionTool, m.handlePushSession)
+
+		sessionContextTool := mcp.NewTool("session_context",
+			mcp.WithDescription(`Read the current context window for a session.
+Returns entries in push order with compression levels and token counts.`),
+			mcp.WithString("session_id",
+				mcp.Description("Session ID"),
+				mcp.Required(),
+			),
+			mcp.WithNumber("max_tokens",
+				mcp.Description("Max tokens to return (0 = all)"),
+			),
+			mcp.WithString("role",
+				mcp.Description("Filter by role"),
+			),
+		)
+		s.AddTool(sessionContextTool, m.handleSessionContext)
+
+		deleteSessionTool := mcp.NewTool("delete_session",
+			mcp.WithDescription("Delete a session and all its entries."),
+			mcp.WithString("session_id",
+				mcp.Description("Session ID"),
+				mcp.Required(),
+			),
+		)
+		s.AddTool(deleteSessionTool, m.handleDeleteSession)
 	}
 }
 
