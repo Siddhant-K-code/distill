@@ -24,8 +24,11 @@ It clusters semantically similar chunks, picks the best representative from each
 # Build
 go build -o distill .
 
-# Start MCP server
+# Start MCP server (dedup only)
 ./distill mcp
+
+# With memory and sessions enabled
+./distill mcp --memory --session
 ```
 
 ### Remote (HTTP) - Hosted deployment
@@ -33,6 +36,9 @@ go build -o distill .
 ```bash
 # Start HTTP server
 ./distill mcp --transport http --port 8081
+
+# With all features
+./distill mcp --transport http --port 8081 --memory --session
 
 # Or deploy to Fly.io
 fly deploy -c fly.mcp.toml
@@ -74,6 +80,78 @@ Query a vector database with automatic deduplication. Requires `--backend` flag.
 
 Analyze chunks for redundancy without removing any. Use to understand overlap before deduplicating.
 
+### `store_memory` (requires `--memory`)
+
+Store context that should persist across sessions. Memories are deduplicated on write.
+
+```json
+{
+  "text": "Auth service uses JWT with RS256 signing",
+  "tags": ["auth", "jwt"],
+  "source": "code_review"
+}
+```
+
+### `recall_memory` (requires `--memory`)
+
+Recall relevant memories by semantic similarity + recency.
+
+```json
+{
+  "query": "How does authentication work?",
+  "max_results": 5,
+  "tags": ["auth"]
+}
+```
+
+### `forget_memory` (requires `--memory`)
+
+Remove memories by tag or age.
+
+### `memory_stats` (requires `--memory`)
+
+Get memory store statistics (total count, by decay level, by source).
+
+### `create_session` (requires `--session`)
+
+Create a token-budgeted context window for a task.
+
+```json
+{
+  "session_id": "fix-auth-bug",
+  "max_tokens": 128000
+}
+```
+
+### `push_session` (requires `--session`)
+
+Push context entries to a session. Entries are deduplicated and the token budget is enforced via compression and eviction.
+
+```json
+{
+  "session_id": "fix-auth-bug",
+  "content": "File: auth/jwt.go\n...",
+  "role": "tool",
+  "source": "file_read",
+  "importance": 0.8
+}
+```
+
+### `session_context` (requires `--session`)
+
+Read the current context window. Returns entries in push order with compression levels and token counts.
+
+```json
+{
+  "session_id": "fix-auth-bug",
+  "max_tokens": 50000
+}
+```
+
+### `delete_session` (requires `--session`)
+
+Delete a session and all its entries.
+
 ## Resources
 
 ### `distill://system-prompt`
@@ -102,13 +180,28 @@ Arguments:
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
-**Local (stdio):**
+**Local (stdio) - dedup only:**
 ```json
 {
   "mcpServers": {
     "distill": {
       "command": "/path/to/distill",
       "args": ["mcp"]
+    }
+  }
+}
+```
+
+**With memory and sessions:**
+```json
+{
+  "mcpServers": {
+    "distill": {
+      "command": "/path/to/distill",
+      "args": ["mcp", "--memory", "--session"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-key"
+      }
     }
   }
 }
@@ -131,7 +224,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "distill": {
       "command": "/path/to/distill",
-      "args": ["mcp", "--backend", "pinecone", "--index", "my-index"],
+      "args": ["mcp", "--backend", "pinecone", "--index", "my-index", "--memory", "--session"],
       "env": {
         "PINECONE_API_KEY": "your-api-key",
         "OPENAI_API_KEY": "your-openai-key"
@@ -219,7 +312,30 @@ AI: [calls analyze_redundancy]
 AI: "Found 40% redundancy across 3 clusters. Want me to deduplicate?"
 ```
 
-### Pattern 4: Direct Vector DB Query
+### Pattern 4: Session-Based Context Tracking
+
+Track context across a multi-step task:
+
+```
+1. AI creates a session: create_session("fix-auth-bug", 128000)
+2. AI reads files: push_session(role="tool", content=file, source="file_read")
+3. AI reads tests: push_session(role="tool", content=tests, source="file_read")
+4. Budget exceeded → oldest low-importance entries compressed automatically
+5. AI reads context: session_context() → deduplicated, budget-aware window
+6. Task done: delete_session()
+```
+
+### Pattern 5: Cross-Session Memory
+
+Persist knowledge that should survive across sessions:
+
+```
+1. AI discovers a pattern: store_memory("Auth uses JWT with RS256", tags=["auth"])
+2. Next session, different task: recall_memory("How does auth work?")
+3. AI gets relevant memories without re-reading files
+```
+
+### Pattern 6: Direct Vector DB Query
 
 If backend is configured, query with automatic deduplication:
 

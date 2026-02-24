@@ -20,6 +20,18 @@ LLMs are non-deterministic. The same input can produce different compressed outp
 
 ---
 
+### What is Context Memory?
+
+Persistent memory that accumulates knowledge across agent sessions. Store context once, recall it later by semantic similarity + recency. Memories are deduplicated on write and compressed over time through hierarchical decay (full text → summary → keywords → evicted). Enable with `--memory` on the `api` or `mcp` commands.
+
+### What are Sessions?
+
+Token-budgeted context windows for long-running agent tasks. Push context incrementally as the agent works - Distill deduplicates entries, compresses aging ones, and evicts when the budget is exceeded. The `preserve_recent` setting keeps the N most recent entries at full fidelity. Enable with `--session` on the `api` or `mcp` commands.
+
+### How is Context Memory different from Sessions?
+
+Memory is cross-session: knowledge persists after a session ends and can be recalled in future sessions. Sessions are within-task: a bounded context window that tracks what the agent has seen during a single task, enforcing a token budget. Use memory for long-term knowledge, sessions for working context.
+
 ## Algorithms
 
 ### Why agglomerative clustering instead of K-Means?
@@ -108,6 +120,10 @@ Yes. The HTTP API is framework-agnostic. MCP works with any MCP-compatible clien
 
 LangChain's `search_type="mmr"` applies MMR at the vector DB level - a single re-ranking step. Distill runs a multi-stage pipeline: cache lookup, agglomerative clustering (groups similar chunks), representative selection (picks the best from each group), compression (reduces token count), then MMR (diversity re-ranking). The clustering step is the key difference - it understands group structure, not just pairwise similarity.
 
+### What MCP tools does Distill expose?
+
+The base MCP server exposes `deduplicate_context` and `analyze_redundancy`. With `--memory`, it adds `store_memory`, `recall_memory`, `forget_memory`, `memory_stats`. With `--session`, it adds `create_session`, `push_session`, `session_context`, `delete_session`. Enable both with `distill mcp --memory --session`.
+
 ### Can I use Distill with local models (Ollama, vLLM)?
 
 The dedup pipeline itself doesn't call any LLM - it's pure math (cosine distance, clustering). The only external dependency is for embedding generation when you send text without pre-computed embeddings. Multi-provider embedding support (Ollama, Azure, Cohere, HuggingFace) is planned in [#33](https://github.com/Siddhant-K-code/distill/issues/33).
@@ -180,8 +196,10 @@ Yes, AGPL-3.0. The full pipeline, CLI, API server, MCP server, and all algorithm
 
 ### What's on the roadmap?
 
-Three pillars:
+**Shipped:**
+- **Context Memory** - Persistent deduplicated memory across sessions with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29))
+- **Session Management** - Token-budgeted context windows with compression and eviction ([#31](https://github.com/Siddhant-K-code/distill/issues/31))
 
-1. **Context Memory** - Persistent deduplicated memory across agent sessions with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29), [#31](https://github.com/Siddhant-K-code/distill/issues/31))
-2. **Code Intelligence** - Dependency graphs, co-change patterns, blast radius analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
-3. **Platform** - Python SDK, multi-provider embeddings, batch API ([#5](https://github.com/Siddhant-K-code/distill/issues/5), [#33](https://github.com/Siddhant-K-code/distill/issues/33), [#11](https://github.com/Siddhant-K-code/distill/issues/11))
+**Upcoming:**
+1. **Code Intelligence** - Dependency graphs, co-change patterns, blast radius analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
+2. **Platform** - Python SDK, multi-provider embeddings, batch API ([#5](https://github.com/Siddhant-K-code/distill/issues/5), [#33](https://github.com/Siddhant-K-code/distill/issues/33), [#11](https://github.com/Siddhant-K-code/distill/issues/11))

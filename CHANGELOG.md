@@ -2,6 +2,23 @@
 
 All notable changes to Distill are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Session-based context window management** (`pkg/session`) — Token-budgeted context windows for long-running agent sessions. Entries are deduplicated on push, compressed through hierarchical levels (full text → summary → sentence → keywords), and evicted when the budget is exceeded. Lowest-importance entries are compressed first. ([#38](https://github.com/Siddhant-K-code/distill/pull/38), closes [#31](https://github.com/Siddhant-K-code/distill/issues/31))
+- **Session CLI** — `distill session create/push/context/delete` commands. ([#38](https://github.com/Siddhant-K-code/distill/pull/38))
+- **Session HTTP API** — `/v1/session/create`, `/push`, `/context`, `/delete`, `/get` endpoints. Opt-in via `--session` flag. ([#38](https://github.com/Siddhant-K-code/distill/pull/38))
+- **Session MCP tools** — `create_session`, `push_session`, `session_context`, `delete_session` for Claude Desktop, Cursor, and Amp. Opt-in via `--session` flag. ([#38](https://github.com/Siddhant-K-code/distill/pull/38))
+
+### Stats
+
+- 9 files changed, 1,928 insertions, 6 deletions
+- 1 new package: `pkg/session`
+- 13 new tests
+
+---
+
 ## [v0.3.0] - 2026-02-23
 
 Feature release adding persistent context memory, SSE streaming, OpenTelemetry tracing, and project documentation.

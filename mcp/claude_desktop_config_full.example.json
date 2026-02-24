@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "distill": {
+      "command": "/path/to/distill",
+      "args": [
+        "mcp",
+        "--memory",
+        "--session",
+        "--backend", "pinecone",
+        "--index", "your-index-name"
+      ],
+      "env": {
+        "PINECONE_API_KEY": "your-pinecone-api-key",
+        "OPENAI_API_KEY": "your-openai-api-key"
+      }
+    }
+  }
+}
