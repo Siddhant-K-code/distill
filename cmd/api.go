@@ -46,6 +46,8 @@ func init() {
 	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
 	apiCmd.Flags().String("api-keys", "", "Comma-separated list of valid API keys (or use DISTILL_API_KEYS)")
 	apiCmd.Flags().Bool("memory", false, "Enable persistent memory store")
+	apiCmd.Flags().String("memory-backend", "sqlite", "Memory store backend: sqlite or postgres")
+	apiCmd.Flags().String("memory-dsn", "", "Memory store DSN (file path for sqlite, connection string for postgres)")
 	apiCmd.Flags().Bool("session", false, "Enable session management")
 	apiCmd.Flags().String("session-db", "distill-sessions.db", "SQLite database path for session store")
 
@@ -184,15 +186,23 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	// Setup memory store (opt-in)
 	enableMemory, _ := cmd.Flags().GetBool("memory")
 	if enableMemory {
-		memDBPath := viper.GetString("memory.db_path")
-		if memDBPath == "" {
-			memDBPath = "distill-memory.db"
+		memBackend, _ := cmd.Flags().GetString("memory-backend")
+		memDSN, _ := cmd.Flags().GetString("memory-dsn")
+		// Fall back to config file values
+		if memDSN == "" {
+			memDSN = viper.GetString("memory.dsn")
+		}
+		if memDSN == "" {
+			memDSN = viper.GetString("memory.db_path")
+		}
+		if memBackend == "sqlite" && memDSN == "" {
+			memDSN = "distill-memory.db"
 		}
 		memThreshold := viper.GetFloat64("memory.dedup_threshold")
 		if memThreshold == 0 {
 			memThreshold = 0.15
 		}
-		memStore, err := memoryStoreFromConfig(memDBPath, memThreshold)
+		memStore, err := memoryStoreFromConfig(memBackend, memDSN, memThreshold)
 		if err != nil {
 			return fmt.Errorf("failed to create memory store: %w", err)
 		}

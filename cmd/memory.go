@@ -250,11 +250,22 @@ func runMemoryStats(cmd *cobra.Command, args []string) error {
 
 // memoryStoreFromConfig creates a memory store from the API server config.
 // Used by the API server and MCP server.
-func memoryStoreFromConfig(dbPath string, threshold float64) (*memory.SQLiteStore, error) {
-	if dbPath == "" {
-		dbPath = "distill-memory.db"
-	}
+// backend: "sqlite" (default) or "postgres"
+// dsn: database path (sqlite) or connection string (postgres)
+func memoryStoreFromConfig(backend, dsn string, threshold float64) (memory.Store, error) {
 	cfg := memory.DefaultConfig()
 	cfg.DedupThreshold = threshold
-	return memory.NewSQLiteStore(dbPath, cfg)
+
+	switch backend {
+	case "postgres":
+		if dsn == "" {
+			return nil, fmt.Errorf("--memory-dsn is required for postgres backend")
+		}
+		return memory.NewPostgresStore(dsn, cfg)
+	default:
+		if dsn == "" {
+			dsn = "distill-memory.db"
+		}
+		return memory.NewSQLiteStore(dsn, cfg)
+	}
 }

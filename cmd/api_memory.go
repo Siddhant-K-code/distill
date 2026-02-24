@@ -13,7 +13,7 @@ import (
 
 // MemoryAPI handles memory-related HTTP endpoints.
 type MemoryAPI struct {
-	store    *memory.SQLiteStore
+	store    memory.Store
 	embedder retriever.EmbeddingProvider
 }
 

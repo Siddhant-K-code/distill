@@ -92,7 +92,9 @@ func init() {
 
 	// Memory store
 	mcpCmd.Flags().Bool("memory", false, "Enable persistent memory store")
-	mcpCmd.Flags().String("memory-db", "distill-memory.db", "SQLite database path for memory store")
+	mcpCmd.Flags().String("memory-backend", "sqlite", "Memory store backend: sqlite or postgres")
+	mcpCmd.Flags().String("memory-dsn", "", "Memory store DSN (file path for sqlite, connection string for postgres")
+	mcpCmd.Flags().String("memory-db", "distill-memory.db", "SQLite database path for memory store (deprecated, use --memory-dsn)")
 	mcpCmd.Flags().Bool("session", false, "Enable session management")
 	mcpCmd.Flags().String("session-db", "distill-sessions.db", "SQLite database path for session store")
 
@@ -108,7 +110,7 @@ type MCPServer struct {
 	broker    *contextlab.Broker
 	embedder  retriever.EmbeddingProvider
 	cfg       contextlab.BrokerConfig
-	memStore  *memory.SQLiteStore
+	memStore  memory.Store
 	sessStore *session.SQLiteStore
 }
 
@@ -159,10 +161,12 @@ func runMCP(cmd *cobra.Command, args []string) error {
 	// Create memory store (opt-in)
 	enableMemory, _ := cmd.Flags().GetBool("memory")
 	if enableMemory {
-		memDBPath, _ := cmd.Flags().GetString("memory-db")
-		memCfg := memory.DefaultConfig()
-		memCfg.DedupThreshold = threshold
-		memStore, err := memory.NewSQLiteStore(memDBPath, memCfg)
+		memBackend, _ := cmd.Flags().GetString("memory-backend")
+		memDSN, _ := cmd.Flags().GetString("memory-dsn")
+		if memDSN == "" {
+			memDSN, _ = cmd.Flags().GetString("memory-db")
+		}
+		memStore, err := memoryStoreFromConfig(memBackend, memDSN, threshold)
 		if err != nil {
 			return fmt.Errorf("failed to create memory store: %w", err)
 		}
