@@ -212,7 +212,16 @@ See [mcp/README.md](mcp/README.md) for more configuration options.
 
 Persistent memory that accumulates knowledge across agent sessions. Memories are deduplicated on write, ranked by relevance + recency on recall, and compressed over time through hierarchical decay.
 
-Enable with the `--memory` flag on `api` or `mcp` commands.
+Enable with the `--memory` flag on `api` or `mcp` commands. Supports SQLite (default, local) and PostgreSQL (persistent, recommended for production).
+
+```bash
+# SQLite (default - local file, good for development)
+distill api --memory
+
+# PostgreSQL (persistent - recommended for production/Supabase)
+distill api --memory --memory-backend postgres \
+  --memory-dsn 'postgres://user:pass@host:5432/db?sslmode=require'
+```
 
 ### CLI
 
@@ -273,8 +282,13 @@ Accessing a memory resets its decay clock. Configure ages via `distill.yaml`:
 
 ```yaml
 memory:
+  # SQLite (default)
   db_path: distill-memory.db
   dedup_threshold: 0.15
+
+  # Or PostgreSQL/Supabase
+  # backend: postgres
+  # dsn: postgres://user:pass@host:5432/db?sslmode=require
 ```
 
 ## Session Management
@@ -431,7 +445,9 @@ auth:
     - ${DISTILL_API_KEY}
 
 memory:
-  db_path: distill-memory.db
+  db_path: distill-memory.db       # SQLite (default)
+  # backend: postgres              # Use 'postgres' for Supabase/PostgreSQL
+  # dsn: ${DATABASE_URL}           # Postgres connection string
   dedup_threshold: 0.15
 
 session:
@@ -448,6 +464,7 @@ Environment variables can be referenced using `${VAR}` or `${VAR:-default}` synt
 OPENAI_API_KEY      # For text → embedding conversion (see note below)
 PINECONE_API_KEY    # For Pinecone backend
 QDRANT_URL          # For Qdrant backend (default: localhost:6334)
+DATABASE_URL        # For Postgres memory backend (Supabase connection string)
 DISTILL_API_KEYS    # Optional: protect your self-hosted instance (see below)
 ```
 

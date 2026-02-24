@@ -22,7 +22,7 @@ LLMs are non-deterministic. The same input can produce different compressed outp
 
 ### What is Context Memory?
 
-Persistent memory that accumulates knowledge across agent sessions. Store context once, recall it later by semantic similarity + recency. Memories are deduplicated on write and compressed over time through hierarchical decay (full text → summary → keywords → evicted). Enable with `--memory` on the `api` or `mcp` commands.
+Persistent memory that accumulates knowledge across agent sessions. Store context once, recall it later by semantic similarity + recency. Memories are deduplicated on write and compressed over time through hierarchical decay (full text → summary → keywords → evicted). Enable with `--memory` on the `api` or `mcp` commands. Supports SQLite (default, local) and PostgreSQL/Supabase (`--memory-backend postgres`) for persistent storage.
 
 ### What are Sessions?
 

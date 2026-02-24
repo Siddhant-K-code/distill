@@ -2,6 +2,14 @@
 
 All notable changes to Distill are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **PostgreSQL/Supabase memory backend** — Persistent memory storage using Postgres instead of ephemeral SQLite. New `--memory-backend postgres` and `--memory-dsn` flags on `api` and `mcp` commands. Implements the same `Store` interface as SQLiteStore. ([#40](https://github.com/Siddhant-K-code/distill/pull/40))
+
+---
+
 ## [v0.4.0] - 2026-02-24
 
 ### Added

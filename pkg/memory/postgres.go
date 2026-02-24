@@ -331,7 +331,6 @@ func (s *PostgresStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetR
 	if !req.OlderThan.IsZero() {
 		conditions = append(conditions, fmt.Sprintf("created_at < $%d", argIdx))
 		args = append(args, req.OlderThan.UTC())
-		argIdx++
 	}
 
 	if len(conditions) == 0 {
