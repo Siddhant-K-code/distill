@@ -183,7 +183,11 @@ curl -X POST http://localhost:8080/v1/retrieve \
 Works with Claude, Cursor, Amp, and other MCP-compatible assistants:
 
 ```bash
+# Dedup only
 distill mcp
+
+# With memory and sessions
+distill mcp --memory --session
 ```
 
 Add to Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -193,7 +197,10 @@ Add to Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_conf
   "mcpServers": {
     "distill": {
       "command": "/path/to/distill",
-      "args": ["mcp"]
+      "args": ["mcp", "--memory", "--session"],
+      "env": {
+        "OPENAI_API_KEY": "your-key"
+      }
     }
   }
 }
@@ -422,6 +429,15 @@ retriever:
 auth:
   api_keys:
     - ${DISTILL_API_KEY}
+
+memory:
+  db_path: distill-memory.db
+  dedup_threshold: 0.15
+
+session:
+  db_path: distill-sessions.db
+  dedup_threshold: 0.15
+  max_tokens: 128000
 ```
 
 Environment variables can be referenced using `${VAR}` or `${VAR:-default}` syntax.
@@ -613,6 +629,14 @@ Reduces token count while preserving meaning. Three strategies:
 - **Pruner** - Strips filler phrases, redundant qualifiers, and boilerplate patterns
 
 Strategies can be chained via `compress.Pipeline`. Configure with target reduction ratio (e.g., 0.3 = keep 30% of original).
+
+### Memory (`pkg/memory`)
+
+Persistent context memory across agent sessions. SQLite-backed with write-time deduplication via cosine similarity. Memories decay over time: full text → summary → keywords → evicted. Recall ranked by `(1-w)*similarity + w*recency`. Enable with `--memory` flag.
+
+### Session (`pkg/session`)
+
+Token-budgeted context windows for long-running tasks. Entries are deduplicated on push, compressed through hierarchical levels when the budget is exceeded, and evicted by importance. The `preserve_recent` setting keeps the N most recent entries at full fidelity. Enable with `--session` flag.
 
 ### Cache (`pkg/cache`)
 
