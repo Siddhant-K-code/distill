@@ -16,6 +16,8 @@ Less redundant data. Lower costs. Faster responses. Deterministic results.
 
 **[Learn more →](https://distill.siddhantkhare.com)**
 
+> 📖 Distill implements the 4-layer context engineering stack (Cluster → Select → Rerank → Compress) described in **[The Agentic Engineering Guide](https://agents.siddhantkhare.com/05-context-engineering-stack/)** — a free, open book on AI agent infrastructure.
+
 ```
 Context sources → Distill → LLM
 (RAG, tools, memory, docs)    (reliable outputs)
@@ -819,6 +821,7 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 
 - [Website](https://distill.siddhantkhare.com)
 - [Playground](https://distill.siddhantkhare.com/playground)
+- [The Agentic Engineering Guide](https://agents.siddhantkhare.com) — the book behind the concepts Distill implements
 - [FAQ](FAQ.md)
 - [Blog Post](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
