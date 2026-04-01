@@ -102,7 +102,17 @@ docker run -p 8080:8080 -e OPENAI_API_KEY=your-key ghcr.io/siddhant-k-code/disti
 ```bash
 git clone https://github.com/Siddhant-K-code/distill.git
 cd distill
-go build -o distill .
+make build
+```
+
+Common development targets:
+
+```bash
+make test       # Run all tests
+make lint       # Run golangci-lint
+make bench      # Run benchmarks
+make fmt        # Format source files
+make help       # List all available targets
 ```
 
 ## Quick Start
@@ -807,8 +817,9 @@ Contributions welcome! Check the [open issues](https://github.com/Siddhant-K-cod
 ```bash
 git clone https://github.com/Siddhant-K-code/distill.git
 cd distill
-go build -o distill .
-go test ./...
+make build
+make test
+make lint
 ```
 
 ## License
