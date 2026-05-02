@@ -640,6 +640,40 @@ Persistent context memory across agent sessions. SQLite-backed with write-time d
 
 Token-budgeted context windows for long-running tasks. Entries are deduplicated on push, compressed through hierarchical levels when the budget is exceeded, and evicted by importance. The `preserve_recent` setting keeps the N most recent entries at full fidelity. Enable with `--session` flag.
 
+#### Session-aware cache boundary manager
+
+After each push, Distill automatically evaluates the optimal `cache_control` placement for the next request. Entries that have been present for `min_stable_turns` (default: 2) consecutive pushes without modification are considered stable and included in the cached prefix.
+
+`PushResult` now includes a `cache_boundary` field:
+
+```json
+{
+  "session_id": "task-42",
+  "accepted": 2,
+  "current_tokens": 4200,
+  "budget_remaining": 123800,
+  "cache_boundary": {
+    "markers": [
+      {"entry_id": "abc123", "tokens_up_to_here": 3800, "stable_since_turn": 1}
+    ],
+    "total_stable_tokens": 3800,
+    "advanced": true,
+    "retreated": false
+  }
+}
+```
+
+Configure via `distill.yaml`:
+
+```yaml
+session:
+  cache_boundary:
+    enabled: true
+    min_stable_turns: 2     # pushes before an entry is considered stable
+    min_prefix_tokens: 1024 # Anthropic's minimum cacheable prefix size
+    max_markers: 4          # Anthropic allows up to 4 simultaneous markers
+```
+
 ### Cache (`pkg/cache`)
 
 KV cache for repeated context patterns (system prompts, tool definitions, boilerplate). Sub-millisecond retrieval for cache hits.
@@ -728,6 +762,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Shipped | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay, token-budgeted recall. See [Context Memory](#context-memory). |
 | **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Shipped | Stateful context windows with token budgets, hierarchical compression, and importance-based eviction. See [Session Management](#session-management). |
 | **PatternDetector cache_control annotations** | [#53](https://github.com/Siddhant-K-code/distill/issues/53) | Shipped | `PatternDetector` emits `CacheAnnotation` per chunk and `AnnotateChunksForCache` produces a `CacheControlPlan` with up to 4 Anthropic-compatible markers. |
+| **Session-aware cache boundary manager** | [#51](https://github.com/Siddhant-K-code/distill/issues/51) | Shipped | Auto-advances `cache_control` placement as sessions grow. Stable entries (present ≥ 2 turns unmodified) are included in the cached prefix; boundary retreats when content changes. |
 
 ### Code Intelligence
 
