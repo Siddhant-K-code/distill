@@ -366,15 +366,49 @@ The `preserve_recent` setting (default: 10) keeps the most recent entries at ful
 ## CLI Commands
 
 ```bash
-distill api       # Start standalone API server
-distill serve     # Start server with vector DB connection
-distill mcp       # Start MCP server for AI assistants
-distill memory    # Store, recall, and manage persistent context memories
-distill session   # Manage token-budgeted context windows for agent sessions
-distill analyze   # Analyze a file for duplicates
-distill sync      # Upload vectors to Pinecone with dedup
-distill query     # Test a query from command line
-distill config    # Manage configuration files
+distill api        # Start standalone API server
+distill serve      # Start server with vector DB connection
+distill pipeline   # Run full optimisation pipeline (dedup → compress → summarize)
+distill mcp        # Start MCP server for AI assistants
+distill memory     # Store, recall, and manage persistent context memories
+distill session    # Manage token-budgeted context windows for agent sessions
+distill analyze    # Analyze a file for duplicates
+distill sync       # Upload vectors to Pinecone with dedup
+distill query      # Test a query from command line
+distill config     # Manage configuration files
+distill completion # Generate shell completion scripts (bash/zsh/fish/powershell)
+```
+
+### Pipeline command
+
+```bash
+# Run full pipeline on a JSON chunk array
+echo '[{"id":"1","text":"..."}]' | distill pipeline
+
+# From file, with stats
+distill pipeline --input chunks.json --output optimised.json --stats
+
+# Tune individual stages
+distill pipeline --dedup-threshold 0.2 --compress-ratio 0.4 --summarize --summarize-max-tokens 2000
+
+# Disable a stage
+distill pipeline --no-compress
+```
+
+### Shell completions
+
+```bash
+# Bash (one-time)
+distill completion bash > /etc/bash_completion.d/distill
+
+# Zsh
+distill completion zsh > "${fpath[1]}/_distill"
+
+# Fish
+distill completion fish > ~/.config/fish/completions/distill.fish
+
+# PowerShell
+distill completion powershell | Out-String | Invoke-Expression
 ```
 
 ## API Endpoints
@@ -383,6 +417,10 @@ distill config    # Manage configuration files
 |--------|------|-------------|
 | POST | `/v1/dedupe` | Deduplicate chunks |
 | POST | `/v1/dedupe/stream` | SSE streaming dedup with per-stage progress |
+| POST | `/v1/pipeline` | Full optimisation pipeline (dedup → compress → summarize) |
+| POST | `/v1/batch` | Submit async batch job |
+| GET | `/v1/batch/{id}` | Poll batch job status and progress |
+| GET | `/v1/batch/{id}/results` | Retrieve completed batch results |
 | POST | `/v1/retrieve` | Query vector DB with dedup (requires backend) |
 | POST | `/v1/memory/store` | Store memories with write-time dedup (requires `--memory`) |
 | POST | `/v1/memory/recall` | Recall memories by relevance + recency (requires `--memory`) |
@@ -395,6 +433,58 @@ distill config    # Manage configuration files
 | GET | `/v1/session/get` | Get session metadata (requires `--session`) |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
+
+### Pipeline API
+
+```json
+POST /v1/pipeline
+{
+  "chunks": [{"id": "1", "text": "..."}],
+  "options": {
+    "dedup":     {"enabled": true, "threshold": 0.15},
+    "compress":  {"enabled": true, "target_reduction": 0.5},
+    "summarize": {"enabled": false, "max_tokens": 4000}
+  }
+}
+```
+
+Response includes per-stage token counts, reduction ratios, and latency.
+
+### Batch API
+
+```bash
+# Submit
+curl -X POST /v1/batch -d '{"chunks":[...],"options":{...}}'
+# → {"job_id":"batch_1234","status":"queued"}
+
+# Poll
+curl /v1/batch/batch_1234
+# → {"status":"processing","progress":0.45}
+
+# Results (when completed)
+curl /v1/batch/batch_1234/results
+# → {"chunks":[...],"stats":{...}}
+```
+
+## Logging
+
+Distill uses structured `log/slog` logging. Default output is JSON to stderr.
+
+```go
+import "github.com/Siddhant-K-code/distill/pkg/logging"
+
+// JSON logger (production default)
+logger := logging.New(logging.Config{Level: "info", Format: logging.FormatJSON})
+
+// Text logger for local development
+logger := logging.NewDebug()
+
+// Attach request context
+logger = logging.WithRequestID(logger, requestID)
+logger = logging.WithTraceID(logger, traceID)
+```
+
+Log levels: `debug`, `info` (default), `warn`, `error`.
 
 ## Configuration
 
@@ -973,19 +1063,24 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 
 ### Code Intelligence
 
-| Feature | Issue | Description |
-|---------|-------|-------------|
-| **Change Impact Graph** | [#30](https://github.com/Siddhant-K-code/distill/issues/30) | Dependency graph + co-change patterns from git history. "This PR changes auth/jwt.go - here's the blast radius." |
-| **Semantic Commit Analysis** | [#32](https://github.com/Siddhant-K-code/distill/issues/32) | Find similar past changes, predict incidents. "This diff is 82% similar to the one that caused outage #47." |
+| Feature | Issue | Status | Description |
+|---------|-------|--------|-------------|
+| **Change Impact Graph** | [#30](https://github.com/Siddhant-K-code/distill/issues/30) | Shipped | `pkg/graph`: BFS blast-radius queries over a dependency graph built from Go imports. |
+| **Semantic Commit Analysis** | [#32](https://github.com/Siddhant-K-code/distill/issues/32) | Shipped | `pkg/commits`: Conventional Commits parser, heuristic risk scoring, cosine similarity search over commit embeddings. |
 
 ### Infrastructure
 
-| Feature | Issue | Description |
-|---------|-------|-------------|
-| **Multi-Provider Embeddings** | [#33](https://github.com/Siddhant-K-code/distill/issues/33) | Ollama, Azure OpenAI, Cohere, HuggingFace. Swap providers via config. |
-| **Batch API** | [#11](https://github.com/Siddhant-K-code/distill/issues/11) | Async batch processing for large workloads. |
-| **Python SDK** | [#5](https://github.com/Siddhant-K-code/distill/issues/5) | `pip install distill-ai` with LangChain/LlamaIndex integrations. |
-| **OpenAPI Spec** | [#23](https://github.com/Siddhant-K-code/distill/issues/23) | Swagger UI at `/docs`, auto-generated client SDKs. |
+| Feature | Issue | Status | Description |
+|---------|-------|--------|-------------|
+| **Multi-Provider Embeddings** | [#33](https://github.com/Siddhant-K-code/distill/issues/33) | Shipped | `embedding.NewProvider` factory: OpenAI, Ollama, Cohere via unified `ProviderConfig`. |
+| **Unified Pipeline** | [#4](https://github.com/Siddhant-K-code/distill/issues/4) | Shipped | `POST /v1/pipeline` + `distill pipeline` CLI: dedup → compress → summarize in one call with per-stage stats. |
+| **Batch API** | [#11](https://github.com/Siddhant-K-code/distill/issues/11) | Shipped | `POST /v1/batch`: async job queue with worker pool, progress polling, 24h result retention. |
+| **Structured Logging** | [#27](https://github.com/Siddhant-K-code/distill/issues/27) | Shipped | `pkg/logging`: JSON/text slog logger with debug/info/warn/error levels, request_id and trace_id helpers. |
+| **Shell Completions** | [#26](https://github.com/Siddhant-K-code/distill/issues/26) | Shipped | `distill completion [bash\|zsh\|fish\|powershell]` generates shell completion scripts. |
+| **Benchmark Suite** | [#24](https://github.com/Siddhant-K-code/distill/issues/24) | Shipped | `go test -bench=. ./...` covers cluster, MMR, selector, and compress with deterministic synthetic data. |
+| **Makefile** | [#28](https://github.com/Siddhant-K-code/distill/issues/28) | Shipped | 20+ targets: build, test, bench, lint, fmt, vet, docker, release. |
+| **Python SDK** | [#5](https://github.com/Siddhant-K-code/distill/issues/5) | Planned | `pip install distill-ai` with LangChain/LlamaIndex integrations. |
+| **OpenAPI Spec** | [#23](https://github.com/Siddhant-K-code/distill/issues/23) | Planned | Swagger UI at `/docs`, auto-generated client SDKs. |
 
 See all open issues: [github.com/Siddhant-K-code/distill/issues](https://github.com/Siddhant-K-code/distill/issues)
 
