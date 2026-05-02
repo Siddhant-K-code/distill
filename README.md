@@ -645,8 +645,27 @@ Token-budgeted context windows for long-running tasks. Entries are deduplicated 
 KV cache for repeated context patterns (system prompts, tool definitions, boilerplate). Sub-millisecond retrieval for cache hits.
 
 - **MemoryCache** - In-memory LRU with TTL, configurable size limits (entries and bytes), background cleanup
-- **PatternDetector** - Identifies cacheable content: system prompts, tool/function definitions, code blocks
+- **PatternDetector** - Identifies cacheable content and emits `CacheAnnotation` per chunk. Use `AnnotateChunksForCache` to get a `CacheControlPlan` — up to 4 `cache_control` markers (Anthropic's limit) placed at the highest-token-count stable chunks. Auto-placement is skipped when the caller has already set markers manually.
 - **RedisCache** - Interface for distributed deployments (requires external Redis)
+
+#### Automatic cache_control placement
+
+```go
+detector := cache.NewPatternDetector()
+plan := detector.AnnotateChunksForCache(chunks)
+// plan.Markers lists which chunk indices should receive cache_control markers
+// plan.ManualMarkersPresent is true if the caller already placed markers
+```
+
+Pattern → annotation mapping:
+
+| Pattern | Recommended | Condition |
+|---------|-------------|-----------|
+| `system_prompt` | Yes | Always |
+| `tool_definition` | Yes | Always |
+| `code_block` | Conditional | Token count ≥ 512 |
+| `document` | Yes | Always |
+| `user_message` | No | Dynamic per turn |
 
 ## Architecture
 
@@ -708,6 +727,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 |---------|-------|--------|-------------|
 | **Context Memory Store** | [#29](https://github.com/Siddhant-K-code/distill/issues/29) | Shipped | Persistent, deduplicated memory across sessions. Write-time dedup, hierarchical decay, token-budgeted recall. See [Context Memory](#context-memory). |
 | **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Shipped | Stateful context windows with token budgets, hierarchical compression, and importance-based eviction. See [Session Management](#session-management). |
+| **PatternDetector cache_control annotations** | [#53](https://github.com/Siddhant-K-code/distill/issues/53) | Shipped | `PatternDetector` emits `CacheAnnotation` per chunk and `AnnotateChunksForCache` produces a `CacheControlPlan` with up to 4 Anthropic-compatible markers. |
 
 ### Code Intelligence
 
