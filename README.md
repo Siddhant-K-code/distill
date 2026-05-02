@@ -659,6 +659,38 @@ Strategies can be chained via `compress.Pipeline`. Configure with target reducti
 
 Persistent context memory across agent sessions. SQLite-backed with write-time deduplication via cosine similarity. Memories decay over time: full text → summary → keywords → evicted. Recall ranked by `(1-w)*similarity + w*recency`. Enable with `--memory` flag.
 
+#### Lifecycle events
+
+The `DecayWorker` emits typed events on every state transition so that cache boundary managers and other subscribers can stay in sync:
+
+| Event | When | Cache boundary action |
+|-------|------|-----------------------|
+| `EventCompressed` | Entry compressed to summary or keywords | Retreat boundary — cached prefix is now stale |
+| `EventEvicted` | Entry removed from store | Retreat boundary — entry no longer exists |
+| `EventStabilized` | Entry promoted to stable | Advance boundary to include entry |
+
+Register a handler on any `Store`:
+
+```go
+store.OnLifecycleEvent(func(e memory.MemoryEvent) {
+    // e.Type, e.EntryID, e.TokensBefore, e.TokensAfter, e.CompressionLevel
+})
+```
+
+Multiple handlers can be registered; they are called in registration order. Handlers must be non-blocking.
+
+#### Cache boundary hint on recall
+
+`RecallResult` now includes a `CacheHint` field. Entries with recall relevance ≥ 0.7 are listed as stable candidates, giving the boundary manager early signal without waiting for the normal stability promotion cycle:
+
+```go
+result, _ := store.Recall(ctx, req)
+if result.CacheHint != nil {
+    // result.CacheHint.StableEntryIDs — IDs likely stable this turn
+    // result.CacheHint.ConfidenceScore — mean relevance of returned entries
+}
+```
+
 ### Session (`pkg/session`)
 
 Token-budgeted context windows for long-running tasks. Entries are deduplicated on push, compressed through hierarchical levels when the budget is exceeded, and evicted by importance. The `preserve_recent` setting keeps the N most recent entries at full fidelity. Enable with `--session` flag.
@@ -787,6 +819,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **PatternDetector cache_control annotations** | [#53](https://github.com/Siddhant-K-code/distill/issues/53) | Shipped | `PatternDetector` emits `CacheAnnotation` per chunk and `AnnotateChunksForCache` produces a `CacheControlPlan` with up to 4 Anthropic-compatible markers. |
 | **Session-aware cache boundary manager** | [#51](https://github.com/Siddhant-K-code/distill/issues/51) | Shipped | Auto-advances `cache_control` placement as sessions grow. Stable entries (present ≥ 2 turns unmodified) are included in the cached prefix; boundary retreats when content changes. |
 | **Cache write cost accounting** | [#52](https://github.com/Siddhant-K-code/distill/issues/52) | Shipped | 9 new Prometheus metrics covering Anthropic prompt cache token usage, hit rate, write efficiency, and boundary position. Feed API response usage via `RecordCacheUsage`. |
+| **Memory decay lifecycle events** | [#54](https://github.com/Siddhant-K-code/distill/issues/54) | Shipped | `DecayWorker` emits `EventCompressed` and `EventEvicted` on each transition. `RecallResult` includes a `CacheBoundaryHint` for high-relevance entries. |
 
 ### Code Intelligence
 
