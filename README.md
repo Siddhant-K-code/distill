@@ -583,6 +583,30 @@ Record Anthropic API usage with `metrics.RecordCacheUsage(UsageRecord{...})` aft
 | `distill_cache_hit_rate` | Gauge | Rolling hit rate: `cache_read / (cache_read + cache_creation + input)` |
 | `distill_cache_write_efficiency` | Gauge | Reads/writes ratio — values < 1.0 mean cache writes that expire before being read |
 
+**Per-call-site hit rate tracking**
+
+`CallSiteTracker` records Anthropic API usage per call site and surfaces the worst performers first:
+
+```go
+tracker := metrics.NewCallSiteTracker()
+
+// After each Anthropic API call:
+tracker.Record("agent/planner.go:84", metrics.UsageRecord{
+    CacheCreationInputTokens: resp.Usage.CacheCreationInputTokens,
+    CacheReadInputTokens:     resp.Usage.CacheReadInputTokens,
+    InputTokens:              resp.Usage.InputTokens,
+})
+
+// Inspect
+s := tracker.Stats("agent/planner.go:84")
+fmt.Printf("hit rate: %.0f%%  efficiency: %.1fx\n", s.HitRate()*100, s.WriteEfficiency())
+
+// All call sites, worst hit rate first
+for _, s := range tracker.AllStats() {
+    fmt.Printf("%-40s %.0f%%\n", s.CallSite, s.HitRate()*100)
+}
+```
+
 **Cache boundary metrics** (populated by the session boundary manager)
 
 | Metric | Type | Description |
@@ -874,6 +898,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Memory decay lifecycle events** | [#54](https://github.com/Siddhant-K-code/distill/issues/54) | Shipped | `DecayWorker` emits `EventCompressed` and `EventEvicted` on each transition. `RecallResult` includes a `CacheBoundaryHint` for high-relevance entries. |
 | **Cache-aware dedup** | [#50](https://github.com/Siddhant-K-code/distill/issues/50) | Shipped | `preserve_cache_prefix` option freezes chunks before the last `cache_control` marker so dedup cannot reorder them. Prefix hash and token count reported in stats. |
 | **Prefix stability validator** | [#48](https://github.com/Siddhant-K-code/distill/issues/48) | Shipped | `StabilityValidator` tracks prefix hashes across requests and detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes. |
+| **Per-call-site hit rate tracking** | [#47](https://github.com/Siddhant-K-code/distill/issues/47) | Shipped | `CallSiteTracker` records Anthropic cache usage per call site; `AllStats()` returns worst performers first. |
 
 ### Code Intelligence
 
