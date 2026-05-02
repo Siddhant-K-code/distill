@@ -558,23 +558,34 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	// Convert to internal types
+	// Convert to internal types, preserving cache_control metadata.
 	chunks := make([]types.Chunk, len(req.Chunks))
 	needsEmbedding := false
-
 	for i, c := range req.Chunks {
 		chunks[i] = types.Chunk{
 			ID:        c.ID,
 			Text:      c.Text,
 			Embedding: c.Embedding,
 			Score:     c.Score,
+			Metadata:  make(map[string]interface{}),
+		}
+		if c.CacheControl != "" {
+			chunks[i].Metadata["cache_control"] = c.CacheControl
 		}
 		if len(c.Embedding) == 0 {
 			needsEmbedding = true
 		}
 	}
 
-	// Stage 1: Embedding
+	// Partition into frozen prefix + dedup-eligible suffix when requested.
+	var partition distillcache.PrefixPartition
+	dedupChunks := chunks
+	if req.Options.PreserveCachePrefix {
+		partition = distillcache.PartitionForCacheAwareDedup(chunks)
+		dedupChunks = partition.Suffix
+	}
+
+	// Stage 1: Embedding (suffix only).
 	if needsEmbedding {
 		if s.embedder == nil {
 			_ = sw.SendError(sse.StageEmbedding, "Embeddings required but no embedding provider configured. Either provide embeddings in request or configure OPENAI_API_KEY.")
@@ -583,9 +594,9 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 
 		_ = sw.SendProgress(sse.StageEmbedding, 0)
 
-		_, embSpan := s.tracing.StartEmbedding(ctx, len(chunks))
-		texts := make([]string, len(chunks))
-		for i, c := range chunks {
+		_, embSpan := s.tracing.StartEmbedding(ctx, len(dedupChunks))
+		texts := make([]string, len(dedupChunks))
+		for i, c := range dedupChunks {
 			texts[i] = c.Text
 		}
 
@@ -598,8 +609,8 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 		}
 		embSpan.End()
 
-		for i := range chunks {
-			chunks[i].Embedding = embeddings[i]
+		for i := range dedupChunks {
+			dedupChunks[i].Embedding = embeddings[i]
 		}
 
 		_ = sw.SendProgress(sse.StageEmbedding, 1.0)
@@ -619,20 +630,20 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 		targetK = 0
 	}
 
-	// Stage 2: Clustering
+	// Stage 2: Clustering (suffix only).
 	_ = sw.SendProgress(sse.StageClustering, 0)
 
-	_, clusterSpan := s.tracing.StartClustering(ctx, len(chunks), threshold)
+	_, clusterSpan := s.tracing.StartClustering(ctx, len(dedupChunks), threshold)
 	clusterer := contextlab.NewClusterer(contextlab.ClusterConfig{
 		Threshold: threshold,
 		Linkage:   "average",
 	})
-	clusterResult := clusterer.Cluster(chunks)
+	clusterResult := clusterer.Cluster(dedupChunks)
 	clusterSpan.End()
 
 	_ = sw.SendProgressWithStats(sse.StageClustering, 1.0, map[string]interface{}{
 		"clusters_formed": clusterResult.ClusterCount,
-		"input_count":     len(chunks),
+		"input_count":     len(dedupChunks),
 	})
 
 	// Stage 3: Selection
@@ -667,13 +678,16 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Prepend frozen prefix to deduped suffix.
+	finalChunks := append(partition.Prefix, representatives...)
+
 	latency := time.Since(start)
 
-	telemetry.RecordResult(rootSpan, len(req.Chunks), len(representatives), clusterResult.ClusterCount, latency)
+	telemetry.RecordResult(rootSpan, len(req.Chunks), len(finalChunks), clusterResult.ClusterCount, latency)
 
 	// Build response chunks
-	outputChunks := make([]DedupeChunkResponse, len(representatives))
-	for i, c := range representatives {
+	outputChunks := make([]DedupeChunkResponse, len(finalChunks))
+	for i, c := range finalChunks {
 		outputChunks[i] = DedupeChunkResponse{
 			ID:        c.ID,
 			Text:      c.Text,
@@ -684,18 +698,25 @@ func (s *APIServer) handleDedupeStream(w http.ResponseWriter, r *http.Request) {
 
 	reductionPct := 0
 	if len(req.Chunks) > 0 {
-		reductionPct = int((1 - float64(len(representatives))/float64(len(req.Chunks))) * 100)
+		reductionPct = int((1 - float64(len(finalChunks))/float64(len(req.Chunks))) * 100)
 	}
 
 	stats := DedupeStats{
 		InputCount:   len(req.Chunks),
-		OutputCount:  len(representatives),
+		OutputCount:  len(finalChunks),
 		ClusterCount: clusterResult.ClusterCount,
 		ReductionPct: reductionPct,
 		LatencyMs:    latency.Milliseconds(),
 	}
+	if req.Options.PreserveCachePrefix && partition.MarkerCount > 0 {
+		stats.CachePrefixFrozen = true
+		stats.CachePrefixTokens = partition.FrozenPrefixTokens
+		stats.CachePrefixHash = partition.PrefixHash
+		stats.SuffixInputCount = len(partition.Suffix)
+		stats.SuffixOutputCount = len(representatives)
+	}
 
-	s.metrics.RecordDedup("/v1/dedupe/stream", len(req.Chunks), len(representatives), clusterResult.ClusterCount)
+	s.metrics.RecordDedup("/v1/dedupe/stream", len(req.Chunks), len(finalChunks), clusterResult.ClusterCount)
 
 	// Send final complete event
 	_ = sw.SendComplete(outputChunks, stats)
