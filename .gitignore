@@ -1,3 +1,6 @@
+# Generated shell completion scripts (produced by scripts/completions.sh)
+completions/
+
 # Binaries
 distill
 *.exe

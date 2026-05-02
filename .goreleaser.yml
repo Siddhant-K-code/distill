@@ -2,6 +2,7 @@ version: 2
 
 before:
   hooks:
+    - ./scripts/completions.sh
     - go mod tidy
 
 builds:
@@ -28,6 +29,8 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - completions/*
 
 checksum:
   name_template: 'checksums.txt'
