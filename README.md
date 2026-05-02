@@ -105,6 +105,19 @@ cd distill
 go build -o distill .
 ```
 
+## Development
+
+```bash
+make build        # compile ./distill
+make test         # go test ./...
+make check        # fmt + vet + test
+make test-cover   # test with coverage report
+make bench        # run benchmarks
+make lint         # golangci-lint (requires golangci-lint in PATH)
+make docker-build # build Docker image
+make help         # list all targets
+```
+
 ## Quick Start
 
 ### 1. Standalone API (No Vector DB Required)
