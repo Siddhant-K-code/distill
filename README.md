@@ -795,6 +795,28 @@ Response stats when prefix is frozen:
 }
 ```
 
+#### TTL-aware cache tracker
+
+`TTLTracker` monitors Anthropic's 5-minute prompt cache TTL per prefix hash. Use it to detect cold-start penalties and schedule batch requests before the cache expires:
+
+```go
+tracker := cache.NewTTLTracker(0) // 0 = use AnthropicCacheTTL (5 min)
+
+// After each request that carries a cache_control marker:
+wasAlive := tracker.Touch(plan.PrefixHash)
+if !wasAlive {
+    log.Warn("cache cold start — first request or TTL expired")
+}
+
+// For batch workloads: latest safe time to send next request
+deadline := tracker.ScheduleDeadline(plan.PrefixHash, 30*time.Second)
+time.Sleep(time.Until(deadline))
+
+// Inspect expiry state
+entry := tracker.Entry(plan.PrefixHash)
+fmt.Printf("hits: %d  misses: %d  alive: %v\n", entry.HitCount, entry.MissCount, entry.IsAlive())
+```
+
 #### Prefix stability validator
 
 Detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes — the most common cause of 0% cache hit rates:
@@ -899,6 +921,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Cache-aware dedup** | [#50](https://github.com/Siddhant-K-code/distill/issues/50) | Shipped | `preserve_cache_prefix` option freezes chunks before the last `cache_control` marker so dedup cannot reorder them. Prefix hash and token count reported in stats. |
 | **Prefix stability validator** | [#48](https://github.com/Siddhant-K-code/distill/issues/48) | Shipped | `StabilityValidator` tracks prefix hashes across requests and detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes. |
 | **Per-call-site hit rate tracking** | [#47](https://github.com/Siddhant-K-code/distill/issues/47) | Shipped | `CallSiteTracker` records Anthropic cache usage per call site; `AllStats()` returns worst performers first. |
+| **TTL-aware cache tracker** | [#49](https://github.com/Siddhant-K-code/distill/issues/49) | Shipped | `TTLTracker` monitors Anthropic's 5-minute cache TTL per prefix hash. `ScheduleDeadline` tells batch jobs the latest safe time to send the next request. |
 
 ### Code Intelligence
 
