@@ -560,6 +560,8 @@ Distill exposes a Prometheus-compatible `/metrics` endpoint on both `api` and `s
 
 ### Metrics
 
+**Pipeline metrics**
+
 | Metric | Type | Description |
 |--------|------|-------------|
 | `distill_requests_total` | Counter | Total requests by endpoint and status code |
@@ -568,6 +570,27 @@ Distill exposes a Prometheus-compatible `/metrics` endpoint on both `api` and `s
 | `distill_reduction_ratio` | Histogram | Chunk reduction ratio per request |
 | `distill_active_requests` | Gauge | Currently processing requests |
 | `distill_clusters_formed_total` | Counter | Clusters formed during deduplication |
+
+**Cache cost metrics**
+
+Record Anthropic API usage with `metrics.RecordCacheUsage(UsageRecord{...})` after each API call to track prompt cache efficiency:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `distill_cache_creation_tokens_total` | Counter | Tokens written to Anthropic cache (charged at 1.25× input price) |
+| `distill_cache_read_tokens_total` | Counter | Tokens read from Anthropic cache (charged at 0.10× input price) |
+| `distill_uncached_input_tokens_total` | Counter | Uncached input tokens (charged at 1.00×) |
+| `distill_cache_hit_rate` | Gauge | Rolling hit rate: `cache_read / (cache_read + cache_creation + input)` |
+| `distill_cache_write_efficiency` | Gauge | Reads/writes ratio — values < 1.0 mean cache writes that expire before being read |
+
+**Cache boundary metrics** (populated by the session boundary manager)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `distill_cache_boundary_position_tokens` | Gauge | Current boundary position in tokens per session |
+| `distill_cache_boundary_advances_total` | Counter | Times the boundary moved forward (more content became stable) |
+| `distill_cache_boundary_retreats_total` | Counter | Times the boundary retreated (content changed or was evicted) |
+| `distill_cache_estimated_savings_tokens_total` | Counter | Estimated tokens saved by prompt caching |
 
 ### Prometheus Scrape Config
 
@@ -763,6 +786,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Session Management** | [#31](https://github.com/Siddhant-K-code/distill/issues/31) | Shipped | Stateful context windows with token budgets, hierarchical compression, and importance-based eviction. See [Session Management](#session-management). |
 | **PatternDetector cache_control annotations** | [#53](https://github.com/Siddhant-K-code/distill/issues/53) | Shipped | `PatternDetector` emits `CacheAnnotation` per chunk and `AnnotateChunksForCache` produces a `CacheControlPlan` with up to 4 Anthropic-compatible markers. |
 | **Session-aware cache boundary manager** | [#51](https://github.com/Siddhant-K-code/distill/issues/51) | Shipped | Auto-advances `cache_control` placement as sessions grow. Stable entries (present ≥ 2 turns unmodified) are included in the cached prefix; boundary retreats when content changes. |
+| **Cache write cost accounting** | [#52](https://github.com/Siddhant-K-code/distill/issues/52) | Shipped | 9 new Prometheus metrics covering Anthropic prompt cache token usage, hit rate, write efficiency, and boundary position. Feed API response usage via `RecordCacheUsage`. |
 
 ### Code Intelligence
 
