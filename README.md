@@ -735,7 +735,59 @@ KV cache for repeated context patterns (system prompts, tool definitions, boiler
 
 - **MemoryCache** - In-memory LRU with TTL, configurable size limits (entries and bytes), background cleanup
 - **PatternDetector** - Identifies cacheable content and emits `CacheAnnotation` per chunk. Use `AnnotateChunksForCache` to get a `CacheControlPlan` — up to 4 `cache_control` markers (Anthropic's limit) placed at the highest-token-count stable chunks. Auto-placement is skipped when the caller has already set markers manually.
+- **PrefixPartition** - Splits a chunk slice into a frozen cache prefix and a dedup-eligible suffix. Used by the `preserve_cache_prefix` dedup option to prevent Distill from reordering chunks that appear before a `cache_control` breakpoint.
+- **StabilityValidator** - Tracks prefix hashes across requests and detects dynamic content bleeding into cached prefixes. Reports instability with a likely cause and supports static text analysis for pre-flight checks.
 - **RedisCache** - Interface for distributed deployments (requires external Redis)
+
+#### Cache-aware dedup (`preserve_cache_prefix`)
+
+Distill's dedup pipeline can reorder chunks to improve context quality. When prompt caching is active, reordering chunks before the `cache_control` breakpoint changes the prefix hash and causes a cache miss. Use `preserve_cache_prefix` to freeze the prefix:
+
+```json
+POST /v1/dedupe
+{
+  "chunks": [
+    {"id": "sys", "text": "You are a helpful assistant.", "cache_control": "ephemeral"},
+    {"id": "tool1", "text": "Tool schema JSON...", "cache_control": "ephemeral"},
+    {"id": "msg1", "text": "What is the capital of France?"},
+    {"id": "msg2", "text": "What is the capital of Germany?"}
+  ],
+  "options": {"preserve_cache_prefix": true}
+}
+```
+
+Response stats when prefix is frozen:
+
+```json
+{
+  "stats": {
+    "input_count": 4, "output_count": 3,
+    "cache_prefix_frozen": true,
+    "cache_prefix_tokens": 320,
+    "cache_prefix_hash": "a3f2c1d4e5b6",
+    "suffix_input_count": 2,
+    "suffix_output_count": 1
+  }
+}
+```
+
+#### Prefix stability validator
+
+Detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes — the most common cause of 0% cache hit rates:
+
+```go
+validator := cache.NewStabilityValidator(cache.DefaultStabilityConfig())
+
+// Runtime check — call on every request
+issues := validator.Check("agent/planner.go:84", chunks)
+for _, issue := range issues {
+    log.Warnf("%s", issue) // "cache-prefix-unstable: stability=12% — likely dynamic interpolation: request id"
+}
+
+// Static pre-flight check
+found := validator.ValidateText(systemPromptText)
+// found = ["request id", "timestamp"] if dynamic patterns detected
+```
 
 #### Automatic cache_control placement
 
@@ -820,6 +872,8 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Session-aware cache boundary manager** | [#51](https://github.com/Siddhant-K-code/distill/issues/51) | Shipped | Auto-advances `cache_control` placement as sessions grow. Stable entries (present ≥ 2 turns unmodified) are included in the cached prefix; boundary retreats when content changes. |
 | **Cache write cost accounting** | [#52](https://github.com/Siddhant-K-code/distill/issues/52) | Shipped | 9 new Prometheus metrics covering Anthropic prompt cache token usage, hit rate, write efficiency, and boundary position. Feed API response usage via `RecordCacheUsage`. |
 | **Memory decay lifecycle events** | [#54](https://github.com/Siddhant-K-code/distill/issues/54) | Shipped | `DecayWorker` emits `EventCompressed` and `EventEvicted` on each transition. `RecallResult` includes a `CacheBoundaryHint` for high-relevance entries. |
+| **Cache-aware dedup** | [#50](https://github.com/Siddhant-K-code/distill/issues/50) | Shipped | `preserve_cache_prefix` option freezes chunks before the last `cache_control` marker so dedup cannot reorder them. Prefix hash and token count reported in stats. |
+| **Prefix stability validator** | [#48](https://github.com/Siddhant-K-code/distill/issues/48) | Shipped | `StabilityValidator` tracks prefix hashes across requests and detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes. |
 
 ### Code Intelligence
 
