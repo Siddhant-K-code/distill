@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -267,6 +269,105 @@ func TestPatternDetector_DetectPattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPatternDetector_CacheAnnotation(t *testing.T) {
+	detector := NewPatternDetector()
+
+	tests := []struct {
+		name            string
+		text            string
+		wantRecommended bool
+		wantReason      string
+	}{
+		{
+			name:            "system prompt gets cache annotation",
+			text:            "You are a helpful AI assistant that helps users with coding tasks. Be concise and accurate in all responses.",
+			wantRecommended: true,
+			wantReason:      "system_prompt",
+		},
+		{
+			name:            "tool definition gets cache annotation",
+			text:            `{"type": "function", "function": {"name": "search", "description": "Search the web for information", "parameters": {"type": "object"}}}`,
+			wantRecommended: true,
+			wantReason:      "tool_definition",
+		},
+		{
+			name:            "document gets cache annotation",
+			text:            "This is a regular document with some information about the product and its features for users.",
+			wantRecommended: true,
+			wantReason:      "document",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := detector.DetectPattern(tt.text)
+			if p == nil {
+				t.Fatal("expected pattern, got nil")
+			}
+			if p.CacheAnnotation == nil {
+				t.Fatal("expected CacheAnnotation, got nil")
+			}
+			if p.CacheAnnotation.Recommended != tt.wantRecommended {
+				t.Errorf("Recommended: got %v, want %v", p.CacheAnnotation.Recommended, tt.wantRecommended)
+			}
+			if p.CacheAnnotation.Reason != tt.wantReason {
+				t.Errorf("Reason: got %q, want %q", p.CacheAnnotation.Reason, tt.wantReason)
+			}
+			if p.TokenCount <= 0 {
+				t.Error("expected positive TokenCount")
+			}
+		})
+	}
+}
+
+func TestPatternDetector_AnnotateChunksForCache(t *testing.T) {
+	detector := NewPatternDetector()
+
+	t.Run("selects up to 4 markers by token count", func(t *testing.T) {
+		// Build 5 system-prompt-like chunks of varying sizes.
+		chunks := make([]types.Chunk, 5)
+		for i := range chunks {
+			size := (i + 1) * 300 // 300, 600, 900, 1200, 1500 chars
+			text := "You are a helpful assistant. " + strings.Repeat("x", size)
+			chunks[i] = types.Chunk{ID: fmt.Sprintf("%d", i), Text: text}
+		}
+
+		plan := detector.AnnotateChunksForCache(chunks)
+		if plan.ManualMarkersPresent {
+			t.Error("expected no manual markers")
+		}
+		if len(plan.Markers) > maxCacheMarkers {
+			t.Errorf("expected at most %d markers, got %d", maxCacheMarkers, len(plan.Markers))
+		}
+	})
+
+	t.Run("skips auto-placement when manual markers present", func(t *testing.T) {
+		chunks := []types.Chunk{
+			{
+				ID:   "1",
+				Text: "You are a helpful assistant with many capabilities.",
+				Metadata: map[string]interface{}{
+					"cache_control": "ephemeral",
+				},
+			},
+		}
+		plan := detector.AnnotateChunksForCache(chunks)
+		if !plan.ManualMarkersPresent {
+			t.Error("expected ManualMarkersPresent=true")
+		}
+		if len(plan.Markers) != 0 {
+			t.Errorf("expected 0 markers when manual markers present, got %d", len(plan.Markers))
+		}
+	})
+
+	t.Run("empty chunks returns empty plan", func(t *testing.T) {
+		plan := detector.AnnotateChunksForCache(nil)
+		if len(plan.Markers) != 0 {
+			t.Errorf("expected 0 markers for nil input, got %d", len(plan.Markers))
+		}
+	})
 }
 
 func TestPatternDetector_DetectChunkPatterns(t *testing.T) {
