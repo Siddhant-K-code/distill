@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	distillcache "github.com/Siddhant-K-code/distill/pkg/cache"
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
 	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
@@ -61,14 +62,27 @@ type DedupeRequest struct {
 	Threshold float64       `json:"threshold,omitempty"`
 	Lambda    float64       `json:"lambda,omitempty"`
 	TargetK   int           `json:"target_k,omitempty"`
+	Options   DedupeOptions `json:"options,omitempty"`
+}
+
+// DedupeOptions controls optional dedup behaviour.
+type DedupeOptions struct {
+	// PreserveCachePrefix freezes chunks before the last cache_control marker
+	// so the dedup pipeline cannot reorder or remove them. This prevents
+	// Distill from silently invalidating Anthropic prompt cache prefixes.
+	PreserveCachePrefix bool `json:"preserve_cache_prefix,omitempty"`
 }
 
 // DedupeChunk represents a chunk in the request.
 type DedupeChunk struct {
-	ID        string    `json:"id"`
-	Text      string    `json:"text"`
-	Embedding []float32 `json:"embedding,omitempty"`
-	Score     float32   `json:"score,omitempty"`
+	ID           string    `json:"id"`
+	Text         string    `json:"text"`
+	Embedding    []float32 `json:"embedding,omitempty"`
+	Score        float32   `json:"score,omitempty"`
+	// CacheControl mirrors the Anthropic cache_control field. When non-empty,
+	// this chunk is treated as a cache boundary marker. Used with
+	// options.preserve_cache_prefix to freeze the prefix during dedup.
+	CacheControl string    `json:"cache_control,omitempty"`
 }
 
 // DedupeResponse is the JSON response for /v1/dedupe.
@@ -92,6 +106,13 @@ type DedupeStats struct {
 	ClusterCount int   `json:"cluster_count"`
 	ReductionPct int   `json:"reduction_pct"`
 	LatencyMs    int64 `json:"latency_ms"`
+
+	// Cache prefix fields — populated when options.preserve_cache_prefix=true.
+	CachePrefixFrozen bool   `json:"cache_prefix_frozen,omitempty"`
+	CachePrefixTokens int    `json:"cache_prefix_tokens,omitempty"`
+	CachePrefixHash   string `json:"cache_prefix_hash,omitempty"`
+	SuffixInputCount  int    `json:"suffix_input_count,omitempty"`
+	SuffixOutputCount int    `json:"suffix_output_count,omitempty"`
 }
 
 // APIServer holds the API server state.
@@ -346,32 +367,43 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	// Convert to internal types
+	// Convert to internal types, preserving cache_control metadata.
 	chunks := make([]types.Chunk, len(req.Chunks))
 	needsEmbedding := false
-
 	for i, c := range req.Chunks {
 		chunks[i] = types.Chunk{
 			ID:        c.ID,
 			Text:      c.Text,
 			Embedding: c.Embedding,
 			Score:     c.Score,
+			Metadata:  make(map[string]interface{}),
+		}
+		if c.CacheControl != "" {
+			chunks[i].Metadata["cache_control"] = c.CacheControl
 		}
 		if len(c.Embedding) == 0 {
 			needsEmbedding = true
 		}
 	}
 
-	// Generate embeddings if needed
+	// Partition into frozen prefix + dedup-eligible suffix when requested.
+	var partition distillcache.PrefixPartition
+	dedupChunks := chunks
+	if req.Options.PreserveCachePrefix {
+		partition = distillcache.PartitionForCacheAwareDedup(chunks)
+		dedupChunks = partition.Suffix
+	}
+
+	// Generate embeddings if needed (only for the dedup-eligible suffix).
 	if needsEmbedding {
 		if s.embedder == nil {
 			http.Error(w, "Embeddings required but no embedding provider configured. Either provide embeddings in request or configure OPENAI_API_KEY.", http.StatusBadRequest)
 			return
 		}
 
-		_, embSpan := s.tracing.StartEmbedding(ctx, len(chunks))
-		texts := make([]string, len(chunks))
-		for i, c := range chunks {
+		_, embSpan := s.tracing.StartEmbedding(ctx, len(dedupChunks))
+		texts := make([]string, len(dedupChunks))
+		for i, c := range dedupChunks {
 			texts[i] = c.Text
 		}
 
@@ -384,8 +416,8 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 		}
 		embSpan.End()
 
-		for i := range chunks {
-			chunks[i].Embedding = embeddings[i]
+		for i := range dedupChunks {
+			dedupChunks[i].Embedding = embeddings[i]
 		}
 	}
 
@@ -403,13 +435,13 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 		targetK = 0 // Will be set to cluster count
 	}
 
-	// Cluster
-	_, clusterSpan := s.tracing.StartClustering(ctx, len(chunks), threshold)
+	// Cluster the dedup-eligible suffix only.
+	_, clusterSpan := s.tracing.StartClustering(ctx, len(dedupChunks), threshold)
 	clusterer := contextlab.NewClusterer(contextlab.ClusterConfig{
 		Threshold: threshold,
 		Linkage:   "average",
 	})
-	clusterResult := clusterer.Cluster(chunks)
+	clusterResult := clusterer.Cluster(dedupChunks)
 	clusterSpan.End()
 
 	// Select representatives
@@ -432,14 +464,17 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 		mmrSpan.End()
 	}
 
+	// Prepend the frozen prefix to the deduped suffix.
+	finalChunks := append(partition.Prefix, representatives...)
+
 	latency := time.Since(start)
 
 	// Record result on root span
-	telemetry.RecordResult(rootSpan, len(req.Chunks), len(representatives), clusterResult.ClusterCount, latency)
+	telemetry.RecordResult(rootSpan, len(req.Chunks), len(finalChunks), clusterResult.ClusterCount, latency)
 
 	// Build response
-	outputChunks := make([]DedupeChunkResponse, len(representatives))
-	for i, c := range representatives {
+	outputChunks := make([]DedupeChunkResponse, len(finalChunks))
+	for i, c := range finalChunks {
 		outputChunks[i] = DedupeChunkResponse{
 			ID:        c.ID,
 			Text:      c.Text,
@@ -450,22 +485,31 @@ func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {
 
 	reductionPct := 0
 	if len(req.Chunks) > 0 {
-		reductionPct = int((1 - float64(len(representatives))/float64(len(req.Chunks))) * 100)
+		reductionPct = int((1 - float64(len(finalChunks))/float64(len(req.Chunks))) * 100)
+	}
+
+	stats := DedupeStats{
+		InputCount:   len(req.Chunks),
+		OutputCount:  len(finalChunks),
+		ClusterCount: clusterResult.ClusterCount,
+		ReductionPct: reductionPct,
+		LatencyMs:    latency.Milliseconds(),
+	}
+	if req.Options.PreserveCachePrefix && partition.MarkerCount > 0 {
+		stats.CachePrefixFrozen = true
+		stats.CachePrefixTokens = partition.FrozenPrefixTokens
+		stats.CachePrefixHash = partition.PrefixHash
+		stats.SuffixInputCount = len(partition.Suffix)
+		stats.SuffixOutputCount = len(representatives)
 	}
 
 	resp := DedupeResponse{
 		Chunks: outputChunks,
-		Stats: DedupeStats{
-			InputCount:   len(req.Chunks),
-			OutputCount:  len(representatives),
-			ClusterCount: clusterResult.ClusterCount,
-			ReductionPct: reductionPct,
-			LatencyMs:    latency.Milliseconds(),
-		},
+		Stats:  stats,
 	}
 
 	// Record dedup-specific metrics
-	s.metrics.RecordDedup("/v1/dedupe", len(req.Chunks), len(representatives), clusterResult.ClusterCount)
+	s.metrics.RecordDedup("/v1/dedupe", len(req.Chunks), len(finalChunks), clusterResult.ClusterCount)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
