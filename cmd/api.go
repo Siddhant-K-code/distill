@@ -240,6 +240,10 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		sessAPI.RegisterSessionRoutes(mux, m.Middleware)
 	}
 
+	// Pipeline and batch routes.
+	pipelineAPI := NewPipelineAPI()
+	pipelineAPI.RegisterPipelineRoutes(mux, m.Middleware)
+
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
