@@ -76,8 +76,11 @@ type RecallRequest struct {
 
 // RecallResult is the output of a recall operation.
 type RecallResult struct {
-	Memories []RecalledMemory `json:"memories"`
-	Stats    RecallStats      `json:"stats"`
+	Memories   []RecalledMemory   `json:"memories"`
+	Stats      RecallStats        `json:"stats"`
+	// CacheHint provides early stability signal to a cache boundary manager.
+	// Entries with high recency + similarity scores are likely stable this turn.
+	CacheHint  *CacheBoundaryHint `json:"cache_hint,omitempty"`
 }
 
 // RecalledMemory is a single memory returned from recall.
@@ -127,6 +130,7 @@ type Store interface {
 	Store(ctx context.Context, req StoreRequest) (*StoreResult, error)
 
 	// Recall retrieves memories matching a query, ranked by relevance and recency.
+	// The result includes a CacheBoundaryHint derived from the recall scores.
 	Recall(ctx context.Context, req RecallRequest) (*RecallResult, error)
 
 	// Forget removes memories matching the given criteria.
@@ -134,6 +138,11 @@ type Store interface {
 
 	// Stats returns memory store statistics.
 	Stats(ctx context.Context) (*Stats, error)
+
+	// OnLifecycleEvent registers a handler that is called whenever a memory
+	// entry transitions state (stabilized, compressed, evicted). Multiple
+	// handlers can be registered; they are called in registration order.
+	OnLifecycleEvent(handler MemoryEventHandler)
 
 	// Close releases resources held by the store.
 	Close() error

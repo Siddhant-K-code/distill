@@ -16,8 +16,9 @@ import (
 // Uses a single connection (SetMaxOpenConns(1)) so SQLite's internal
 // serialization handles concurrency. No application-level mutex needed.
 type SQLiteStore struct {
-	db  *sql.DB
-	cfg Config
+	db       *sql.DB
+	cfg      Config
+	handlers []MemoryEventHandler
 }
 
 // NewSQLiteStore creates a new SQLite-backed memory store.
@@ -319,6 +320,10 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 		s.touchMemories(ctx, ids)
 	}
 
+	// Build a CacheBoundaryHint from the top-scoring recalled entries.
+	// Entries with relevance >= 0.7 are considered stable candidates.
+	hint := buildCacheBoundaryHint(results)
+
 	return &RecallResult{
 		Memories: results,
 		Stats: RecallStats{
@@ -327,7 +332,31 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 			Returned:     len(results),
 			TokenCount:   tokenCount,
 		},
+		CacheHint: hint,
 	}, nil
+}
+
+// buildCacheBoundaryHint derives a hint from recalled memories.
+// Entries with relevance >= 0.7 are treated as stable this turn.
+func buildCacheBoundaryHint(memories []RecalledMemory) *CacheBoundaryHint {
+	if len(memories) == 0 {
+		return nil
+	}
+	var stableIDs []string
+	var totalScore float64
+	for _, m := range memories {
+		totalScore += m.Relevance
+		if m.Relevance >= 0.7 {
+			stableIDs = append(stableIDs, m.ID)
+		}
+	}
+	if len(stableIDs) == 0 {
+		return nil
+	}
+	return &CacheBoundaryHint{
+		StableEntryIDs:  stableIDs,
+		ConfidenceScore: totalScore / float64(len(memories)),
+	}
 }
 
 // Forget removes memories matching the given criteria.
@@ -448,6 +477,20 @@ func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 	}
 
 	return stats, nil
+}
+
+// OnLifecycleEvent registers a handler called on memory lifecycle transitions.
+// Handlers are invoked synchronously in registration order; they must not
+// block. Multiple handlers may be registered.
+func (s *SQLiteStore) OnLifecycleEvent(handler MemoryEventHandler) {
+	s.handlers = append(s.handlers, handler)
+}
+
+// emit dispatches a lifecycle event to all registered handlers.
+func (s *SQLiteStore) emit(event MemoryEvent) {
+	for _, h := range s.handlers {
+		h(event)
+	}
 }
 
 // Close closes the database connection.

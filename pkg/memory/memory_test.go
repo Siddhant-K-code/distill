@@ -324,6 +324,148 @@ func TestDecayWorker(t *testing.T) {
 	}
 }
 
+func TestLifecycleEvents_Compression(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.SummaryAge = 1 * time.Millisecond
+	cfg.KeywordsAge = 1 * time.Millisecond
+	cfg.EvictAge = 0
+	cfg.DedupThreshold = 0.15
+
+	s, err := NewSQLiteStore(":memory:", cfg)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	var events []MemoryEvent
+	s.OnLifecycleEvent(func(e MemoryEvent) {
+		events = append(events, e)
+	})
+
+	ctx := context.Background()
+
+	_, err = s.Store(ctx, StoreRequest{
+		Entries: []StoreEntry{
+			{Text: "The authentication service uses JWT tokens with RS256 signing. It validates tokens on every request. The token expiry is set to 24 hours."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	past := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339Nano)
+	_, _ = s.db.ExecContext(ctx, "UPDATE memories SET last_referenced = ?", past)
+
+	w := NewDecayWorker(s, cfg)
+	if err := w.RunOnce(ctx); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+
+	if len(events) == 0 {
+		t.Fatal("expected at least one lifecycle event, got none")
+	}
+	if events[0].Type != EventCompressed {
+		t.Errorf("expected EventCompressed, got %s", events[0].Type)
+	}
+	if events[0].TokensBefore <= events[0].TokensAfter {
+		t.Errorf("expected TokensBefore > TokensAfter, got %d <= %d",
+			events[0].TokensBefore, events[0].TokensAfter)
+	}
+	if events[0].CompressionLevel != DecaySummary {
+		t.Errorf("expected DecaySummary, got %d", events[0].CompressionLevel)
+	}
+}
+
+func TestLifecycleEvents_Eviction(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.SummaryAge = 0
+	cfg.KeywordsAge = 0
+	cfg.EvictAge = 1 * time.Millisecond
+	cfg.DedupThreshold = 0.15
+
+	s, err := NewSQLiteStore(":memory:", cfg)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	var events []MemoryEvent
+	s.OnLifecycleEvent(func(e MemoryEvent) {
+		events = append(events, e)
+	})
+
+	ctx := context.Background()
+
+	_, err = s.Store(ctx, StoreRequest{
+		Entries: []StoreEntry{
+			{Text: "Old keywords-level memory that should be evicted soon."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	// Force to keywords level and backdate.
+	past := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339Nano)
+	_, _ = s.db.ExecContext(ctx,
+		"UPDATE memories SET decay_level = ?, last_referenced = ?",
+		int(DecayKeywords), past,
+	)
+
+	w := NewDecayWorker(s, cfg)
+	if err := w.RunOnce(ctx); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+
+	if len(events) == 0 {
+		t.Fatal("expected eviction event, got none")
+	}
+	if events[0].Type != EventEvicted {
+		t.Errorf("expected EventEvicted, got %s", events[0].Type)
+	}
+	if events[0].TokensAfter != 0 {
+		t.Errorf("expected TokensAfter=0 for eviction, got %d", events[0].TokensAfter)
+	}
+}
+
+func TestRecall_CacheBoundaryHint(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Store entries with embeddings; high-similarity recall should produce a hint.
+	_, err := s.Store(ctx, StoreRequest{
+		Entries: []StoreEntry{
+			{Text: "The auth service uses JWT with RS256 signing algorithm", Embedding: makeEmbedding(0, 8)},
+			{Text: "Payment service integrates with Stripe for billing", Embedding: makeEmbedding(math.Pi/2, 8)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	result, err := s.Recall(ctx, RecallRequest{
+		Query:          "auth JWT",
+		QueryEmbedding: makeEmbedding(0, 8), // exact match → relevance near 1.0
+		MaxResults:     5,
+		RecencyWeight:  0.1,
+	})
+	if err != nil {
+		t.Fatalf("Recall: %v", err)
+	}
+
+	// With a near-exact embedding match and low recency weight, the top entry
+	// should have relevance >= 0.7, producing a hint.
+	if result.CacheHint == nil {
+		t.Fatal("expected CacheBoundaryHint, got nil")
+	}
+	if len(result.CacheHint.StableEntryIDs) == 0 {
+		t.Error("expected at least one stable entry ID in hint")
+	}
+	if result.CacheHint.ConfidenceScore <= 0 {
+		t.Error("expected positive confidence score")
+	}
+}
+
 func TestEmbeddingRoundtrip(t *testing.T) {
 	original := []float32{0.1, 0.2, 0.3, -0.5, 1.0}
 	encoded := encodeEmbedding(original)

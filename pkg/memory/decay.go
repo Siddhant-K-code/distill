@@ -14,6 +14,9 @@ import (
 // Memories progress through decay levels based on age and access patterns:
 //
 //	full text -> summary -> keywords -> evicted
+//
+// When entries transition, lifecycle events are emitted via the store's
+// registered handlers so that cache boundary managers can stay in sync.
 type DecayWorker struct {
 	store  *SQLiteStore
 	cfg    Config
@@ -64,16 +67,15 @@ func (w *DecayWorker) runOnce(ctx context.Context) error {
 
 	now := time.Now().UTC()
 
-	// Evict: remove very old, unreferenced memories
+	// Evict: remove very old, unreferenced memories and emit EventEvicted.
 	if w.cfg.EvictAge > 0 {
 		evictBefore := now.Add(-w.cfg.EvictAge).Format(time.RFC3339Nano)
-		_, _ = w.store.db.ExecContext(ctx,
-			"DELETE FROM memories WHERE last_referenced < ? AND decay_level >= ?",
-			evictBefore, int(DecayKeywords),
-		)
+		if err := w.evictRows(ctx, evictBefore); err != nil {
+			return err
+		}
 	}
 
-	// Decay to keywords: compress old summaries
+	// Decay to keywords: compress old summaries.
 	if w.cfg.KeywordsAge > 0 {
 		keywordsBefore := now.Add(-w.cfg.KeywordsAge).Format(time.RFC3339Nano)
 		if err := w.decayRows(ctx, keywordsBefore, DecaySummary, DecayKeywords, extractKeywords); err != nil {
@@ -81,7 +83,7 @@ func (w *DecayWorker) runOnce(ctx context.Context) error {
 		}
 	}
 
-	// Decay to summary: compress old full-text memories
+	// Decay to summary: compress old full-text memories.
 	if w.cfg.SummaryAge > 0 {
 		summaryBefore := now.Add(-w.cfg.SummaryAge).Format(time.RFC3339Nano)
 		if err := w.decayRows(ctx, summaryBefore, DecayFull, DecaySummary, extractSummary); err != nil {
@@ -92,8 +94,47 @@ func (w *DecayWorker) runOnce(ctx context.Context) error {
 	return nil
 }
 
+// evictRows deletes memories at DecayKeywords level older than cutoff and
+// emits EventEvicted for each removed entry.
+func (w *DecayWorker) evictRows(ctx context.Context, cutoff string) error {
+	rows, err := w.store.db.QueryContext(ctx,
+		"SELECT id, LENGTH(text) FROM memories WHERE last_referenced < ? AND decay_level >= ?",
+		cutoff, int(DecayKeywords),
+	)
+	if err != nil {
+		return fmt.Errorf("query for eviction: %w", err)
+	}
+
+	type entry struct {
+		id     string
+		length int
+	}
+	var entries []entry
+	for rows.Next() {
+		var e entry
+		if err := rows.Scan(&e.id, &e.length); err != nil {
+			continue
+		}
+		entries = append(entries, e)
+	}
+	_ = rows.Close()
+
+	for _, e := range entries {
+		_, _ = w.store.db.ExecContext(ctx, "DELETE FROM memories WHERE id = ?", e.id)
+		w.store.emit(MemoryEvent{
+			Type:         EventEvicted,
+			EntryID:      e.id,
+			TokensBefore: (e.length + 3) / 4,
+			TokensAfter:  0,
+			OccurredAt:   time.Now().UTC(),
+		})
+	}
+	return nil
+}
+
 // decayRows queries for memories at fromLevel older than cutoff,
-// applies the transform function, and updates them to toLevel.
+// applies the transform function, updates them to toLevel, and emits
+// EventCompressed for each entry so cache boundary managers can retreat.
 func (w *DecayWorker) decayRows(ctx context.Context, cutoff string, fromLevel, toLevel DecayLevel, transform func(string) string) error {
 	rows, err := w.store.db.QueryContext(ctx,
 		"SELECT id, text FROM memories WHERE last_referenced < ? AND decay_level = ?",
@@ -122,6 +163,14 @@ func (w *DecayWorker) decayRows(ctx context.Context, cutoff string, fromLevel, t
 			"UPDATE memories SET text = ?, decay_level = ? WHERE id = ?",
 			compressed, int(toLevel), e.id,
 		)
+		w.store.emit(MemoryEvent{
+			Type:             EventCompressed,
+			EntryID:          e.id,
+			TokensBefore:     (len(e.text) + 3) / 4,
+			TokensAfter:      (len(compressed) + 3) / 4,
+			CompressionLevel: toLevel,
+			OccurredAt:       time.Now().UTC(),
+		})
 	}
 
 	return nil
