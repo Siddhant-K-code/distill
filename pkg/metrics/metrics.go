@@ -20,6 +20,20 @@ type Metrics struct {
 	ActiveRequests   prometheus.Gauge
 	ClustersFormed   *prometheus.CounterVec
 
+	// Cache cost accounting (issue #52).
+	// These track Anthropic API usage fields returned in every response.
+	CacheCreationTokens *prometheus.CounterVec
+	CacheReadTokens     *prometheus.CounterVec
+	UncachedInputTokens *prometheus.CounterVec
+	CacheHitRate        prometheus.Gauge
+	CacheWriteEfficiency prometheus.Gauge
+
+	// Cache boundary metrics (issue #51).
+	CacheBoundaryPosition  *prometheus.GaugeVec
+	CacheBoundaryAdvances  *prometheus.CounterVec
+	CacheBoundaryRetreats  *prometheus.CounterVec
+	CacheEstimatedSavings  *prometheus.CounterVec
+
 	registry *prometheus.Registry
 }
 
@@ -75,6 +89,72 @@ func New() *Metrics {
 			},
 			[]string{"endpoint"},
 		),
+
+		// Cache cost accounting.
+		CacheCreationTokens: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_cache_creation_tokens_total",
+				Help: "Tokens written to Anthropic prompt cache (charged at 1.25x input price).",
+			},
+			[]string{"session_id"},
+		),
+		CacheReadTokens: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_cache_read_tokens_total",
+				Help: "Tokens read from Anthropic prompt cache (charged at 0.10x input price).",
+			},
+			[]string{"session_id"},
+		),
+		UncachedInputTokens: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_uncached_input_tokens_total",
+				Help: "Input tokens not served from cache (charged at 1.00x input price).",
+			},
+			[]string{"session_id"},
+		),
+		CacheHitRate: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "distill_cache_hit_rate",
+				Help: "Rolling cache hit rate: cache_read / (cache_read + cache_creation + input).",
+			},
+		),
+		CacheWriteEfficiency: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "distill_cache_write_efficiency",
+				Help: "Cache read/write ratio. Values < 1.0 indicate writes that expire before being read.",
+			},
+		),
+
+		// Cache boundary metrics.
+		CacheBoundaryPosition: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "distill_cache_boundary_position_tokens",
+				Help: "Current cache boundary position in tokens for a session.",
+			},
+			[]string{"session_id"},
+		),
+		CacheBoundaryAdvances: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_cache_boundary_advances_total",
+				Help: "Number of times the cache boundary advanced (more content became stable).",
+			},
+			[]string{"session_id"},
+		),
+		CacheBoundaryRetreats: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_cache_boundary_retreats_total",
+				Help: "Number of times the cache boundary retreated (content changed or was evicted).",
+			},
+			[]string{"session_id"},
+		),
+		CacheEstimatedSavings: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "distill_cache_estimated_savings_tokens_total",
+				Help: "Estimated tokens saved by prompt caching across all sessions.",
+			},
+			[]string{"session_id"},
+		),
+
 		registry: reg,
 	}
 
@@ -85,6 +165,15 @@ func New() *Metrics {
 		m.ReductionRatio,
 		m.ActiveRequests,
 		m.ClustersFormed,
+		m.CacheCreationTokens,
+		m.CacheReadTokens,
+		m.UncachedInputTokens,
+		m.CacheHitRate,
+		m.CacheWriteEfficiency,
+		m.CacheBoundaryPosition,
+		m.CacheBoundaryAdvances,
+		m.CacheBoundaryRetreats,
+		m.CacheEstimatedSavings,
 	)
 
 	return m
@@ -111,6 +200,64 @@ func (m *Metrics) RecordDedup(endpoint string, inputCount, outputCount, clusterC
 	if inputCount > 0 {
 		ratio := 1.0 - float64(outputCount)/float64(inputCount)
 		m.ReductionRatio.WithLabelValues(endpoint).Observe(ratio)
+	}
+}
+
+// UsageRecord holds the token counts returned by the Anthropic API in the
+// usage block of every response. Pass this to RecordCacheUsage after each
+// API call to keep the cache cost metrics up to date.
+type UsageRecord struct {
+	// SessionID is optional; use "" for non-session requests.
+	SessionID string
+
+	InputTokens              int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	OutputTokens             int
+}
+
+// RecordCacheUsage records Anthropic API usage fields and updates the derived
+// cache hit rate and write efficiency gauges.
+func (m *Metrics) RecordCacheUsage(u UsageRecord) {
+	sid := u.SessionID
+	if sid == "" {
+		sid = "default"
+	}
+
+	if u.CacheCreationInputTokens > 0 {
+		m.CacheCreationTokens.WithLabelValues(sid).Add(float64(u.CacheCreationInputTokens))
+	}
+	if u.CacheReadInputTokens > 0 {
+		m.CacheReadTokens.WithLabelValues(sid).Add(float64(u.CacheReadInputTokens))
+	}
+	if u.InputTokens > 0 {
+		m.UncachedInputTokens.WithLabelValues(sid).Add(float64(u.InputTokens))
+	}
+
+	// Update derived gauges using the values from this single request.
+	total := float64(u.InputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens)
+	if total > 0 {
+		hitRate := float64(u.CacheReadInputTokens) / total
+		m.CacheHitRate.Set(hitRate)
+	}
+
+	if u.CacheCreationInputTokens > 0 {
+		efficiency := float64(u.CacheReadInputTokens) / float64(u.CacheCreationInputTokens)
+		m.CacheWriteEfficiency.Set(efficiency)
+	}
+}
+
+// RecordCacheBoundary records a cache boundary evaluation result for a session.
+func (m *Metrics) RecordCacheBoundary(sessionID string, boundaryTokens int, advanced, retreated bool) {
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	m.CacheBoundaryPosition.WithLabelValues(sessionID).Set(float64(boundaryTokens))
+	if advanced {
+		m.CacheBoundaryAdvances.WithLabelValues(sessionID).Inc()
+	}
+	if retreated {
+		m.CacheBoundaryRetreats.WithLabelValues(sessionID).Inc()
 	}
 }
 

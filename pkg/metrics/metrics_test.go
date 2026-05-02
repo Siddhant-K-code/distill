@@ -159,6 +159,121 @@ func TestActiveRequests(t *testing.T) {
 	close(release)
 }
 
+func TestRecordCacheUsage(t *testing.T) {
+	m := New()
+
+	m.RecordCacheUsage(UsageRecord{
+		SessionID:                "sess-1",
+		InputTokens:              100,
+		CacheCreationInputTokens: 8000,
+		CacheReadInputTokens:     0,
+		OutputTokens:             200,
+	})
+
+	creationVal := counterValue(t, m.CacheCreationTokens, "session_id", "sess-1")
+	if creationVal != 8000 {
+		t.Errorf("expected 8000 cache creation tokens, got %f", creationVal)
+	}
+
+	uncachedVal := counterValue(t, m.UncachedInputTokens, "session_id", "sess-1")
+	if uncachedVal != 100 {
+		t.Errorf("expected 100 uncached input tokens, got %f", uncachedVal)
+	}
+
+	// Second call: now we have cache reads.
+	m.RecordCacheUsage(UsageRecord{
+		SessionID:                "sess-1",
+		InputTokens:              0,
+		CacheCreationInputTokens: 0,
+		CacheReadInputTokens:     8000,
+		OutputTokens:             200,
+	})
+
+	readVal := counterValue(t, m.CacheReadTokens, "session_id", "sess-1")
+	if readVal != 8000 {
+		t.Errorf("expected 8000 cache read tokens, got %f", readVal)
+	}
+
+	// Hit rate should be 1.0 (all tokens from cache on second call).
+	var hitRateMetric dto.Metric
+	if err := m.CacheHitRate.Write(&hitRateMetric); err != nil {
+		t.Fatalf("read CacheHitRate: %v", err)
+	}
+	if hitRateMetric.GetGauge().GetValue() != 1.0 {
+		t.Errorf("expected hit rate 1.0, got %f", hitRateMetric.GetGauge().GetValue())
+	}
+}
+
+func TestRecordCacheUsage_DefaultSessionID(t *testing.T) {
+	m := New()
+	// Should not panic with empty session ID.
+	m.RecordCacheUsage(UsageRecord{
+		InputTokens:              50,
+		CacheCreationInputTokens: 1000,
+	})
+	val := counterValue(t, m.CacheCreationTokens, "session_id", "default")
+	if val != 1000 {
+		t.Errorf("expected 1000, got %f", val)
+	}
+}
+
+func TestRecordCacheBoundary(t *testing.T) {
+	m := New()
+
+	m.RecordCacheBoundary("sess-1", 8192, true, false)
+	m.RecordCacheBoundary("sess-1", 16384, true, false)
+	m.RecordCacheBoundary("sess-1", 8192, false, true)
+
+	advVal := counterValue(t, m.CacheBoundaryAdvances, "session_id", "sess-1")
+	if advVal != 2 {
+		t.Errorf("expected 2 advances, got %f", advVal)
+	}
+
+	retVal := counterValue(t, m.CacheBoundaryRetreats, "session_id", "sess-1")
+	if retVal != 1 {
+		t.Errorf("expected 1 retreat, got %f", retVal)
+	}
+
+	var posMetric dto.Metric
+	pos, err := m.CacheBoundaryPosition.GetMetricWithLabelValues("sess-1")
+	if err != nil {
+		t.Fatalf("get boundary position: %v", err)
+	}
+	if err := pos.Write(&posMetric); err != nil {
+		t.Fatalf("read boundary position: %v", err)
+	}
+	if posMetric.GetGauge().GetValue() != 8192 {
+		t.Errorf("expected boundary 8192, got %f", posMetric.GetGauge().GetValue())
+	}
+}
+
+func TestHandler_CacheMetrics(t *testing.T) {
+	m := New()
+	m.RecordCacheUsage(UsageRecord{
+		SessionID:                "sess-1",
+		CacheCreationInputTokens: 4096,
+		CacheReadInputTokens:     4096,
+	})
+	m.RecordCacheBoundary("sess-1", 8192, true, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	for _, metric := range []string{
+		"distill_cache_creation_tokens_total",
+		"distill_cache_read_tokens_total",
+		"distill_cache_hit_rate",
+		"distill_cache_write_efficiency",
+		"distill_cache_boundary_position_tokens",
+	} {
+		if !strings.Contains(body, metric) {
+			t.Errorf("metrics output missing %s", metric)
+		}
+	}
+}
+
 // counterValue extracts the value of a counter with the given label pairs.
 func counterValue(t *testing.T, cv *prometheus.CounterVec, labelPairs ...string) float64 {
 	t.Helper()
