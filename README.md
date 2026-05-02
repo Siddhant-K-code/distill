@@ -904,6 +904,40 @@ Pattern → annotation mapping:
 - **Code Review** - Blast radius analysis for PRs
 - **Enterprise** - Deterministic outputs with source attribution
 
+## Embedding Providers
+
+Distill supports multiple embedding backends via a unified factory. Import the provider package to register it, then call `embedding.NewProvider`:
+
+```go
+import (
+    "github.com/Siddhant-K-code/distill/pkg/embedding"
+    _ "github.com/Siddhant-K-code/distill/pkg/embedding/openai"  // register OpenAI
+    _ "github.com/Siddhant-K-code/distill/pkg/embedding/ollama"  // register Ollama
+    _ "github.com/Siddhant-K-code/distill/pkg/embedding/cohere"  // register Cohere
+)
+
+provider, err := embedding.NewProvider(embedding.ProviderConfig{
+    Type:      embedding.ProviderOllama,   // "openai" | "ollama" | "cohere"
+    BaseURL:   "http://localhost:11434",   // optional override
+    Model:     "nomic-embed-text",         // optional override
+    CacheSize: 10000,                      // 0 = default (10k), -1 = disabled
+})
+```
+
+| Provider | Type string | Default model | Notes |
+|----------|-------------|---------------|-------|
+| OpenAI | `openai` | `text-embedding-3-small` | Requires `OPENAI_API_KEY` |
+| Ollama | `ollama` | `nomic-embed-text` | Local server, no API key |
+| Cohere | `cohere` | `embed-english-v3.0` | Requires `COHERE_API_KEY` |
+
+Custom providers can be registered at startup:
+
+```go
+embedding.RegisterFactory("my-provider", func(cfg embedding.ProviderConfig) (embedding.Provider, error) {
+    return myProvider{apiKey: cfg.APIKey}, nil
+})
+```
+
 ## Roadmap
 
 Distill is evolving from a dedup utility into a context intelligence layer. Here's what's next:
@@ -922,6 +956,7 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Prefix stability validator** | [#48](https://github.com/Siddhant-K-code/distill/issues/48) | Shipped | `StabilityValidator` tracks prefix hashes across requests and detects dynamic content (timestamps, request IDs, UUIDs) bleeding into cached prefixes. |
 | **Per-call-site hit rate tracking** | [#47](https://github.com/Siddhant-K-code/distill/issues/47) | Shipped | `CallSiteTracker` records Anthropic cache usage per call site; `AllStats()` returns worst performers first. |
 | **TTL-aware cache tracker** | [#49](https://github.com/Siddhant-K-code/distill/issues/49) | Shipped | `TTLTracker` monitors Anthropic's 5-minute cache TTL per prefix hash. `ScheduleDeadline` tells batch jobs the latest safe time to send the next request. |
+| **Multi-provider embedding abstraction** | [#33](https://github.com/Siddhant-K-code/distill/issues/33) | Shipped | `embedding.NewProvider` factory supports OpenAI, Ollama, and Cohere via a unified `ProviderConfig`. Custom providers register via `RegisterFactory`. |
 
 ### Code Intelligence
 
