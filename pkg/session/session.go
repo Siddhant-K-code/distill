@@ -43,12 +43,14 @@ type Entry struct {
 
 // Session holds the state of a single context window.
 type Session struct {
-	ID            string    `json:"session_id"`
-	MaxTokens     int       `json:"max_tokens"`
-	CurrentTokens int       `json:"current_tokens"`
-	EntryCount    int       `json:"entry_count"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID                   string    `json:"session_id"`
+	MaxTokens            int       `json:"max_tokens"`
+	CurrentTokens        int       `json:"current_tokens"`
+	EntryCount           int       `json:"entry_count"`
+	CacheBoundaryTokens  int       `json:"cache_boundary_tokens,omitempty"`
+	PushCount            int       `json:"push_count,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // CreateRequest is the input for creating a session.
@@ -76,13 +78,14 @@ type PushEntry struct {
 
 // PushResult is the output of a push operation.
 type PushResult struct {
-	SessionID      string `json:"session_id"`
-	Accepted       int    `json:"accepted"`
-	Deduplicated   int    `json:"deduplicated"`
-	Compressed     int    `json:"compressed"`
-	Evicted        int    `json:"evicted"`
-	CurrentTokens  int    `json:"current_tokens"`
-	BudgetRemaining int   `json:"budget_remaining"`
+	SessionID           string               `json:"session_id"`
+	Accepted            int                  `json:"accepted"`
+	Deduplicated        int                  `json:"deduplicated"`
+	Compressed          int                  `json:"compressed"`
+	Evicted             int                  `json:"evicted"`
+	CurrentTokens       int                  `json:"current_tokens"`
+	BudgetRemaining     int                  `json:"budget_remaining"`
+	CacheBoundary       *CacheBoundaryResult `json:"cache_boundary,omitempty"`
 }
 
 // ContextRequest is the input for reading a session's context window.
@@ -145,6 +148,9 @@ type Config struct {
 	// DefaultPreserveRecent is how many recent entries to keep uncompressed.
 	// Default: 10.
 	DefaultPreserveRecent int
+
+	// CacheBoundary configures the session-aware cache boundary manager.
+	CacheBoundary CacheBoundaryConfig
 }
 
 // DefaultConfig returns sensible defaults.
@@ -153,5 +159,6 @@ func DefaultConfig() Config {
 		DefaultMaxTokens:      128000,
 		DefaultDedupThreshold: 0.15,
 		DefaultPreserveRecent: 10,
+		CacheBoundary:         DefaultCacheBoundaryConfig(),
 	}
 }

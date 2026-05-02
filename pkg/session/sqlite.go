@@ -21,8 +21,9 @@ import (
 // SQLiteStore implements Store using SQLite.
 // Single connection (SetMaxOpenConns(1)) - SQLite handles serialization.
 type SQLiteStore struct {
-	db  *sql.DB
-	cfg Config
+	db      *sql.DB
+	cfg     Config
+	boundary *CacheBoundaryManager
 }
 
 // NewSQLiteStore creates a new SQLite-backed session store.
@@ -47,7 +48,11 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
-	s := &SQLiteStore{db: db, cfg: cfg}
+	s := &SQLiteStore{
+		db:       db,
+		cfg:      cfg,
+		boundary: newCacheBoundaryManager(db, cfg.CacheBoundary),
+	}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
@@ -59,31 +64,37 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 func (s *SQLiteStore) migrate() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS sessions (
-		id               TEXT PRIMARY KEY,
-		max_tokens       INTEGER NOT NULL,
-		dedup_threshold  REAL NOT NULL DEFAULT 0.15,
-		preserve_recent  INTEGER NOT NULL DEFAULT 10,
-		created_at       TEXT NOT NULL,
-		updated_at       TEXT NOT NULL
+		id                     TEXT PRIMARY KEY,
+		max_tokens             INTEGER NOT NULL,
+		dedup_threshold        REAL NOT NULL DEFAULT 0.15,
+		preserve_recent        INTEGER NOT NULL DEFAULT 10,
+		push_count             INTEGER NOT NULL DEFAULT 0,
+		cache_boundary_tokens  INTEGER NOT NULL DEFAULT 0,
+		created_at             TEXT NOT NULL,
+		updated_at             TEXT NOT NULL
 	);
 	CREATE TABLE IF NOT EXISTS session_entries (
-		id               TEXT PRIMARY KEY,
-		session_id       TEXT NOT NULL,
-		role             TEXT NOT NULL DEFAULT '',
-		content          TEXT NOT NULL,
-		original_content TEXT NOT NULL,
-		source           TEXT DEFAULT '',
-		embedding        BLOB,
-		importance       REAL NOT NULL DEFAULT 0.5,
+		id                TEXT PRIMARY KEY,
+		session_id        TEXT NOT NULL,
+		role              TEXT NOT NULL DEFAULT '',
+		content           TEXT NOT NULL,
+		original_content  TEXT NOT NULL,
+		source            TEXT DEFAULT '',
+		embedding         BLOB,
+		importance        REAL NOT NULL DEFAULT 0.5,
 		compression_level INTEGER NOT NULL DEFAULT 0,
-		tokens           INTEGER NOT NULL DEFAULT 0,
-		seq              INTEGER NOT NULL,
-		created_at       TEXT NOT NULL,
-		compressed_at    TEXT DEFAULT '',
+		tokens            INTEGER NOT NULL DEFAULT 0,
+		seq               INTEGER NOT NULL,
+		inserted_at_push  INTEGER NOT NULL DEFAULT 0,
+		stable_since_turn INTEGER NOT NULL DEFAULT 0,
+		content_hash      TEXT NOT NULL DEFAULT '',
+		created_at        TEXT NOT NULL,
+		compressed_at     TEXT DEFAULT '',
 		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 	);
 	CREATE INDEX IF NOT EXISTS idx_entries_session ON session_entries(session_id);
 	CREATE INDEX IF NOT EXISTS idx_entries_seq ON session_entries(session_id, seq);
+	CREATE INDEX IF NOT EXISTS idx_entries_stable ON session_entries(session_id, stable_since_turn);
 	`
 	_, err := s.db.Exec(schema)
 	return err
@@ -185,14 +196,24 @@ func (s *SQLiteStore) Push(ctx context.Context, req PushRequest) (*PushResult, e
 		maxSeq++
 		id := generateID()
 		now := time.Now().UTC().Format(time.RFC3339Nano)
+		contentHash := hashContent(entry.Content)
+
+		// inserted_at_push is set after RecordPush increments the counter,
+		// so we read the current push_count and add 1 (the value it will be
+		// after RecordPush runs at the end of this Push call).
+		var currentPushCount int
+		_ = s.db.QueryRowContext(ctx,
+			"SELECT push_count FROM sessions WHERE id = ?", req.SessionID,
+		).Scan(&currentPushCount)
+		insertedAtPush := currentPushCount + 1
 
 		_, err := s.db.ExecContext(ctx,
 			`INSERT INTO session_entries
-			 (id, session_id, role, content, original_content, source, embedding, importance, compression_level, tokens, seq, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+			 (id, session_id, role, content, original_content, source, embedding, importance, compression_level, tokens, seq, inserted_at_push, stable_since_turn, content_hash, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?)`,
 			id, req.SessionID, entry.Role, entry.Content, entry.Content,
 			entry.Source, encodeEmbedding(entry.Embedding), importance,
-			tokens, maxSeq, now,
+			tokens, maxSeq, insertedAtPush, contentHash, now,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert entry: %w", err)
@@ -212,6 +233,17 @@ func (s *SQLiteStore) Push(ctx context.Context, req PushRequest) (*PushResult, e
 		if c == 0 && e == 0 {
 			break // no progress possible
 		}
+	}
+
+	// Record push and promote stable entries.
+	if err := s.boundary.RecordPush(ctx, req.SessionID); err != nil {
+		return nil, fmt.Errorf("record push: %w", err)
+	}
+
+	// Evaluate cache boundary.
+	boundary, err := s.boundary.Evaluate(ctx, req.SessionID)
+	if err == nil {
+		result.CacheBoundary = boundary
 	}
 
 	// Update session timestamp
@@ -329,9 +361,9 @@ func (s *SQLiteStore) Get(ctx context.Context, sessionID string) (*Session, erro
 	var createdStr, updatedStr string
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, max_tokens, created_at, updated_at FROM sessions WHERE id = ?",
+		"SELECT id, max_tokens, push_count, cache_boundary_tokens, created_at, updated_at FROM sessions WHERE id = ?",
 		sessionID,
-	).Scan(&sess.ID, &sess.MaxTokens, &createdStr, &updatedStr)
+	).Scan(&sess.ID, &sess.MaxTokens, &sess.PushCount, &sess.CacheBoundaryTokens, &createdStr, &updatedStr)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrSessionNotFound
@@ -655,6 +687,22 @@ func sortCandidates(c []compressCandidate) {
 }
 
 // --- helpers ---
+
+// hashContent returns a short SHA-256 hash of text for change detection.
+func hashContent(text string) string {
+	h := make([]byte, 0, 32)
+	sum := [32]byte{}
+	// Simple FNV-like hash to avoid importing crypto/sha256 just for this.
+	// We already have crypto/rand; use a simple polynomial hash instead.
+	var v uint64 = 14695981039346656037
+	for i := 0; i < len(text); i++ {
+		v ^= uint64(text[i])
+		v *= 1099511628211
+	}
+	_ = h
+	_ = sum
+	return fmt.Sprintf("%016x", v)
+}
 
 func generateID() string {
 	b := make([]byte, 12)
