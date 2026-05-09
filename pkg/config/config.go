@@ -35,6 +35,7 @@ type ServerConfig struct {
 type EmbeddingConfig struct {
 	Provider  string `mapstructure:"provider"`
 	Model     string `mapstructure:"model"`
+	BaseURL   string `mapstructure:"base_url"`
 	BatchSize int    `mapstructure:"batch_size"`
 }
 
@@ -166,9 +167,9 @@ func Validate(cfg *Config) error {
 	}
 
 	// Embedding validation
-	validProviders := map[string]bool{"openai": true, "": true}
+	validProviders := map[string]bool{"openai": true, "ollama": true, "cohere": true, "": true}
 	if !validProviders[cfg.Embedding.Provider] {
-		errs = append(errs, fmt.Sprintf("embedding.provider: unsupported provider %q (supported: openai)", cfg.Embedding.Provider))
+		errs = append(errs, fmt.Sprintf("embedding.provider: unsupported provider %q (supported: openai, ollama, cohere)", cfg.Embedding.Provider))
 	}
 	if cfg.Embedding.BatchSize < 0 {
 		errs = append(errs, "embedding.batch_size: must be non-negative")
@@ -252,6 +253,7 @@ func interpolateConfig(cfg *Config) {
 	cfg.Server.Host = InterpolateEnv(cfg.Server.Host)
 	cfg.Embedding.Provider = InterpolateEnv(cfg.Embedding.Provider)
 	cfg.Embedding.Model = InterpolateEnv(cfg.Embedding.Model)
+	cfg.Embedding.BaseURL = InterpolateEnv(cfg.Embedding.BaseURL)
 	cfg.Dedup.Method = InterpolateEnv(cfg.Dedup.Method)
 	cfg.Dedup.Linkage = InterpolateEnv(cfg.Dedup.Linkage)
 	cfg.Retriever.Backend = InterpolateEnv(cfg.Retriever.Backend)
@@ -281,9 +283,10 @@ server:
   write_timeout: 60s
 
 embedding:
-  provider: openai
+  provider: openai       # openai, ollama, or cohere
   model: text-embedding-3-small
   batch_size: 100
+  # base_url: ""         # override API endpoint (e.g. http://localhost:11434 for Ollama)
 
 dedup:
   threshold: 0.15

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
+	"github.com/Siddhant-K-code/distill/pkg/embedding"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/cohere"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/ollama"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/memory"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,7 +70,8 @@ func init() {
 	memoryStoreCmd.Flags().String("source", "", "Source of the memory (e.g., code_review, docs)")
 	memoryStoreCmd.Flags().StringSlice("tags", nil, "Tags for the memory")
 	memoryStoreCmd.Flags().String("session-id", "", "Session ID")
-	memoryStoreCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or OPENAI_API_KEY)")
+	memoryStoreCmd.Flags().String("openai-key", "", "API key for embeddings (or OPENAI_API_KEY / COHERE_API_KEY)")
+	memoryStoreCmd.Flags().String("embedding-provider", "", "Embedding provider (openai, ollama, cohere)")
 
 	// Recall flags
 	memoryRecallCmd.Flags().String("query", "", "Query text")
@@ -75,7 +79,8 @@ func init() {
 	memoryRecallCmd.Flags().Int("max-results", 10, "Maximum results to return")
 	memoryRecallCmd.Flags().Int("max-tokens", 0, "Maximum token budget (0 = unlimited)")
 	memoryRecallCmd.Flags().Float64("recency-weight", 0.3, "Weight for recency vs relevance (0-1)")
-	memoryRecallCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or OPENAI_API_KEY)")
+	memoryRecallCmd.Flags().String("openai-key", "", "API key for embeddings (or OPENAI_API_KEY / COHERE_API_KEY)")
+	memoryRecallCmd.Flags().String("embedding-provider", "", "Embedding provider (openai, ollama, cohere)")
 
 	// Forget flags
 	memoryForgetCmd.Flags().StringSlice("tags", nil, "Remove memories with these tags")
@@ -92,6 +97,47 @@ func openMemoryStore(cmd *cobra.Command) (*memory.SQLiteStore, error) {
 	return memory.NewSQLiteStore(dbPath, cfg)
 }
 
+// createEmbedder builds an embedding.Provider from CLI flags and config.
+func createEmbedder(cmd *cobra.Command) (embedding.Provider, error) {
+	apiKey, _ := cmd.Flags().GetString("openai-key")
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	providerName, _ := cmd.Flags().GetString("embedding-provider")
+	if providerName == "" {
+		providerName = viper.GetString("embedding.provider")
+	}
+	if providerName == "" {
+		providerName = "openai"
+	}
+
+	// Ollama doesn't need an API key
+	needsKey := providerName == "openai" || providerName == "cohere"
+	if needsKey && apiKey == "" {
+		if providerName == "cohere" {
+			apiKey = os.Getenv("COHERE_API_KEY")
+		}
+		if apiKey == "" {
+			return nil, nil // no key available, skip embedding
+		}
+	}
+
+	model := viper.GetString("embedding.model")
+	if model == "" {
+		model = "text-embedding-3-small"
+	}
+	baseURL := viper.GetString("embedding.base_url")
+
+	return embedding.NewProvider(embedding.ProviderConfig{
+		Type:      embedding.ProviderType(providerName),
+		APIKey:    apiKey,
+		Model:     model,
+		BaseURL:   baseURL,
+		CacheSize: -1,
+	})
+}
+
 func runMemoryStore(cmd *cobra.Command, args []string) error {
 	text, _ := cmd.Flags().GetString("text")
 	if text == "" {
@@ -101,10 +147,6 @@ func runMemoryStore(cmd *cobra.Command, args []string) error {
 	source, _ := cmd.Flags().GetString("source")
 	tags, _ := cmd.Flags().GetStringSlice("tags")
 	sessionID, _ := cmd.Flags().GetString("session-id")
-	openaiKey, _ := cmd.Flags().GetString("openai-key")
-	if openaiKey == "" {
-		openaiKey = os.Getenv("OPENAI_API_KEY")
-	}
 
 	store, err := openMemoryStore(cmd)
 	if err != nil {
@@ -118,16 +160,12 @@ func runMemoryStore(cmd *cobra.Command, args []string) error {
 		Tags:   tags,
 	}
 
-	// Generate embedding if OpenAI key is available
-	if openaiKey != "" {
-		model := viper.GetString("embedding.model")
-		if model == "" {
-			model = "text-embedding-3-small"
-		}
-		embedder, err := openai.NewClient(openai.Config{APIKey: openaiKey, Model: model})
-		if err != nil {
-			return fmt.Errorf("create embedder: %w", err)
-		}
+	// Generate embedding if a provider is available
+	embedder, err := createEmbedder(cmd)
+	if err != nil {
+		return fmt.Errorf("create embedder: %w", err)
+	}
+	if embedder != nil {
 		emb, err := embedder.Embed(context.Background(), text)
 		if err != nil {
 			return fmt.Errorf("embed text: %w", err)
@@ -158,10 +196,6 @@ func runMemoryRecall(cmd *cobra.Command, args []string) error {
 	maxResults, _ := cmd.Flags().GetInt("max-results")
 	maxTokens, _ := cmd.Flags().GetInt("max-tokens")
 	recencyWeight, _ := cmd.Flags().GetFloat64("recency-weight")
-	openaiKey, _ := cmd.Flags().GetString("openai-key")
-	if openaiKey == "" {
-		openaiKey = os.Getenv("OPENAI_API_KEY")
-	}
 
 	store, err := openMemoryStore(cmd)
 	if err != nil {
@@ -177,16 +211,12 @@ func runMemoryRecall(cmd *cobra.Command, args []string) error {
 		RecencyWeight: recencyWeight,
 	}
 
-	// Generate query embedding if OpenAI key is available
-	if openaiKey != "" {
-		model := viper.GetString("embedding.model")
-		if model == "" {
-			model = "text-embedding-3-small"
-		}
-		embedder, err := openai.NewClient(openai.Config{APIKey: openaiKey, Model: model})
-		if err != nil {
-			return fmt.Errorf("create embedder: %w", err)
-		}
+	// Generate query embedding if a provider is available
+	embedder, err := createEmbedder(cmd)
+	if err != nil {
+		return fmt.Errorf("create embedder: %w", err)
+	}
+	if embedder != nil {
 		emb, err := embedder.Embed(context.Background(), query)
 		if err != nil {
 			return fmt.Errorf("embed query: %w", err)

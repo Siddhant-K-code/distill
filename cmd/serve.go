@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
-	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
+	"github.com/Siddhant-K-code/distill/pkg/embedding"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/cohere"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/ollama"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
 	"github.com/Siddhant-K-code/distill/pkg/retriever"
 	"github.com/Siddhant-K-code/distill/pkg/telemetry"
@@ -53,8 +56,10 @@ func init() {
 	serveCmd.Flags().StringP("namespace", "n", "", "Default namespace")
 
 	// Embedding settings
-	serveCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or use OPENAI_API_KEY)")
-	serveCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
+	serveCmd.Flags().String("openai-key", "", "API key for embeddings (or use OPENAI_API_KEY / COHERE_API_KEY)")
+	serveCmd.Flags().String("embedding-provider", "openai", "Embedding provider (openai, ollama, cohere)")
+	serveCmd.Flags().String("embedding-model", "text-embedding-3-small", "Embedding model name")
+	serveCmd.Flags().String("embedding-base-url", "", "Embedding provider base URL (e.g. http://localhost:11434 for Ollama)")
 
 	// ContextLab settings
 	serveCmd.Flags().Int("over-fetch-k", 50, "Number of chunks to over-fetch")
@@ -69,7 +74,9 @@ func init() {
 	_ = viper.BindPFlag("retriever.backend", serveCmd.Flags().Lookup("backend"))
 	_ = viper.BindPFlag("retriever.index", serveCmd.Flags().Lookup("index"))
 	_ = viper.BindPFlag("retriever.namespace", serveCmd.Flags().Lookup("namespace"))
+	_ = viper.BindPFlag("embedding.provider", serveCmd.Flags().Lookup("embedding-provider"))
 	_ = viper.BindPFlag("embedding.model", serveCmd.Flags().Lookup("embedding-model"))
+	_ = viper.BindPFlag("embedding.base_url", serveCmd.Flags().Lookup("embedding-base-url"))
 	_ = viper.BindPFlag("retriever.top_k", serveCmd.Flags().Lookup("over-fetch-k"))
 	_ = viper.BindPFlag("retriever.target_k", serveCmd.Flags().Lookup("target-k"))
 	_ = viper.BindPFlag("dedup.threshold", serveCmd.Flags().Lookup("threshold"))
@@ -204,12 +211,31 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { _ = ret.Close() }()
 
-	// Create embedding provider if OpenAI key is provided
+	// Create embedding provider via registry
+	embeddingProvider := viper.GetString("embedding.provider")
+	embeddingBaseURL, _ := cmd.Flags().GetString("embedding-base-url")
+	if embeddingBaseURL == "" {
+		embeddingBaseURL = viper.GetString("embedding.base_url")
+	}
+
 	var embedder retriever.EmbeddingProvider
-	if openaiKey != "" {
-		embedder, err = openai.NewClient(openai.Config{
-			APIKey: openaiKey,
-			Model:  embeddingModel,
+	needsAPIKey := embeddingProvider == "" || embeddingProvider == "openai" || embeddingProvider == "cohere"
+	if needsAPIKey && openaiKey == "" {
+		// No API key and cloud provider selected — embeddings disabled
+	} else {
+		apiKeyForEmbed := openaiKey
+		if embeddingProvider == "cohere" && apiKeyForEmbed == "" {
+			apiKeyForEmbed = os.Getenv("COHERE_API_KEY")
+		}
+		if embeddingProvider == "" {
+			embeddingProvider = "openai"
+		}
+		embedder, err = embedding.NewProvider(embedding.ProviderConfig{
+			Type:      embedding.ProviderType(embeddingProvider),
+			APIKey:    apiKeyForEmbed,
+			Model:     embeddingModel,
+			BaseURL:   embeddingBaseURL,
+			CacheSize: -1,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create embedding provider: %w", err)

@@ -13,7 +13,10 @@ import (
 
 	distillcache "github.com/Siddhant-K-code/distill/pkg/cache"
 	"github.com/Siddhant-K-code/distill/pkg/contextlab"
-	"github.com/Siddhant-K-code/distill/pkg/embedding/openai"
+	"github.com/Siddhant-K-code/distill/pkg/embedding"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/cohere"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/ollama"
+	_ "github.com/Siddhant-K-code/distill/pkg/embedding/openai"
 	"github.com/Siddhant-K-code/distill/pkg/metrics"
 	"github.com/Siddhant-K-code/distill/pkg/sse"
 	"github.com/Siddhant-K-code/distill/pkg/telemetry"
@@ -44,7 +47,9 @@ func init() {
 	apiCmd.Flags().IntP("port", "p", 8080, "HTTP server port")
 	apiCmd.Flags().String("host", "0.0.0.0", "HTTP server host")
 	apiCmd.Flags().String("openai-key", "", "OpenAI API key for embeddings (or use OPENAI_API_KEY)")
-	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "OpenAI embedding model")
+	apiCmd.Flags().String("embedding-provider", "openai", "Embedding provider (openai, ollama, cohere)")
+	apiCmd.Flags().String("embedding-model", "text-embedding-3-small", "Embedding model name")
+	apiCmd.Flags().String("embedding-base-url", "", "Embedding provider base URL (e.g. http://localhost:11434 for Ollama)")
 	apiCmd.Flags().String("api-keys", "", "Comma-separated list of valid API keys (or use DISTILL_API_KEYS)")
 	apiCmd.Flags().Bool("memory", false, "Enable persistent memory store")
 	apiCmd.Flags().Bool("session", false, "Enable session management")
@@ -53,7 +58,9 @@ func init() {
 	// Bind to viper for config file support
 	_ = viper.BindPFlag("server.port", apiCmd.Flags().Lookup("port"))
 	_ = viper.BindPFlag("server.host", apiCmd.Flags().Lookup("host"))
+	_ = viper.BindPFlag("embedding.provider", apiCmd.Flags().Lookup("embedding-provider"))
 	_ = viper.BindPFlag("embedding.model", apiCmd.Flags().Lookup("embedding-model"))
+	_ = viper.BindPFlag("embedding.base_url", apiCmd.Flags().Lookup("embedding-base-url"))
 }
 
 // DedupeRequest is the JSON request body for /v1/dedupe.
@@ -117,7 +124,7 @@ type DedupeStats struct {
 
 // APIServer holds the API server state.
 type APIServer struct {
-	embedder  *openai.Client
+	embedder  embedding.Provider
 	validKeys map[string]bool
 	hasAuth   bool
 	metrics   *metrics.Metrics
@@ -131,6 +138,12 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	openaiKey, _ := cmd.Flags().GetString("openai-key")
 	embeddingModel := viper.GetString("embedding.model")
 	apiKeysStr, _ := cmd.Flags().GetString("api-keys")
+
+	embeddingProvider := viper.GetString("embedding.provider")
+	embeddingBaseURL, _ := cmd.Flags().GetString("embedding-base-url")
+	if embeddingBaseURL == "" {
+		embeddingBaseURL = viper.GetString("embedding.base_url")
+	}
 
 	// Resolve from environment
 	if openaiKey == "" {
@@ -151,13 +164,26 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Create embedding provider if OpenAI key is provided
-	var embedder *openai.Client
-	if openaiKey != "" {
+	// Create embedding provider via registry
+	var embedder embedding.Provider
+	needsAPIKey := embeddingProvider == "" || embeddingProvider == "openai" || embeddingProvider == "cohere"
+	if needsAPIKey && openaiKey == "" {
+		// No API key and cloud provider selected — embeddings disabled
+	} else {
+		apiKey := openaiKey
+		if embeddingProvider == "cohere" && apiKey == "" {
+			apiKey = os.Getenv("COHERE_API_KEY")
+		}
+		if embeddingProvider == "" {
+			embeddingProvider = "openai"
+		}
 		var err error
-		embedder, err = openai.NewClient(openai.Config{
-			APIKey: openaiKey,
-			Model:  embeddingModel,
+		embedder, err = embedding.NewProvider(embedding.ProviderConfig{
+			Type:      embedding.ProviderType(embeddingProvider),
+			APIKey:    apiKey,
+			Model:     embeddingModel,
+			BaseURL:   embeddingBaseURL,
+			CacheSize: -1, // caching handled at a higher layer
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create embedding provider: %w", err)
