@@ -9,6 +9,7 @@ import (
 	"time"
 
 	distillmath "github.com/Siddhant-K-code/distill/pkg/math"
+	"github.com/Siddhant-K-code/distill/pkg/sensitivity"
 	_ "modernc.org/sqlite"
 )
 
@@ -16,9 +17,10 @@ import (
 // Uses a single connection (SetMaxOpenConns(1)) so SQLite's internal
 // serialization handles concurrency. No application-level mutex needed.
 type SQLiteStore struct {
-	db       *sql.DB
-	cfg      Config
-	handlers []MemoryEventHandler
+	db         *sql.DB
+	cfg        Config
+	handlers   []MemoryEventHandler
+	classifier *sensitivity.Classifier
 }
 
 // NewSQLiteStore creates a new SQLite-backed memory store.
@@ -49,7 +51,11 @@ func NewSQLiteStore(dsn string, cfg Config) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
-	s := &SQLiteStore{db: db, cfg: cfg}
+	s := &SQLiteStore{
+		db:         db,
+		cfg:        cfg,
+		classifier: sensitivity.New(sensitivity.DefaultConfig()),
+	}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
@@ -68,6 +74,7 @@ func (s *SQLiteStore) migrate() error {
 		session_id      TEXT DEFAULT '',
 		metadata        TEXT DEFAULT '{}',
 		decay_level     INTEGER DEFAULT 0,
+		sensitivity     INTEGER DEFAULT 0,
 		created_at      TEXT NOT NULL,
 		last_referenced TEXT NOT NULL,
 		access_count    INTEGER DEFAULT 0,
@@ -98,6 +105,7 @@ func (s *SQLiteStore) migrate() error {
 		{"expired_at", "TEXT DEFAULT ''"},
 		{"superseded_by", "TEXT DEFAULT ''"},
 		{"expires_at", "TEXT DEFAULT ''"},
+		{"sensitivity", "INTEGER DEFAULT 0"},
 	} {
 		_, _ = s.db.Exec("ALTER TABLE memories ADD COLUMN " + col.name + " " + col.def)
 	}
@@ -149,10 +157,19 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 			expiresAt = entry.ExpiresAt.UTC().Format(time.RFC3339Nano)
 		}
 
+		// Determine sensitivity level
+		sens := entry.Sensitivity
+		if entry.AutoClassify {
+			classified := s.classifier.Classify(entry.Text)
+			if classified.Level > sens {
+				sens = classified.Level
+			}
+		}
+
 		_, err := s.db.ExecContext(ctx,
-			`INSERT INTO memories (id, text, embedding, source, session_id, metadata, decay_level, created_at, last_referenced, access_count, expires_at)
-			 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 0, ?)`,
-			id, entry.Text, embBlob, entry.Source, sessionID, string(metaJSON), now, now, expiresAt,
+			`INSERT INTO memories (id, text, embedding, source, session_id, metadata, decay_level, sensitivity, created_at, last_referenced, access_count, expires_at)
+			 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?)`,
+			id, entry.Text, embBlob, entry.Source, sessionID, string(metaJSON), int(sens), now, now, expiresAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert memory: %w", err)
@@ -237,7 +254,7 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	}
 
 	// Build query with optional tag filter and expiry exclusion
-	query := "SELECT m.id, m.text, m.embedding, m.source, m.decay_level, m.last_referenced FROM memories m"
+	query := "SELECT m.id, m.text, m.embedding, m.source, m.decay_level, m.sensitivity, m.last_referenced FROM memories m"
 	var args []interface{}
 	var conditions []string
 
@@ -273,11 +290,12 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 		id, text, source, refStr string
 		embBlob                  []byte
 		decayLevel               int
+		sensitivity              int
 	}
 	var rawRows []rawRow
 	for rows.Next() {
 		var r rawRow
-		if err := rows.Scan(&r.id, &r.text, &r.embBlob, &r.source, &r.decayLevel, &r.refStr); err != nil {
+		if err := rows.Scan(&r.id, &r.text, &r.embBlob, &r.source, &r.decayLevel, &r.sensitivity, &r.refStr); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -323,6 +341,7 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 				Tags:           tags,
 				Relevance:      relevance,
 				DecayLevel:     DecayLevel(r.decayLevel),
+				Sensitivity:    sensitivity.Level(r.sensitivity),
 				LastReferenced: lastRef,
 			},
 			relevance: relevance,
@@ -360,6 +379,9 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	// Entries with relevance >= 0.7 are considered stable candidates.
 	hint := buildCacheBoundaryHint(results)
 
+	// Build sensitivity metadata from returned memories.
+	maxSens, sensitiveChunks := buildSensitivityMetadata(results)
+
 	return &RecallResult{
 		Memories: results,
 		Stats: RecallStats{
@@ -368,7 +390,9 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 			Returned:     len(results),
 			TokenCount:   tokenCount,
 		},
-		CacheHint: hint,
+		CacheHint:       hint,
+		MaxSensitivity:  maxSens,
+		SensitiveChunks: sensitiveChunks,
 	}, nil
 }
 
@@ -393,6 +417,25 @@ func buildCacheBoundaryHint(memories []RecalledMemory) *CacheBoundaryHint {
 		StableEntryIDs:  stableIDs,
 		ConfidenceScore: totalScore / float64(len(memories)),
 	}
+}
+
+// buildSensitivityMetadata derives MaxSensitivity and SensitiveChunks from
+// the recalled memories. Only entries with non-zero sensitivity are included.
+func buildSensitivityMetadata(memories []RecalledMemory) (sensitivity.Level, []SensitiveChunk) {
+	var maxSens sensitivity.Level
+	var chunks []SensitiveChunk
+	for _, m := range memories {
+		if m.Sensitivity > maxSens {
+			maxSens = m.Sensitivity
+		}
+		if m.Sensitivity > sensitivity.None {
+			chunks = append(chunks, SensitiveChunk{
+				ChunkID:     m.ID,
+				Sensitivity: m.Sensitivity,
+			})
+		}
+	}
+	return maxSens, chunks
 }
 
 // Forget removes memories matching the given criteria.

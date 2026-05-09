@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/Siddhant-K-code/distill/pkg/sensitivity"
 )
 
 // Common errors returned by memory stores.
@@ -37,6 +39,7 @@ type Entry struct {
 	SessionID      string                 `json:"session_id,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 	DecayLevel     DecayLevel             `json:"decay_level"`
+	Sensitivity    sensitivity.Level      `json:"sensitivity"`
 	CreatedAt      time.Time              `json:"created_at"`
 	LastReferenced time.Time              `json:"last_referenced"`
 	AccessCount    int                    `json:"access_count"`
@@ -54,12 +57,14 @@ type StoreRequest struct {
 
 // StoreEntry is a single entry in a store request.
 type StoreEntry struct {
-	Text      string                 `json:"text"`
-	Embedding []float32              `json:"embedding,omitempty"`
-	Source    string                 `json:"source,omitempty"`
-	Tags      []string               `json:"tags,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-	ExpiresAt *time.Time             `json:"expires_at,omitempty"`
+	Text         string                 `json:"text"`
+	Embedding    []float32              `json:"embedding,omitempty"`
+	Source       string                 `json:"source,omitempty"`
+	Tags         []string               `json:"tags,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	ExpiresAt    *time.Time             `json:"expires_at,omitempty"`
+	Sensitivity  sensitivity.Level      `json:"sensitivity,omitempty"`
+	AutoClassify bool                   `json:"auto_classify,omitempty"`
 }
 
 // StoreResult is the output of a store operation.
@@ -83,22 +88,32 @@ type RecallRequest struct {
 
 // RecallResult is the output of a recall operation.
 type RecallResult struct {
-	Memories   []RecalledMemory   `json:"memories"`
-	Stats      RecallStats        `json:"stats"`
+	Memories        []RecalledMemory   `json:"memories"`
+	Stats           RecallStats        `json:"stats"`
 	// CacheHint provides early stability signal to a cache boundary manager.
-	// Entries with high recency + similarity scores are likely stable this turn.
-	CacheHint  *CacheBoundaryHint `json:"cache_hint,omitempty"`
+	CacheHint       *CacheBoundaryHint `json:"cache_hint,omitempty"`
+	// MaxSensitivity is the highest sensitivity level across all returned memories.
+	MaxSensitivity  sensitivity.Level  `json:"max_sensitivity"`
+	// SensitiveChunks lists memories that have non-zero sensitivity.
+	SensitiveChunks []SensitiveChunk   `json:"sensitive_chunks,omitempty"`
+}
+
+// SensitiveChunk identifies a recalled memory that contains sensitive content.
+type SensitiveChunk struct {
+	ChunkID     string            `json:"chunk_id"`
+	Sensitivity sensitivity.Level `json:"sensitivity"`
 }
 
 // RecalledMemory is a single memory returned from recall.
 type RecalledMemory struct {
-	ID             string     `json:"id"`
-	Text           string     `json:"text"`
-	Source         string     `json:"source,omitempty"`
-	Tags           []string   `json:"tags,omitempty"`
-	Relevance      float64    `json:"relevance"`
-	DecayLevel     DecayLevel `json:"decay_level"`
-	LastReferenced time.Time  `json:"last_referenced"`
+	ID             string            `json:"id"`
+	Text           string            `json:"text"`
+	Source         string            `json:"source,omitempty"`
+	Tags           []string          `json:"tags,omitempty"`
+	Relevance      float64           `json:"relevance"`
+	DecayLevel     DecayLevel        `json:"decay_level"`
+	Sensitivity    sensitivity.Level `json:"sensitivity"`
+	LastReferenced time.Time         `json:"last_referenced"`
 }
 
 // RecallStats contains recall operation metrics.
