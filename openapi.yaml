@@ -1,0 +1,928 @@
+openapi: "3.1.0"
+info:
+  title: Distill API
+  version: 0.9.0
+  description: |
+    Context intelligence layer for LLM agents. Distill deduplicates, compresses,
+    and caches context before it reaches the model, and provides persistent memory
+    with sensitivity tagging and conflict detection.
+  license:
+    name: MIT
+    url: https://github.com/Siddhant-K-code/distill/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Dedupe
+    description: Semantic deduplication of context chunks
+  - name: Pipeline
+    description: Full dedup + compress + cache pipeline
+  - name: Batch
+    description: Async batch processing
+  - name: Memory
+    description: Persistent context memory store
+  - name: Session
+    description: Stateful context window management
+  - name: Health
+    description: Server health and metrics
+
+paths:
+  /v1/dedupe:
+    post:
+      tags: [Dedupe]
+      summary: Deduplicate chunks
+      description: |
+        Clusters semantically similar chunks and returns one representative per cluster.
+        Supports MMR re-ranking for relevance + diversity balance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DedupeRequest"
+      responses:
+        "200":
+          description: Deduplicated chunks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupeResponse"
+        "400":
+          description: Invalid request
+
+  /v1/dedupe/stream:
+    post:
+      tags: [Dedupe]
+      summary: Deduplicate chunks (SSE stream)
+      description: |
+        Same as `/v1/dedupe` but returns results as Server-Sent Events with
+        per-stage progress updates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DedupeRequest"
+      responses:
+        "200":
+          description: SSE stream of dedup progress and results
+          content:
+            text/event-stream: {}
+
+  /v1/pipeline:
+    post:
+      tags: [Pipeline]
+      summary: Run full pipeline
+      description: |
+        Runs the complete dedup → compress → summarize → cache pipeline.
+        Returns processed chunks with per-stage statistics.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PipelineRequest"
+      responses:
+        "200":
+          description: Pipeline results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineResponse"
+        "400":
+          description: Invalid request
+
+  /v1/batch:
+    post:
+      tags: [Batch]
+      summary: Submit batch job
+      description: Submit a batch of chunks for async processing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchSubmitRequest"
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchSubmitResponse"
+
+  /v1/batch/{job_id}:
+    get:
+      tags: [Batch]
+      summary: Get batch job status
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchStatusResponse"
+        "404":
+          description: Job not found
+
+  /v1/batch/{job_id}/results:
+    get:
+      tags: [Batch]
+      summary: Get batch job results
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResultsResponse"
+        "404":
+          description: Job not found
+
+  /v1/memory/store:
+    post:
+      tags: [Memory]
+      summary: Store memories
+      description: |
+        Store one or more memory entries with write-time deduplication.
+        Supports sensitivity tagging (explicit or auto-classified) and
+        conflict detection against existing entries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreRequest"
+      responses:
+        "200":
+          description: Store result with conflict information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreResult"
+
+  /v1/memory/recall:
+    post:
+      tags: [Memory]
+      summary: Recall memories
+      description: |
+        Retrieve memories ranked by relevance and recency. Supports tag boosting,
+        task context matching, and minimum relevance filtering.
+        Expired entries are excluded by default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecallRequest"
+      responses:
+        "200":
+          description: Recalled memories with sensitivity metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecallResult"
+
+  /v1/memory/forget:
+    post:
+      tags: [Memory]
+      summary: Forget memories
+      description: Permanently remove memories by ID, tag, or age.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgetRequest"
+      responses:
+        "200":
+          description: Forget result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForgetResult"
+
+  /v1/memory/expire:
+    post:
+      tags: [Memory]
+      summary: Expire memories
+      description: |
+        Mark memories as expired. Expired entries are excluded from recall
+        by default but remain in the store for auditing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpireRequest"
+      responses:
+        "200":
+          description: Expire result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpireResult"
+
+  /v1/memory/supersede:
+    post:
+      tags: [Memory]
+      summary: Supersede a memory
+      description: |
+        Mark a memory as superseded by a newer entry. The old entry is expired
+        and a forward pointer to the replacement is stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupersedeRequest"
+      responses:
+        "200":
+          description: Supersede result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupersedeResult"
+        "404":
+          description: Old entry not found
+        "409":
+          description: Old entry already expired
+
+  /v1/memory/stats:
+    get:
+      tags: [Memory]
+      summary: Memory store statistics
+      responses:
+        "200":
+          description: Store statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryStats"
+
+  /v1/session/create:
+    post:
+      tags: [Session]
+      summary: Create a session
+      description: Create a new context window session with a token budget.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCreateRequest"
+      responses:
+        "200":
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "409":
+          description: Session already exists
+
+  /v1/session/push:
+    post:
+      tags: [Session]
+      summary: Push entries to a session
+      description: |
+        Add context entries to a session. Distill deduplicates and compresses
+        to stay within the token budget.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionPushRequest"
+      responses:
+        "200":
+          description: Push result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionPushResult"
+        "404":
+          description: Session not found
+        "413":
+          description: Over token budget
+
+  /v1/session/context:
+    post:
+      tags: [Session]
+      summary: Get session context
+      description: Retrieve the current context window for a session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionContextRequest"
+      responses:
+        "200":
+          description: Session context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionContextResult"
+        "404":
+          description: Session not found
+
+  /v1/session/get:
+    get:
+      tags: [Session]
+      summary: Get session metadata
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Session not found
+
+  /v1/session/delete:
+    post:
+      tags: [Session]
+      summary: Delete a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id:
+                  type: string
+      responses:
+        "200":
+          description: Delete result
+        "404":
+          description: Session not found
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Prometheus-formatted metrics
+          content:
+            text/plain: {}
+
+components:
+  schemas:
+    DedupeChunk:
+      type: object
+      required: [text]
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        embedding:
+          type: array
+          items:
+            type: number
+            format: float
+        score:
+          type: number
+          format: float
+        cache_control:
+          type: string
+          description: Anthropic cache_control marker
+
+    DedupeRequest:
+      type: object
+      required: [chunks]
+      properties:
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DedupeChunk"
+        threshold:
+          type: number
+          format: double
+          description: Cosine distance threshold for clustering
+        lambda:
+          type: number
+          format: double
+          description: MMR lambda (0=diversity, 1=relevance)
+        target_k:
+          type: integer
+          description: Target number of output chunks
+        options:
+          type: object
+          properties:
+            preserve_cache_prefix:
+              type: boolean
+              description: Freeze chunks before the last cache_control marker
+
+    DedupeResponse:
+      type: object
+      properties:
+        chunks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+              score:
+                type: number
+                format: float
+              cluster_id:
+                type: integer
+              cache_control:
+                type: string
+        stats:
+          type: object
+          properties:
+            input_chunks:
+              type: integer
+            output_chunks:
+              type: integer
+            reduction_pct:
+              type: number
+            clusters:
+              type: integer
+            latency_ms:
+              type: number
+
+    PipelineRequest:
+      type: object
+      required: [chunks]
+      properties:
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DedupeChunk"
+        options:
+          type: object
+          properties:
+            dedup:
+              type: boolean
+            compress:
+              type: boolean
+            summarize:
+              type: boolean
+            cache:
+              type: boolean
+
+    PipelineResponse:
+      type: object
+      properties:
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DedupeChunk"
+        stats:
+          type: object
+          properties:
+            total_input_tokens:
+              type: integer
+            total_output_tokens:
+              type: integer
+            total_reduction:
+              type: number
+            total_latency_ms:
+              type: number
+            stages:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  input_tokens:
+                    type: integer
+                  output_tokens:
+                    type: integer
+                  reduction:
+                    type: number
+                  latency_ms:
+                    type: number
+
+    BatchSubmitRequest:
+      type: object
+      required: [chunks]
+      properties:
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DedupeChunk"
+        options:
+          $ref: "#/components/schemas/PipelineRequest/properties/options"
+
+    BatchSubmitResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+
+    BatchStatusResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress:
+          type: number
+        error:
+          type: string
+        created_at:
+          type: string
+        started_at:
+          type: string
+        completed_at:
+          type: string
+
+    BatchResultsResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DedupeChunk"
+        stats:
+          $ref: "#/components/schemas/PipelineResponse/properties/stats"
+
+    StoreRequest:
+      type: object
+      required: [entries]
+      properties:
+        session_id:
+          type: string
+        entries:
+          type: array
+          items:
+            type: object
+            required: [text]
+            properties:
+              text:
+                type: string
+              embedding:
+                type: array
+                items:
+                  type: number
+                  format: float
+              source:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
+              metadata:
+                type: object
+                additionalProperties: true
+              expires_at:
+                type: string
+                format: date-time
+              sensitivity:
+                type: integer
+                description: "0=none, 1=pii, 2=internal, 3=credentials"
+              auto_classify:
+                type: boolean
+                description: Run pattern-based sensitivity classification
+
+    StoreResult:
+      type: object
+      properties:
+        stored:
+          type: integer
+        merged:
+          type: integer
+        deduplicated:
+          type: integer
+        total_memories:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conflict"
+
+    Conflict:
+      type: object
+      properties:
+        new_id:
+          type: string
+        new_text:
+          type: string
+        existing_id:
+          type: string
+        existing_text:
+          type: string
+        distance:
+          type: number
+          format: double
+
+    RecallRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        query_embedding:
+          type: array
+          items:
+            type: number
+            format: float
+        tags:
+          type: array
+          items:
+            type: string
+        max_tokens:
+          type: integer
+        max_results:
+          type: integer
+        recency_weight:
+          type: number
+          format: double
+          description: Weight for recency vs relevance (0-1)
+        include_expired:
+          type: boolean
+        task_context:
+          type: string
+          description: Task description for source-matching boost
+        boost_tags:
+          type: array
+          items:
+            type: string
+          description: Tags that receive a relevance boost
+        min_relevance:
+          type: number
+          format: double
+          description: Filter out memories below this score (0-1)
+
+    RecallResult:
+      type: object
+      properties:
+        memories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+              source:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
+              relevance:
+                type: number
+                format: double
+              decay_level:
+                type: integer
+              sensitivity:
+                type: integer
+              last_referenced:
+                type: string
+                format: date-time
+        stats:
+          type: object
+          properties:
+            candidates:
+              type: integer
+            deduplicated:
+              type: integer
+            returned:
+              type: integer
+            token_count:
+              type: integer
+        max_sensitivity:
+          type: integer
+          description: Highest sensitivity level across returned memories
+        sensitive_chunks:
+          type: array
+          items:
+            type: object
+            properties:
+              chunk_id:
+                type: string
+              sensitivity:
+                type: integer
+
+    ForgetRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        before:
+          type: string
+          format: date-time
+
+    ForgetResult:
+      type: object
+      properties:
+        forgotten:
+          type: integer
+
+    ExpireRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+
+    ExpireResult:
+      type: object
+      properties:
+        expired:
+          type: integer
+
+    SupersedeRequest:
+      type: object
+      required: [old_id]
+      properties:
+        old_id:
+          type: string
+        new_id:
+          type: string
+
+    SupersedeResult:
+      type: object
+      properties:
+        superseded:
+          type: boolean
+
+    MemoryStats:
+      type: object
+      properties:
+        total_memories:
+          type: integer
+        expired_count:
+          type: integer
+        active_count:
+          type: integer
+        by_decay_level:
+          type: object
+          additionalProperties:
+            type: integer
+        by_source:
+          type: object
+          additionalProperties:
+            type: integer
+        oldest_memory:
+          type: string
+          format: date-time
+        newest_memory:
+          type: string
+          format: date-time
+
+    SessionCreateRequest:
+      type: object
+      required: [max_tokens]
+      properties:
+        session_id:
+          type: string
+          description: Auto-generated if empty
+        max_tokens:
+          type: integer
+        dedup_threshold:
+          type: number
+          format: double
+        preserve_recent:
+          type: integer
+          description: Always keep last N entries at full fidelity
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        max_tokens:
+          type: integer
+        used_tokens:
+          type: integer
+        entry_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    SessionPushRequest:
+      type: object
+      required: [session_id, entries]
+      properties:
+        session_id:
+          type: string
+        entries:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+              embedding:
+                type: array
+                items:
+                  type: number
+                  format: float
+
+    SessionPushResult:
+      type: object
+      properties:
+        added:
+          type: integer
+        deduplicated:
+          type: integer
+        compressed:
+          type: integer
+        tokens_used:
+          type: integer
+        tokens_remaining:
+          type: integer
+
+    SessionContextRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+        max_tokens:
+          type: integer
+          description: "0 = return full window"
+        role:
+          type: string
+          description: Filter by role
+
+    SessionContextResult:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+              compression_level:
+                type: string
+              tokens:
+                type: integer
+        total_tokens:
+          type: integer
