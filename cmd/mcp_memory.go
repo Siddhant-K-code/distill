@@ -144,6 +144,53 @@ func (m *MCPServer) handleForgetMemory(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(string(out)), nil
 }
 
+func (m *MCPServer) handleExpireMemory(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+
+	var ids []string
+	if idsRaw, ok := args["ids"].([]interface{}); ok {
+		for _, id := range idsRaw {
+			if s, ok := id.(string); ok {
+				ids = append(ids, s)
+			}
+		}
+	}
+
+	if len(ids) == 0 {
+		return mcp.NewToolResultError("ids is required"), nil
+	}
+
+	result, err := m.memStore.Expire(ctx, memory.ExpireRequest{IDs: ids})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("expire error: %v", err)), nil
+	}
+
+	out, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
+func (m *MCPServer) handleSupersedeMemory(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+
+	oldID, _ := args["old_id"].(string)
+	newID, _ := args["new_id"].(string)
+
+	if oldID == "" {
+		return mcp.NewToolResultError("old_id is required"), nil
+	}
+
+	result, err := m.memStore.Supersede(ctx, memory.SupersedeRequest{
+		OldID: oldID,
+		NewID: newID,
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("supersede error: %v", err)), nil
+	}
+
+	out, _ := json.MarshalIndent(result, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
+
 func (m *MCPServer) handleMemoryStats(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	stats, err := m.memStore.Stats(ctx)
 	if err != nil {

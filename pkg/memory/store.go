@@ -10,10 +10,11 @@ import (
 
 // Common errors returned by memory stores.
 var (
-	ErrNotFound     = errors.New("memory not found")
-	ErrEmptyText    = errors.New("entry text is empty")
-	ErrStoreClosed  = errors.New("memory store is closed")
-	ErrInvalidQuery = errors.New("query text is empty")
+	ErrNotFound        = errors.New("memory not found")
+	ErrEmptyText       = errors.New("entry text is empty")
+	ErrStoreClosed     = errors.New("memory store is closed")
+	ErrInvalidQuery    = errors.New("query text is empty")
+	ErrAlreadyExpired  = errors.New("memory is already expired")
 )
 
 // DecayLevel represents how compressed a memory is.
@@ -39,6 +40,10 @@ type Entry struct {
 	CreatedAt      time.Time              `json:"created_at"`
 	LastReferenced time.Time              `json:"last_referenced"`
 	AccessCount    int                    `json:"access_count"`
+	Expired        bool                   `json:"expired"`
+	ExpiredAt      *time.Time             `json:"expired_at,omitempty"`
+	SupersededBy   string                 `json:"superseded_by,omitempty"`
+	ExpiresAt      *time.Time             `json:"expires_at,omitempty"`
 }
 
 // StoreRequest is the input for storing memories.
@@ -54,6 +59,7 @@ type StoreEntry struct {
 	Source    string                 `json:"source,omitempty"`
 	Tags      []string               `json:"tags,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	ExpiresAt *time.Time             `json:"expires_at,omitempty"`
 }
 
 // StoreResult is the output of a store operation.
@@ -66,12 +72,13 @@ type StoreResult struct {
 
 // RecallRequest is the input for recalling memories.
 type RecallRequest struct {
-	Query         string   `json:"query"`
+	Query          string    `json:"query"`
 	QueryEmbedding []float32 `json:"query_embedding,omitempty"`
-	Tags          []string `json:"tags,omitempty"`
-	MaxTokens     int      `json:"max_tokens,omitempty"`
-	MaxResults    int      `json:"max_results,omitempty"`
-	RecencyWeight float64  `json:"recency_weight,omitempty"`
+	Tags           []string  `json:"tags,omitempty"`
+	MaxTokens      int       `json:"max_tokens,omitempty"`
+	MaxResults     int       `json:"max_results,omitempty"`
+	RecencyWeight  float64   `json:"recency_weight,omitempty"`
+	IncludeExpired bool      `json:"include_expired,omitempty"`
 }
 
 // RecallResult is the output of a recall operation.
@@ -115,9 +122,35 @@ type ForgetResult struct {
 	TotalMemories int `json:"total_memories"`
 }
 
+// ExpireRequest marks one or more memories as expired.
+type ExpireRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// ExpireResult is the output of an expire operation.
+type ExpireResult struct {
+	Expired int `json:"expired"`
+}
+
+// SupersedeRequest marks a memory as superseded by a replacement.
+type SupersedeRequest struct {
+	// OldID is the memory being superseded.
+	OldID string `json:"old_id"`
+	// NewID is the replacement memory. If empty, the old entry is simply
+	// marked expired without a forward pointer.
+	NewID string `json:"new_id,omitempty"`
+}
+
+// SupersedeResult is the output of a supersede operation.
+type SupersedeResult struct {
+	Superseded bool `json:"superseded"`
+}
+
 // Stats contains memory store statistics.
 type Stats struct {
 	TotalMemories  int            `json:"total_memories"`
+	ExpiredCount   int            `json:"expired_count"`
+	ActiveCount    int            `json:"active_count"`
 	ByDecayLevel   map[int]int    `json:"by_decay_level"`
 	BySource       map[string]int `json:"by_source"`
 	OldestMemory   time.Time      `json:"oldest_memory,omitempty"`
@@ -131,10 +164,19 @@ type Store interface {
 
 	// Recall retrieves memories matching a query, ranked by relevance and recency.
 	// The result includes a CacheBoundaryHint derived from the recall scores.
+	// Expired entries are excluded by default; set IncludeExpired to retrieve them.
 	Recall(ctx context.Context, req RecallRequest) (*RecallResult, error)
 
 	// Forget removes memories matching the given criteria.
 	Forget(ctx context.Context, req ForgetRequest) (*ForgetResult, error)
+
+	// Expire marks memories as expired. Expired entries are excluded from
+	// recall by default but remain in the store for auditing.
+	Expire(ctx context.Context, req ExpireRequest) (*ExpireResult, error)
+
+	// Supersede marks a memory as superseded by another entry. The old
+	// entry is expired and a forward pointer to the replacement is stored.
+	Supersede(ctx context.Context, req SupersedeRequest) (*SupersedeResult, error)
 
 	// Stats returns memory store statistics.
 	Stats(ctx context.Context) (*Stats, error)

@@ -20,6 +20,10 @@ const (
 	// EventEvicted fires when an entry is removed from the store entirely.
 	// Any cached prefix that included this entry must retreat.
 	EventEvicted MemoryEventType = "evicted"
+
+	// EventExpired fires when an entry is marked as expired or superseded.
+	// The entry remains in the store but is excluded from recall by default.
+	EventExpired MemoryEventType = "expired"
 )
 
 // MemoryEvent describes a single lifecycle transition for a memory entry.

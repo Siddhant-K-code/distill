@@ -70,7 +70,11 @@ func (s *SQLiteStore) migrate() error {
 		decay_level     INTEGER DEFAULT 0,
 		created_at      TEXT NOT NULL,
 		last_referenced TEXT NOT NULL,
-		access_count    INTEGER DEFAULT 0
+		access_count    INTEGER DEFAULT 0,
+		expired         INTEGER DEFAULT 0,
+		expired_at      TEXT DEFAULT '',
+		superseded_by   TEXT DEFAULT '',
+		expires_at      TEXT DEFAULT ''
 	);
 	CREATE TABLE IF NOT EXISTS memory_tags (
 		memory_id TEXT NOT NULL,
@@ -82,9 +86,23 @@ func (s *SQLiteStore) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_memories_decay ON memories(decay_level);
 	CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
 	CREATE INDEX IF NOT EXISTS idx_memories_referenced ON memories(last_referenced);
+	CREATE INDEX IF NOT EXISTS idx_memories_expired ON memories(expired);
 	`
-	_, err := s.db.Exec(schema)
-	return err
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Add columns to existing databases that lack them.
+	for _, col := range []struct{ name, def string }{
+		{"expired", "INTEGER DEFAULT 0"},
+		{"expired_at", "TEXT DEFAULT ''"},
+		{"superseded_by", "TEXT DEFAULT ''"},
+		{"expires_at", "TEXT DEFAULT ''"},
+	} {
+		_, _ = s.db.Exec("ALTER TABLE memories ADD COLUMN " + col.name + " " + col.def)
+	}
+
+	return nil
 }
 
 // Store adds entries with write-time deduplication.
@@ -126,10 +144,15 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 
 		sessionID := req.SessionID
 
+		expiresAt := ""
+		if entry.ExpiresAt != nil {
+			expiresAt = entry.ExpiresAt.UTC().Format(time.RFC3339Nano)
+		}
+
 		_, err := s.db.ExecContext(ctx,
-			`INSERT INTO memories (id, text, embedding, source, session_id, metadata, decay_level, created_at, last_referenced, access_count)
-			 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 0)`,
-			id, entry.Text, embBlob, entry.Source, sessionID, string(metaJSON), now, now,
+			`INSERT INTO memories (id, text, embedding, source, session_id, metadata, decay_level, created_at, last_referenced, access_count, expires_at)
+			 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 0, ?)`,
+			id, entry.Text, embBlob, entry.Source, sessionID, string(metaJSON), now, now, expiresAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert memory: %w", err)
@@ -166,7 +189,7 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 // At larger scale, consider an approximate nearest-neighbor index or caching
 // embeddings in memory.
 func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (string, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, embedding FROM memories WHERE embedding IS NOT NULL")
+	rows, err := s.db.QueryContext(ctx, "SELECT id, embedding FROM memories WHERE embedding IS NOT NULL AND expired = 0")
 	if err != nil {
 		return "", err
 	}
@@ -213,9 +236,18 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 		recencyWeight = 1
 	}
 
-	// Build query with optional tag filter
+	// Build query with optional tag filter and expiry exclusion
 	query := "SELECT m.id, m.text, m.embedding, m.source, m.decay_level, m.last_referenced FROM memories m"
 	var args []interface{}
+	var conditions []string
+
+	// Exclude expired entries by default
+	if !req.IncludeExpired {
+		conditions = append(conditions, "m.expired = 0")
+		// Also exclude entries past their TTL
+		conditions = append(conditions, "(m.expires_at = '' OR m.expires_at > ?)")
+		args = append(args, time.Now().UTC().Format(time.RFC3339Nano))
+	}
 
 	if len(req.Tags) > 0 {
 		placeholders := make([]string, len(req.Tags))
@@ -223,7 +255,11 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 			placeholders[i] = "?"
 			args = append(args, tag)
 		}
-		query += " WHERE m.id IN (SELECT memory_id FROM memory_tags WHERE tag IN (" + strings.Join(placeholders, ",") + "))"
+		conditions = append(conditions, "m.id IN (SELECT memory_id FROM memory_tags WHERE tag IN ("+strings.Join(placeholders, ",")+"))")
+	}
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -411,6 +447,79 @@ func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetRes
 	}, nil
 }
 
+// Expire marks the given memory IDs as expired.
+func (s *SQLiteStore) Expire(ctx context.Context, req ExpireRequest) (*ExpireResult, error) {
+	if len(req.IDs) == 0 {
+		return &ExpireResult{}, nil
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	placeholders := make([]string, len(req.IDs))
+	args := []interface{}{now}
+	for i, id := range req.IDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	res, err := s.db.ExecContext(ctx,
+		"UPDATE memories SET expired = 1, expired_at = ? WHERE expired = 0 AND id IN ("+strings.Join(placeholders, ",")+
+			")", args...)
+	if err != nil {
+		return nil, fmt.Errorf("expire memories: %w", err)
+	}
+
+	affected, _ := res.RowsAffected()
+
+	// Emit lifecycle events for expired entries
+	for _, id := range req.IDs {
+		s.emit(MemoryEvent{
+			Type:       EventExpired,
+			EntryID:    id,
+			OccurredAt: time.Now().UTC(),
+		})
+	}
+
+	return &ExpireResult{Expired: int(affected)}, nil
+}
+
+// Supersede marks oldID as expired and records newID as its replacement.
+func (s *SQLiteStore) Supersede(ctx context.Context, req SupersedeRequest) (*SupersedeResult, error) {
+	if req.OldID == "" {
+		return nil, ErrNotFound
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	res, err := s.db.ExecContext(ctx,
+		"UPDATE memories SET expired = 1, expired_at = ?, superseded_by = ? WHERE id = ? AND expired = 0",
+		now, req.NewID, req.OldID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("supersede memory: %w", err)
+	}
+
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		// Check if the entry exists at all
+		var count int
+		if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM memories WHERE id = ?", req.OldID).Scan(&count); err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, ErrNotFound
+		}
+		return nil, ErrAlreadyExpired
+	}
+
+	s.emit(MemoryEvent{
+		Type:       EventExpired,
+		EntryID:    req.OldID,
+		OccurredAt: time.Now().UTC(),
+	})
+
+	return &SupersedeResult{Superseded: true}, nil
+}
+
 // Stats returns memory store statistics.
 // Each query is scanned and closed before the next to avoid holding
 // the single SQLite connection across multiple result sets.
@@ -425,6 +534,12 @@ func (s *SQLiteStore) Stats(ctx context.Context) (*Stats, error) {
 	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM memories").Scan(&stats.TotalMemories); err != nil {
 		return nil, err
 	}
+
+	// Expired count
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM memories WHERE expired = 1").Scan(&stats.ExpiredCount); err != nil {
+		return nil, err
+	}
+	stats.ActiveCount = stats.TotalMemories - stats.ExpiredCount
 
 	// By decay level - scan and close before next query
 	rows, err := s.db.QueryContext(ctx, "SELECT decay_level, COUNT(*) FROM memories GROUP BY decay_level")
