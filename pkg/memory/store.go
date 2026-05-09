@@ -96,6 +96,15 @@ type RecallRequest struct {
 	MaxResults     int       `json:"max_results,omitempty"`
 	RecencyWeight  float64   `json:"recency_weight,omitempty"`
 	IncludeExpired bool      `json:"include_expired,omitempty"`
+	// TaskContext provides additional context about the current task.
+	// When set, memories with matching tags or source are boosted.
+	TaskContext    string    `json:"task_context,omitempty"`
+	// BoostTags are tags that receive a relevance boost during ranking.
+	// Useful for prioritizing domain-specific memories for the current task.
+	BoostTags      []string  `json:"boost_tags,omitempty"`
+	// MinRelevance filters out memories below this relevance score (0-1).
+	// Default: 0 (no filtering).
+	MinRelevance   float64   `json:"min_relevance,omitempty"`
 }
 
 // RecallResult is the output of a recall operation.
