@@ -159,9 +159,10 @@ func (m *MemoryAPI) handleSupersede(w http.ResponseWriter, r *http.Request) {
 	result, err := m.store.Supersede(r.Context(), req)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if err == memory.ErrNotFound {
+		switch err {
+		case memory.ErrNotFound:
 			code = http.StatusNotFound
-		} else if err == memory.ErrAlreadyExpired {
+		case memory.ErrAlreadyExpired:
 			code = http.StatusConflict
 		}
 		writeJSONError(w, err.Error(), code)
