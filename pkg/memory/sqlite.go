@@ -352,6 +352,15 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	}
 	_ = rows.Close()
 
+	// Build boost tag set for O(1) lookup
+	boostTagSet := make(map[string]bool, len(req.BoostTags))
+	for _, t := range req.BoostTags {
+		boostTagSet[t] = true
+	}
+
+	// Lowercase task context for substring matching
+	taskCtxLower := strings.ToLower(req.TaskContext)
+
 	var candidates []scored
 	now := time.Now()
 
@@ -377,6 +386,36 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 		}
 
 		relevance := (1.0-recencyWeight)*similarity + recencyWeight*recency
+
+		// Boost for matching tags
+		if len(boostTagSet) > 0 {
+			for _, tag := range tags {
+				if boostTagSet[tag] {
+					relevance += 0.1
+					break
+				}
+			}
+		}
+
+		// Boost for task context match (source or text substring)
+		if taskCtxLower != "" {
+			if r.source != "" && strings.Contains(taskCtxLower, strings.ToLower(r.source)) {
+				relevance += 0.05
+			}
+			if strings.Contains(strings.ToLower(r.text), taskCtxLower) {
+				relevance += 0.05
+			}
+		}
+
+		// Clamp relevance to [0, 1]
+		if relevance > 1.0 {
+			relevance = 1.0
+		}
+
+		// Apply minimum relevance filter
+		if req.MinRelevance > 0 && relevance < req.MinRelevance {
+			continue
+		}
 
 		candidates = append(candidates, scored{
 			memory: RecalledMemory{
