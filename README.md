@@ -252,18 +252,28 @@ distill memory stats
 # Start API with memory enabled
 distill api --port 8080 --memory
 
-# Store
+# Store (with auto sensitivity classification)
 curl -X POST http://localhost:8080/v1/memory/store \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "session-1",
-    "entries": [{"text": "Auth uses JWT with RS256", "tags": ["auth"], "source": "docs"}]
+    "entries": [{"text": "Auth uses JWT with RS256", "tags": ["auth"], "source": "docs", "auto_classify": true}]
   }'
 
-# Recall
+# Recall (with task-relevance boosting)
 curl -X POST http://localhost:8080/v1/memory/recall \
   -H "Content-Type: application/json" \
-  -d '{"query": "How does auth work?", "max_results": 5}'
+  -d '{"query": "How does auth work?", "max_results": 5, "boost_tags": ["auth"], "min_relevance": 0.3}'
+
+# Expire a memory (soft delete)
+curl -X POST http://localhost:8080/v1/memory/expire \
+  -H "Content-Type: application/json" \
+  -d '{"id": "memory-id"}'
+
+# Supersede with a newer version
+curl -X POST http://localhost:8080/v1/memory/supersede \
+  -H "Content-Type: application/json" \
+  -d '{"id": "old-memory-id", "new_id": "new-memory-id"}'
 ```
 
 ### MCP
@@ -285,12 +295,13 @@ Full text → Summary (~20%) → Keywords (~5%) → Evicted
   (24h)        (7 days)         (30 days)
 ```
 
-Accessing a memory resets its decay clock. Configure ages via `distill.yaml`:
+Accessing a memory resets its decay clock. Configure via `distill.yaml`:
 
 ```yaml
 memory:
   db_path: distill-memory.db
   dedup_threshold: 0.15
+  conflict_threshold: 0.35
 ```
 
 ## Session Management
@@ -413,6 +424,8 @@ distill completion powershell | Out-String | Invoke-Expression
 ```
 
 ## API Endpoints
+
+Interactive docs available at `/docs` (Swagger UI). Full OpenAPI 3.1 spec at `/openapi.yaml`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -541,6 +554,7 @@ auth:
 memory:
   db_path: distill-memory.db
   dedup_threshold: 0.15
+  conflict_threshold: 0.35
 
 session:
   db_path: distill-sessions.db
@@ -600,7 +614,8 @@ If `DISTILL_API_KEYS` is not set, the API is open (suitable for local/internal u
 
 **Alternatives:**
 - Bring your own embeddings - include `"embedding"` field in chunks
-- Self-host an embedding model - set `EMBEDDING_API_URL` to your endpoint
+- Use Ollama locally - `--embedding-provider ollama` (no API key needed)
+- Use Cohere - `--embedding-provider cohere` with `COHERE_API_KEY`
 
 ### Parameters
 
@@ -787,7 +802,14 @@ Strategies can be chained via `compress.Pipeline`. Configure with target reducti
 
 ### Memory (`pkg/memory`)
 
-Persistent context memory across agent sessions. SQLite-backed with write-time deduplication via cosine similarity. Memories decay over time: full text → summary → keywords → evicted. Recall ranked by `(1-w)*similarity + w*recency`. Enable with `--memory` flag.
+Persistent context memory across agent sessions. SQLite-backed with write-time deduplication via cosine similarity. Memories decay over time: full text → summary → keywords → evicted. Recall ranked by `(1-w)*similarity + w*recency` with optional task-relevance boosting. Enable with `--memory` flag.
+
+**v0.9.0 additions:**
+
+- **Conflict detection** — on store, entries with cosine distance 0.15–0.35 from existing memories are flagged as conflicts (contradictory information). Returned in `StoreResult.Conflicts`.
+- **Task-relevance ranking** — recall accepts `boost_tags`, `task_context`, and `min_relevance` to re-rank results by what matters for the current task.
+- **Expiry and supersession** — soft-delete via `POST /v1/memory/expire`, or replace with a newer version via `POST /v1/memory/supersede`. Expired entries are excluded from recall by default.
+- **Sensitivity classification** — automatic PII, credential, and internal-IP detection on store via `auto_classify: true`. Recall results include `max_sensitivity` and `sensitive_chunks` metadata.
 
 #### Lifecycle events
 
@@ -1012,7 +1034,20 @@ Pattern → annotation mapping:
 
 ## Embedding Providers
 
-Distill supports multiple embedding backends via a unified factory. Import the provider package to register it, then call `embedding.NewProvider`:
+Distill supports multiple embedding backends via a unified factory. Switch providers with `--embedding-provider` on any command:
+
+```bash
+# Use Ollama (local, no API key)
+distill api --embedding-provider ollama --embedding-base-url http://localhost:11434
+
+# Use Cohere
+distill api --embedding-provider cohere
+
+# Use OpenAI (default)
+distill api --embedding-provider openai
+```
+
+Programmatically, import the provider package to register it, then call `embedding.NewProvider`:
 
 ```go
 import (
@@ -1063,6 +1098,11 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Per-call-site hit rate tracking** | [#47](https://github.com/Siddhant-K-code/distill/issues/47) | Shipped | `CallSiteTracker` records Anthropic cache usage per call site; `AllStats()` returns worst performers first. |
 | **TTL-aware cache tracker** | [#49](https://github.com/Siddhant-K-code/distill/issues/49) | Shipped | `TTLTracker` monitors Anthropic's 5-minute cache TTL per prefix hash. `ScheduleDeadline` tells batch jobs the latest safe time to send the next request. |
 | **Multi-provider embedding abstraction** | [#33](https://github.com/Siddhant-K-code/distill/issues/33) | Shipped | `embedding.NewProvider` factory supports OpenAI, Ollama, and Cohere via a unified `ProviderConfig`. Custom providers register via `RegisterFactory`. |
+| **Memory expiry and supersession** | [#79](https://github.com/Siddhant-K-code/distill/issues/79) | Shipped | Soft-delete via `expire`, version replacement via `supersede`. Expired entries excluded from recall. |
+| **Sensitivity classification** | [#82](https://github.com/Siddhant-K-code/distill/issues/82) | Shipped | Regex-based classifier detects PII, credentials, and internal IPs on store. Recall includes sensitivity metadata. |
+| **Conflict detection** | [#77](https://github.com/Siddhant-K-code/distill/issues/77) | Shipped | Entries with cosine distance 0.15–0.35 from existing memories are flagged as conflicts on store. |
+| **Task-relevance ranking** | [#78](https://github.com/Siddhant-K-code/distill/issues/78) | Shipped | Recall supports `boost_tags`, `task_context`, and `min_relevance` for task-aware re-ranking. |
+| **Multi-provider embeddings (CLI)** | [#25](https://github.com/Siddhant-K-code/distill/issues/25) | Shipped | `--embedding-provider` flag on `api`, `serve`, and `memory` commands. Supports `openai`, `ollama`, `cohere`. |
 
 ### Code Intelligence
 
@@ -1082,8 +1122,9 @@ Distill is evolving from a dedup utility into a context intelligence layer. Here
 | **Shell Completions** | [#26](https://github.com/Siddhant-K-code/distill/issues/26) | Shipped | `distill completion [bash\|zsh\|fish\|powershell]` generates shell completion scripts. |
 | **Benchmark Suite** | [#24](https://github.com/Siddhant-K-code/distill/issues/24) | Shipped | `go test -bench=. ./...` covers cluster, MMR, selector, and compress with deterministic synthetic data. |
 | **Makefile** | [#28](https://github.com/Siddhant-K-code/distill/issues/28) | Shipped | 20+ targets: build, test, bench, lint, fmt, vet, docker, release. |
+| **OpenAPI Spec** | [#23](https://github.com/Siddhant-K-code/distill/issues/23) | Shipped | OpenAPI 3.1 spec at `/openapi.yaml`, Swagger UI at `/docs`. |
+| **v2.0 Documentation** | [#8](https://github.com/Siddhant-K-code/distill/issues/8) | Shipped | Guides, API reference, configuration reference, LangChain and RAG examples. See [`docs/`](docs/). |
 | **Python SDK** | [#5](https://github.com/Siddhant-K-code/distill/issues/5) | Planned | `pip install distill-ai` with LangChain/LlamaIndex integrations. |
-| **OpenAPI Spec** | [#23](https://github.com/Siddhant-K-code/distill/issues/23) | Planned | Swagger UI at `/docs`, auto-generated client SDKs. |
 
 See all open issues: [github.com/Siddhant-K-code/distill/issues](https://github.com/Siddhant-K-code/distill/issues)
 
@@ -1105,7 +1146,8 @@ Use LLMs for reasoning. Use deterministic algorithms for reliability.
 
 Works with your existing AI stack:
 
-- **LLM Providers:** OpenAI, Anthropic (more via [#33](https://github.com/Siddhant-K-code/distill/issues/33))
+- **Embedding Providers:** OpenAI, Ollama (local), Cohere
+- **LLM Providers:** OpenAI, Anthropic
 - **Frameworks:** LangChain, LlamaIndex (SDKs planned: [#5](https://github.com/Siddhant-K-code/distill/issues/5))
 - **Vector DBs:** Pinecone, Qdrant
 - **AI Assistants:** Claude Desktop, Cursor (via MCP)
@@ -1182,6 +1224,7 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 - [Website](https://distill.siddhantkhare.com)
 - [Playground](https://distill.siddhantkhare.com/playground)
 - [The Agentic Engineering Guide](https://agents.siddhantkhare.com) - the book behind the concepts Distill implements
+- [Documentation](docs/)
 - [FAQ](FAQ.md)
 - [Blog Post](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
