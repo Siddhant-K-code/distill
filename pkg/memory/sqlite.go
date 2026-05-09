@@ -123,23 +123,42 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 			continue
 		}
 
-		// Check for semantic duplicates if embedding is provided
+		// Check for semantic duplicates and conflicts if embedding is provided
 		if len(entry.Embedding) > 0 {
-			dupID, err := s.findDuplicate(ctx, entry.Embedding)
+			similar, err := s.findSimilar(ctx, entry.Embedding)
 			if err != nil {
-				return nil, fmt.Errorf("find duplicate: %w", err)
+				return nil, fmt.Errorf("find similar: %w", err)
 			}
-			if dupID != "" {
-				// Update the existing memory's last_referenced and access_count
-				_, err := s.db.ExecContext(ctx,
-					`UPDATE memories SET last_referenced = ?, access_count = access_count + 1 WHERE id = ?`,
-					time.Now().UTC().Format(time.RFC3339Nano), dupID,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("update duplicate: %w", err)
+
+			// Check for exact duplicate first
+			isDup := false
+			for _, sim := range similar {
+				if sim.isDup {
+					_, err := s.db.ExecContext(ctx,
+						`UPDATE memories SET last_referenced = ?, access_count = access_count + 1 WHERE id = ?`,
+						time.Now().UTC().Format(time.RFC3339Nano), sim.id,
+					)
+					if err != nil {
+						return nil, fmt.Errorf("update duplicate: %w", err)
+					}
+					result.Deduplicated++
+					isDup = true
+					break
 				}
-				result.Deduplicated++
+			}
+			if isDup {
 				continue
+			}
+
+			// Collect conflicts (similar but not identical)
+			// We still store the entry — conflicts are surfaced, not blocked.
+			for _, sim := range similar {
+				result.Conflicts = append(result.Conflicts, Conflict{
+					NewText:      entry.Text,
+					ExistingID:   sim.id,
+					ExistingText: sim.text,
+					Distance:     sim.distance,
+				})
 			}
 		}
 
@@ -186,6 +205,13 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 			}
 		}
 
+		// Backfill NewID on any conflicts detected for this entry
+		for i := range result.Conflicts {
+			if result.Conflicts[i].NewID == "" {
+				result.Conflicts[i].NewID = id
+			}
+		}
+
 		result.Stored++
 	}
 
@@ -199,24 +225,39 @@ func (s *SQLiteStore) Store(ctx context.Context, req StoreRequest) (*StoreResult
 	return result, nil
 }
 
-// findDuplicate scans existing embeddings and returns the ID of the first
-// entry within the dedup threshold. Returns "" if no duplicate found.
+// similarEntry describes an existing memory that is semantically close to a
+// new entry. Entries below DedupThreshold are duplicates; entries between
+// DedupThreshold and ConflictThreshold are potential conflicts.
+type similarEntry struct {
+	id       string
+	text     string
+	distance float64
+	isDup    bool
+}
+
+// findSimilar scans existing embeddings and returns duplicates and conflicts.
 //
 // TODO: This does a full table scan (O(n) per insert). Fine for < 10K entries.
 // At larger scale, consider an approximate nearest-neighbor index or caching
 // embeddings in memory.
-func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (string, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, embedding FROM memories WHERE embedding IS NOT NULL AND expired = 0")
+func (s *SQLiteStore) findSimilar(ctx context.Context, embedding []float32) ([]similarEntry, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id, text, embedding FROM memories WHERE embedding IS NOT NULL AND expired = 0")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
+	conflictThreshold := s.cfg.ConflictThreshold
+	if conflictThreshold <= 0 {
+		conflictThreshold = 0.35
+	}
+
+	var results []similarEntry
 	for rows.Next() {
-		var id string
+		var id, text string
 		var embBlob []byte
-		if err := rows.Scan(&id, &embBlob); err != nil {
-			return "", err
+		if err := rows.Scan(&id, &text, &embBlob); err != nil {
+			return nil, err
 		}
 
 		existing := decodeEmbedding(embBlob)
@@ -226,11 +267,15 @@ func (s *SQLiteStore) findDuplicate(ctx context.Context, embedding []float32) (s
 
 		dist := distillmath.CosineDistance(embedding, existing)
 		if dist < s.cfg.DedupThreshold {
-			return id, nil
+			results = append(results, similarEntry{id: id, text: text, distance: dist, isDup: true})
+			return results, nil // exact dup found, no need to continue
+		}
+		if dist < conflictThreshold {
+			results = append(results, similarEntry{id: id, text: text, distance: dist, isDup: false})
 		}
 	}
 
-	return "", rows.Err()
+	return results, rows.Err()
 }
 
 // Recall retrieves memories matching a query, ranked by relevance and recency.

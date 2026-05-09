@@ -69,10 +69,22 @@ type StoreEntry struct {
 
 // StoreResult is the output of a store operation.
 type StoreResult struct {
-	Stored        int `json:"stored"`
-	Merged        int `json:"merged"`
-	Deduplicated  int `json:"deduplicated"`
-	TotalMemories int `json:"total_memories"`
+	Stored        int        `json:"stored"`
+	Merged        int        `json:"merged"`
+	Deduplicated  int        `json:"deduplicated"`
+	TotalMemories int        `json:"total_memories"`
+	Conflicts     []Conflict `json:"conflicts,omitempty"`
+}
+
+// Conflict describes a semantic conflict between a newly stored entry
+// and an existing memory. The caller can resolve by superseding the old
+// entry, keeping both, or expiring the new one.
+type Conflict struct {
+	NewID       string  `json:"new_id"`
+	NewText     string  `json:"new_text"`
+	ExistingID  string  `json:"existing_id"`
+	ExistingText string `json:"existing_text"`
+	Distance    float64 `json:"distance"`
 }
 
 // RecallRequest is the input for recalling memories.
@@ -211,6 +223,12 @@ type Config struct {
 	// considered duplicates. Default: 0.15.
 	DedupThreshold float64
 
+	// ConflictThreshold is the cosine distance below which entries are
+	// considered semantically related but not identical. Entries in the
+	// range (DedupThreshold, ConflictThreshold] are flagged as conflicts.
+	// Default: 0.35.
+	ConflictThreshold float64
+
 	// DecayEnabled enables the background decay worker.
 	DecayEnabled bool
 
@@ -233,8 +251,9 @@ type Config struct {
 // DefaultConfig returns sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		DedupThreshold: 0.15,
-		DecayEnabled:   true,
+		DedupThreshold:    0.15,
+		ConflictThreshold: 0.35,
+		DecayEnabled:      true,
 		DecayInterval:  1 * time.Hour,
 		SummaryAge:     24 * time.Hour,
 		KeywordsAge:    168 * time.Hour,
