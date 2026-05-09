@@ -511,3 +511,4 @@ func TestStoreEmptyText(t *testing.T) {
 		t.Errorf("expected 1 stored (empty skipped), got %d", result.Stored)
 	}
 }
+

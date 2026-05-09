@@ -443,6 +443,27 @@ Use this to clean up outdated or incorrect memories.`),
 		)
 		s.AddTool(forgetMemoryTool, m.handleForgetMemory)
 
+		expireMemoryTool := mcp.NewTool("memory_expire",
+			mcp.WithDescription("Mark memory entries as expired. Expired entries are excluded from recall by default but remain in the store."),
+			mcp.WithArray("ids",
+				mcp.Description("Memory entry IDs to expire"),
+				mcp.Required(),
+			),
+		)
+		s.AddTool(expireMemoryTool, m.handleExpireMemory)
+
+		supersedeMemoryTool := mcp.NewTool("memory_supersede",
+			mcp.WithDescription("Mark a memory as superseded by a newer entry. The old entry is expired and a forward pointer to the replacement is stored."),
+			mcp.WithString("old_id",
+				mcp.Description("ID of the memory being superseded"),
+				mcp.Required(),
+			),
+			mcp.WithString("new_id",
+				mcp.Description("ID of the replacement memory"),
+			),
+		)
+		s.AddTool(supersedeMemoryTool, m.handleSupersedeMemory)
+
 		memoryStatsTool := mcp.NewTool("memory_stats",
 			mcp.WithDescription("Get statistics about the persistent memory store."),
 		)

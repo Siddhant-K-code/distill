@@ -22,6 +22,8 @@ func (m *MemoryAPI) RegisterMemoryRoutes(mux *http.ServeMux, mw func(string, htt
 	mux.HandleFunc("/v1/memory/store", mw("/v1/memory/store", m.handleStore))
 	mux.HandleFunc("/v1/memory/recall", mw("/v1/memory/recall", m.handleRecall))
 	mux.HandleFunc("/v1/memory/forget", mw("/v1/memory/forget", m.handleForget))
+	mux.HandleFunc("/v1/memory/expire", mw("/v1/memory/expire", m.handleExpire))
+	mux.HandleFunc("/v1/memory/supersede", mw("/v1/memory/supersede", m.handleSupersede))
 	mux.HandleFunc("/v1/memory/stats", mw("/v1/memory/stats", m.handleStats))
 }
 
@@ -103,6 +105,66 @@ func (m *MemoryAPI) handleRecall(w http.ResponseWriter, r *http.Request) {
 	result, err := m.store.Recall(r.Context(), req)
 	if err != nil {
 		writeJSONError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+func (m *MemoryAPI) handleExpire(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req memory.ExpireRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		writeJSONError(w, "ids is required", http.StatusBadRequest)
+		return
+	}
+
+	result, err := m.store.Expire(r.Context(), req)
+	if err != nil {
+		writeJSONError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+func (m *MemoryAPI) handleSupersede(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req memory.SupersedeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.OldID == "" {
+		writeJSONError(w, "old_id is required", http.StatusBadRequest)
+		return
+	}
+
+	result, err := m.store.Supersede(r.Context(), req)
+	if err != nil {
+		code := http.StatusInternalServerError
+		if err == memory.ErrNotFound {
+			code = http.StatusNotFound
+		} else if err == memory.ErrAlreadyExpired {
+			code = http.StatusConflict
+		}
+		writeJSONError(w, err.Error(), code)
 		return
 	}
 
