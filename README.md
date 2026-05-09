@@ -8,11 +8,11 @@
 
 [![Build with Ona](https://ona.com/build-with-ona.svg)](https://app.ona.com/#https://github.com/siddhant-k-code/distill)
 
-**Open-source context preprocessing for LLM applications.**
+**Your agent remembers what matters.**
 
-Distill sits between your application and any LLM. It cleans up context before it's sent: deduplicating semantically redundant chunks, compressing conversation history as it ages, and placing cache markers on stable content so Anthropic's prompt cache actually fires.
+Distill gives LLM agents persistent, deduplicated memory that survives across sessions. It prevents repeated re-learning, surfaces conflicting information before it causes mistakes, and compresses aging context so the signal stays high.
 
-The result: fewer tokens sent, lower cost per request, and context windows that don't fill up with noise.
+> Other tools compress what goes into your agent. Distill controls what your agent *remembers* — across sessions, without conflicts, ranked by what matters now.
 
 **[Learn more →](https://distill.siddhantkhare.com)**
 
@@ -22,16 +22,16 @@ The result: fewer tokens sent, lower cost per request, and context windows that 
 RAG / tools / memory / docs
           ↓
         Distill
-  (dedupe · compress · cache)
+  (remember · dedupe · compress · cache)
           ↓
          LLM
 ```
 
 ## The Problem
 
-30-40% of context assembled from multiple sources is semantically redundant. The same information arrives from docs, code, memory, and tool outputs, all competing for attention in the same prompt.
+Agents forget. Every new session starts from zero — the same constraints, preferences, and facts have to be re-established. When context does persist, 30-40% of it is semantically redundant, and contradictory information sits side by side with no signal about which version is current.
 
-This causes non-deterministic outputs, confused reasoning, and failures that only show up at scale. Better prompts don't fix it. The context going in needs to be clean.
+This causes non-deterministic outputs, confused reasoning, and failures that only show up at scale. Better prompts don't fix it. The agent needs memory it can trust.
 
 ## How It Works
 
@@ -39,12 +39,13 @@ No LLM calls. Fully deterministic. ~12ms overhead.
 
 | Stage | What it does |
 |-------|-------------|
+| **Remember** | Persistent memory across sessions with write-time dedup, expiry, and sensitivity tagging |
 | **Deduplicate** | Cluster semantically similar chunks, keep one representative per cluster |
 | **Compress** | Extractive compression to remove noise and preserve signal |
 | **Summarize** | Progressively condense conversation history as turns age |
 | **Cache** | Annotate stable prefixes with `cache_control`, track TTL per prefix |
 
-All four stages chain together via `POST /v1/pipeline` or `distill pipeline` CLI.
+All stages chain together via `POST /v1/pipeline` or `distill pipeline` CLI. Memory is available via `--memory` flag.
 
 ### Dedup pipeline
 
@@ -273,7 +274,7 @@ Memory tools are available in Claude Desktop, Cursor, and other MCP clients when
 distill mcp --memory
 ```
 
-Tools exposed: `store_memory`, `recall_memory`, `forget_memory`, `memory_stats`.
+Tools exposed: `store_memory`, `recall_memory`, `forget_memory`, `memory_expire`, `memory_supersede`, `memory_stats`.
 
 ### How Decay Works
 
@@ -422,9 +423,11 @@ distill completion powershell | Out-String | Invoke-Expression
 | GET | `/v1/batch/{id}` | Poll batch job status and progress |
 | GET | `/v1/batch/{id}/results` | Retrieve completed batch results |
 | POST | `/v1/retrieve` | Query vector DB with dedup (requires backend) |
-| POST | `/v1/memory/store` | Store memories with write-time dedup (requires `--memory`) |
+| POST | `/v1/memory/store` | Store memories with write-time dedup and sensitivity tagging (requires `--memory`) |
 | POST | `/v1/memory/recall` | Recall memories by relevance + recency (requires `--memory`) |
 | POST | `/v1/memory/forget` | Remove memories by ID, tag, or age (requires `--memory`) |
+| POST | `/v1/memory/expire` | Mark memories as expired without deleting (requires `--memory`) |
+| POST | `/v1/memory/supersede` | Replace a memory with a newer version (requires `--memory`) |
 | GET | `/v1/memory/stats` | Memory store statistics (requires `--memory`) |
 | POST | `/v1/session/create` | Create a session with token budget (requires `--session`) |
 | POST | `/v1/session/push` | Push entries with dedup + budget enforcement (requires `--session`) |
