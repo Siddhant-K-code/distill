@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"math"
 	"time"
+
+	"github.com/Siddhant-K-code/distill/pkg/sensitivity"
 )
 
 // generateID creates a random 16-char hex ID with a time prefix for ordering.
@@ -50,4 +52,46 @@ func decodeEmbedding(buf []byte) []float32 {
 // Uses the same heuristic as pkg/compress: ~4 chars per token.
 func estimateTokens(text string) int {
 	return (len(text) + 3) / 4
+}
+
+// buildCacheBoundaryHint derives a hint from recalled memories.
+// Entries with relevance >= 0.7 are treated as stable this turn.
+func buildCacheBoundaryHint(memories []RecalledMemory) *CacheBoundaryHint {
+	if len(memories) == 0 {
+		return nil
+	}
+	var stableIDs []string
+	var totalScore float64
+	for _, m := range memories {
+		totalScore += m.Relevance
+		if m.Relevance >= 0.7 {
+			stableIDs = append(stableIDs, m.ID)
+		}
+	}
+	if len(stableIDs) == 0 {
+		return nil
+	}
+	return &CacheBoundaryHint{
+		StableEntryIDs:  stableIDs,
+		ConfidenceScore: totalScore / float64(len(memories)),
+	}
+}
+
+// buildSensitivityMetadata derives MaxSensitivity and SensitiveChunks from
+// the recalled memories. Only entries with non-zero sensitivity are included.
+func buildSensitivityMetadata(memories []RecalledMemory) (sensitivity.Level, []SensitiveChunk) {
+	var maxSens sensitivity.Level
+	var chunks []SensitiveChunk
+	for _, m := range memories {
+		if m.Sensitivity > maxSens {
+			maxSens = m.Sensitivity
+		}
+		if m.Sensitivity > sensitivity.None {
+			chunks = append(chunks, SensitiveChunk{
+				ChunkID:     m.ID,
+				Sensitivity: m.Sensitivity,
+			})
+		}
+	}
+	return maxSens, chunks
 }
