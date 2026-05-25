@@ -74,37 +74,42 @@ func NewPostgresStore(dsn string, cfg Config) (*PostgresStore, error) {
 }
 
 func (ps *PostgresStore) migrate() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS memories (
-		id             TEXT PRIMARY KEY,
-		text           TEXT NOT NULL,
-		embedding      BYTEA,
-		source         TEXT DEFAULT '',
-		session_id     TEXT DEFAULT '',
-		metadata       TEXT DEFAULT '{}',
-		decay_level    INTEGER DEFAULT 0,
-		sensitivity    INTEGER DEFAULT 0,
-		created_at     TIMESTAMPTZ NOT NULL,
-		last_referenced TIMESTAMPTZ NOT NULL,
-		access_count   INTEGER DEFAULT 0,
-		expired        BOOLEAN DEFAULT FALSE,
-		expired_at     TIMESTAMPTZ,
-		superseded_by  TEXT DEFAULT '',
-		expires_at     TIMESTAMPTZ
-	);
-	CREATE TABLE IF NOT EXISTS memory_tags (
-		memory_id TEXT NOT NULL,
-		tag       TEXT NOT NULL,
-		PRIMARY KEY (memory_id, tag)
-	);
-	CREATE INDEX IF NOT EXISTS idx_memory_tags_tag    ON memory_tags(tag);
-	CREATE INDEX IF NOT EXISTS idx_memories_decay     ON memories(decay_level);
-	CREATE INDEX IF NOT EXISTS idx_memories_created   ON memories(created_at);
-	CREATE INDEX IF NOT EXISTS idx_memories_referenced ON memories(last_referenced);
-	CREATE INDEX IF NOT EXISTS idx_memories_expired   ON memories(expired);
-	`
-	_, err := ps.dbPool.Exec(context.Background(), schema)
-	return err
+	ctx := context.Background()
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS memories (
+			id             TEXT PRIMARY KEY,
+			text           TEXT NOT NULL,
+			embedding      BYTEA,
+			source         TEXT DEFAULT '',
+			session_id     TEXT DEFAULT '',
+			metadata       TEXT DEFAULT '{}',
+			decay_level    INTEGER DEFAULT 0,
+			sensitivity    INTEGER DEFAULT 0,
+			created_at     TIMESTAMPTZ NOT NULL,
+			last_referenced TIMESTAMPTZ NOT NULL,
+			access_count   INTEGER DEFAULT 0,
+			expired        BOOLEAN DEFAULT FALSE,
+			expired_at     TIMESTAMPTZ,
+			superseded_by  TEXT DEFAULT '',
+			expires_at     TIMESTAMPTZ
+		)`,
+		`CREATE TABLE IF NOT EXISTS memory_tags (
+			memory_id TEXT NOT NULL,
+			tag       TEXT NOT NULL,
+			PRIMARY KEY (memory_id, tag)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_memory_tags_tag     ON memory_tags(tag)`,
+		`CREATE INDEX IF NOT EXISTS idx_memories_decay      ON memories(decay_level)`,
+		`CREATE INDEX IF NOT EXISTS idx_memories_created    ON memories(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_memories_referenced ON memories(last_referenced)`,
+		`CREATE INDEX IF NOT EXISTS idx_memories_expired    ON memories(expired)`,
+	}
+	for _, stmt := range stmts {
+		if _, err := ps.dbPool.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+	}
+	return nil
 }
 
 // Store adds entries with write-time deduplication.
