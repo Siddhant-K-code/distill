@@ -480,48 +480,6 @@ func (s *SQLiteStore) Recall(ctx context.Context, req RecallRequest) (*RecallRes
 	}, nil
 }
 
-// buildCacheBoundaryHint derives a hint from recalled memories.
-// Entries with relevance >= 0.7 are treated as stable this turn.
-func buildCacheBoundaryHint(memories []RecalledMemory) *CacheBoundaryHint {
-	if len(memories) == 0 {
-		return nil
-	}
-	var stableIDs []string
-	var totalScore float64
-	for _, m := range memories {
-		totalScore += m.Relevance
-		if m.Relevance >= 0.7 {
-			stableIDs = append(stableIDs, m.ID)
-		}
-	}
-	if len(stableIDs) == 0 {
-		return nil
-	}
-	return &CacheBoundaryHint{
-		StableEntryIDs:  stableIDs,
-		ConfidenceScore: totalScore / float64(len(memories)),
-	}
-}
-
-// buildSensitivityMetadata derives MaxSensitivity and SensitiveChunks from
-// the recalled memories. Only entries with non-zero sensitivity are included.
-func buildSensitivityMetadata(memories []RecalledMemory) (sensitivity.Level, []SensitiveChunk) {
-	var maxSens sensitivity.Level
-	var chunks []SensitiveChunk
-	for _, m := range memories {
-		if m.Sensitivity > maxSens {
-			maxSens = m.Sensitivity
-		}
-		if m.Sensitivity > sensitivity.None {
-			chunks = append(chunks, SensitiveChunk{
-				ChunkID:     m.ID,
-				Sensitivity: m.Sensitivity,
-			})
-		}
-	}
-	return maxSens, chunks
-}
-
 // Forget removes memories matching the given criteria.
 func (s *SQLiteStore) Forget(ctx context.Context, req ForgetRequest) (*ForgetResult, error) {
 
