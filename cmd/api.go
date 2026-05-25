@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,6 +25,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+//go:embed openapi.yaml
+var openapiSpec []byte
 
 var apiCmd = &cobra.Command{
 	Use:   "api",
@@ -274,6 +278,8 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		m.Handler().ServeHTTP(w, r)
 	})
+	mux.HandleFunc("/openapi.yaml", server.handleOpenAPISpec)
+	mux.HandleFunc("/docs", server.handleDocs)
 	mux.HandleFunc("/", server.handleRoot)
 
 	// CORS middleware
@@ -349,15 +355,51 @@ func (s *APIServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"name":    "Distill API",
-		"version": "1.0.0",
-		"docs":    "https://distill.siddhantkhare.com/docs",
+		"version": "0.9.0",
+		"docs":    "/docs",
+		"openapi": "/openapi.yaml",
 		"endpoints": map[string]string{
 			"dedupe":        "POST /v1/dedupe",
 			"dedupe_stream": "POST /v1/dedupe/stream",
+			"pipeline":      "POST /v1/pipeline",
+			"memory_store":  "POST /v1/memory/store",
+			"memory_recall": "POST /v1/memory/recall",
 			"health":        "GET /health",
 			"metrics":       "GET /metrics",
 		},
 	})
+}
+
+func (s *APIServer) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	_, _ = w.Write(openapiSpec)
+}
+
+func (s *APIServer) handleDocs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Distill API Docs</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: "/openapi.yaml",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout"
+    });
+  </script>
+</body>
+</html>`))
 }
 
 func (s *APIServer) handleDedupe(w http.ResponseWriter, r *http.Request) {

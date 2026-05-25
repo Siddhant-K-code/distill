@@ -4,7 +4,7 @@
 
 ### What does Distill do?
 
-Distill is a post-retrieval processing layer for RAG pipelines. When you fetch chunks from a vector database, 30-40% are typically redundant - same information phrased differently. Distill clusters semantically similar chunks, picks the best representative from each cluster, compresses verbose content, and re-ranks for diversity. Total overhead is ~12ms. No LLM calls.
+Distill is a context intelligence layer for LLM agents. It gives agents persistent, deduplicated memory that survives across sessions, deduplicates semantically similar context chunks, compresses verbose content, and re-ranks for diversity. It also detects conflicting information, classifies sensitive content, and manages token-budgeted context windows. Total overhead is ~12ms. No LLM calls.
 
 ### Why not just fetch fewer results from the vector DB?
 
@@ -22,7 +22,7 @@ LLMs are non-deterministic. The same input can produce different compressed outp
 
 ### What is Context Memory?
 
-Persistent memory that accumulates knowledge across agent sessions. Store context once, recall it later by semantic similarity + recency. Memories are deduplicated on write and compressed over time through hierarchical decay (full text → summary → keywords → evicted). Enable with `--memory` on the `api` or `mcp` commands.
+Persistent memory that accumulates knowledge across agent sessions. Store context once, recall it later by semantic similarity + recency. Memories are deduplicated on write, compressed over time through hierarchical decay (full text → summary → keywords → evicted), and automatically classified for sensitivity (PII, credentials, internal IPs). On store, conflicting memories (cosine distance 0.15–0.35) are flagged. On recall, results can be boosted by tags and task context. Enable with `--memory` on the `api` or `mcp` commands.
 
 ### What are Sessions?
 
@@ -31,6 +31,20 @@ Token-budgeted context windows for long-running agent tasks. Push context increm
 ### How is Context Memory different from Sessions?
 
 Memory is cross-session: knowledge persists after a session ends and can be recalled in future sessions. Sessions are within-task: a bounded context window that tracks what the agent has seen during a single task, enforcing a token budget. Use memory for long-term knowledge, sessions for working context.
+
+### How does conflict detection work?
+
+When storing a memory, Distill checks existing entries by cosine distance. Entries below 0.15 are duplicates (skipped). Entries between 0.15 and 0.35 are flagged as conflicts — semantically related but different enough to be contradictory. The conflicts are returned in the store response so the agent can decide which version to keep, or supersede the old one.
+
+### What is sensitivity classification?
+
+Distill can automatically scan memory content for PII (emails, phone numbers, SSNs), credentials (API keys, tokens, passwords), and internal infrastructure (private IPs, internal domains). Enable with `auto_classify: true` on store. Recall results include `max_sensitivity` and a list of `sensitive_chunks` so agents can handle sensitive data appropriately.
+
+### How do expiry and supersession work?
+
+**Expire** soft-deletes a memory — it stays in the database but is excluded from recall by default. Useful for marking outdated information without losing it. **Supersede** links an old memory to its replacement — the old entry is expired and tagged with the new entry's ID. This preserves the audit trail while ensuring only current information is recalled.
+
+---
 
 ## Algorithms
 
@@ -122,11 +136,21 @@ LangChain's `search_type="mmr"` applies MMR at the vector DB level - a single re
 
 ### What MCP tools does Distill expose?
 
-The base MCP server exposes `deduplicate_context` and `analyze_redundancy`. With `--memory`, it adds `store_memory`, `recall_memory`, `forget_memory`, `memory_stats`. With `--session`, it adds `create_session`, `push_session`, `session_context`, `delete_session`. Enable both with `distill mcp --memory --session`.
+The base MCP server exposes `deduplicate_context` and `analyze_redundancy`. With `--memory`, it adds `store_memory`, `recall_memory`, `forget_memory`, `memory_expire`, `memory_supersede`, `memory_stats`. With `--session`, it adds `create_session`, `push_session`, `session_context`, `delete_session`. Enable both with `distill mcp --memory --session`.
 
 ### Can I use Distill with local models (Ollama, vLLM)?
 
-The dedup pipeline itself doesn't call any LLM - it's pure math (cosine distance, clustering). The only external dependency is for embedding generation when you send text without pre-computed embeddings. Multi-provider embedding support (Ollama, Azure, Cohere, HuggingFace) is planned in [#33](https://github.com/Siddhant-K-code/distill/issues/33).
+Yes. The dedup pipeline itself doesn't call any LLM - it's pure math (cosine distance, clustering). For embeddings, Distill supports OpenAI, Ollama, and Cohere via `--embedding-provider`:
+
+```bash
+# Use Ollama locally (no API key needed)
+distill api --embedding-provider ollama --embedding-base-url http://localhost:11434
+
+# Use Cohere
+distill api --embedding-provider cohere
+```
+
+You can also send chunks with pre-computed embeddings to skip embedding generation entirely.
 
 ---
 
@@ -146,7 +170,7 @@ The agglomerative clustering is O(N²) for the distance matrix. For N=50, this i
 
 ### What if chunks don't have embeddings?
 
-If you send text-only chunks to the API, Distill calls OpenAI's `text-embedding-3-small` to generate embeddings on the fly. Set `OPENAI_API_KEY` to enable this. If you send chunks with pre-computed embeddings (e.g., from your vector DB retrieval), no OpenAI call is needed.
+If you send text-only chunks to the API, Distill generates embeddings on the fly using the configured provider (OpenAI by default, or Ollama/Cohere via `--embedding-provider`). If you send chunks with pre-computed embeddings (e.g., from your vector DB retrieval), no embedding call is needed.
 
 ---
 
@@ -197,9 +221,15 @@ Yes, MIT. The full pipeline, CLI, API server, MCP server, and all algorithms are
 ### What's on the roadmap?
 
 **Shipped:**
-- **Context Memory** - Persistent deduplicated memory across sessions with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29))
-- **Session Management** - Token-budgeted context windows with compression and eviction ([#31](https://github.com/Siddhant-K-code/distill/issues/31))
+- **Context Memory** — persistent deduplicated memory with hierarchical decay ([#29](https://github.com/Siddhant-K-code/distill/issues/29))
+- **Session Management** — token-budgeted context windows with compression and eviction ([#31](https://github.com/Siddhant-K-code/distill/issues/31))
+- **Memory Intelligence (v0.9.0)** — conflict detection ([#77](https://github.com/Siddhant-K-code/distill/issues/77)), task-relevance ranking ([#78](https://github.com/Siddhant-K-code/distill/issues/78)), expiry/supersession ([#79](https://github.com/Siddhant-K-code/distill/issues/79)), sensitivity classification ([#82](https://github.com/Siddhant-K-code/distill/issues/82))
+- **Multi-provider embeddings** — OpenAI, Ollama, Cohere via `--embedding-provider` ([#25](https://github.com/Siddhant-K-code/distill/issues/25), [#33](https://github.com/Siddhant-K-code/distill/issues/33))
+- **OpenAPI spec & Swagger UI (v0.9.1)** — interactive docs at `/docs` ([#23](https://github.com/Siddhant-K-code/distill/issues/23))
+- **v2.0 Documentation** — guides, API reference, examples ([#8](https://github.com/Siddhant-K-code/distill/issues/8))
+- **Code Intelligence** — dependency graphs, blast radius, semantic commit analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
+- **Batch API** — async job queue with progress polling ([#11](https://github.com/Siddhant-K-code/distill/issues/11))
 
 **Upcoming:**
-1. **Code Intelligence** - Dependency graphs, co-change patterns, blast radius analysis ([#30](https://github.com/Siddhant-K-code/distill/issues/30), [#32](https://github.com/Siddhant-K-code/distill/issues/32))
-2. **Platform** - Python SDK, multi-provider embeddings, batch API ([#5](https://github.com/Siddhant-K-code/distill/issues/5), [#33](https://github.com/Siddhant-K-code/distill/issues/33), [#11](https://github.com/Siddhant-K-code/distill/issues/11))
+1. **Python SDK** — `pip install distill-ai` with LangChain/LlamaIndex integrations ([#5](https://github.com/Siddhant-K-code/distill/issues/5))
+2. **Postgres memory backend** — pgvector-backed memory store for production deployments ([#74](https://github.com/Siddhant-K-code/distill/issues/74))
