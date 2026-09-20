@@ -128,6 +128,7 @@ different identity.
 /decision
 /policy/result
 /policy/reason_codes
+/policy/acceptance_score
 /run_validity
 ```
 
@@ -150,7 +151,7 @@ It never repairs, coerces, reorders, retries, or silently drops data.
 
 1. The exact schema bytes hash to `/receipt_schema_digest` and to the published
    constant
-   `adfe846637344f202e5b73f3c082c6d485663120cefc40ca4d9c65a6a2a4c9a3`.
+   `63f96c8eb1cacee9a072d43ae508f8628acc6ccd86bcf5926ca6954975c06238`.
 2. The JSON Schema engine and version equal `/validator` and run with Draft
    2020-12 format assertion enabled. URI and RFC 3339 date-time negative
    fixtures must fail.
@@ -236,9 +237,9 @@ unless its separately preregistered version emits genuine probabilities.
    paired with `accept`. The score function/version is bound by
    `policy_digest` and `acceptance_score_definition_digest`.
 2. A failed or not-attempted decision has no outputs, has a sanitized error
-   artifact, and produces policy result `review`. Failed attempts use reason
-   `decision_failed`; calls stopped before execution use `not_attempted` and
-   error stage `scheduler`.
+   artifact, has null `acceptance_score`, and produces policy result `review`.
+   Failed attempts use reason `decision_failed`; calls stopped before execution
+   use `not_attempted` and error stage `scheduler`.
 3. Every error's `sanitized_error_artifact_id` resolves to exactly one
    `receipt_artifact_hashes` entry whose digest equals
    `error_detail_digest`.

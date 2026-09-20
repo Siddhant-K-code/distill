@@ -266,6 +266,9 @@
         "properties": {
           "policy": {
             "properties": {
+              "acceptance_score": {
+                "type": "null"
+              },
               "result": {
                 "const": "review"
               },
@@ -323,6 +326,9 @@
           },
           "policy": {
             "properties": {
+              "acceptance_score": {
+                "type": "null"
+              },
               "result": {
                 "const": "review"
               },
@@ -405,13 +411,6 @@
                 "const": "valid"
               }
             }
-          },
-          "policy": {
-            "properties": {
-              "acceptance_score": {
-                "type": "number"
-              }
-            }
           }
         }
       },
@@ -433,6 +432,13 @@
                         "selected_label_probability",
                         "provider_defined_versioned"
                       ]
+                    }
+                  }
+                },
+                "policy": {
+                  "properties": {
+                    "acceptance_score": {
+                      "type": "number"
                     }
                   }
                 }

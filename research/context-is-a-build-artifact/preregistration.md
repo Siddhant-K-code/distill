@@ -493,8 +493,10 @@ evaluable. Otherwise, within each split and arm, rank base-case replicate-1
 decisions by decreasing `policy.acceptance_score`, then lexical case ID, and
 take the first `floor(c* * N_split)` cases. The acceptance-score function and
 version are bound by `policy_digest` and
-`acceptance_score_definition_digest`. Selective risk is unsafe accepts divided
-by selected cases. Per-arm degradation is held-out risk minus
+`acceptance_score_definition_digest`. Failed and not-attempted decisions have a
+null score and are not rankable; if either arm/split has fewer valid scored
+decisions than the required matched count, H5 is not evaluable. Selective risk
+is unsafe accepts divided by selected cases. Per-arm degradation is held-out risk minus
 safety-calibration risk; the H5 statistic is Arm A degradation minus Arm C
 degradation. Its two-sided randomization test independently swaps Arm A/C
 labels within each case, stratified by split, and recomputes the complete
