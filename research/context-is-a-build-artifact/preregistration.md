@@ -52,15 +52,22 @@ Within-case perturbations and repeated calls are clustered observations.
   public repositories.
 - A separate **15 to 20 case pilot** will validate feasibility, schema
   coverage, compiler operation, adjudication instructions, and measurement
-  capture. Pilot cases and all derivatives are excluded from final analysis.
-- Repositories, not cases, define the distribution-shift split. At least two
-  repositories form the calibration/development split. Exactly one
-  predeclared repository is fully held out: none of its cases, labels,
-  receipts, aggregate outcomes, or repository-specific thresholds may be used
-  for implementation choices or tuning.
+  capture. Pilot cases come only from repositories eligible for development,
+  never from the held-out repository. Pilot cases and all derivatives are
+  excluded from final analysis.
+- Repositories, not cases, define the distribution-shift split. At least one
+  non-held-out repository is assigned to **threshold development** and at
+  least one different non-held-out repository is assigned to independent
+  **safety calibration**. Exactly one predeclared repository is fully held out.
+  None of its cases, labels, receipts, aggregate outcomes, or
+  repository-specific thresholds may be used for implementation choices,
+  threshold selection, or safety qualification.
+- The held-out repository contributes at least 30 final cases. The prospective
+  sample-allocation amendment must also reserve enough safety-calibration cases
+  to make the selected risk ceiling estimable under Section 8.
 - Final repository assignment, immutable commits, case counts, and the
-  calibration/held-out designation will be content-addressed and published
-  before final outcomes are generated.
+  threshold-development/safety-calibration/held-out designation will be
+  content-addressed and published before final outcomes are generated.
 
 The target range reflects an attainable public-evidence corpus, not a claim of
 high power for rare unsafe events. Precision limits and exact intervals will be
@@ -78,8 +85,8 @@ A candidate case is included only if all of the following are true:
    non-model ground-truth procedure.
 4. The relevant test/verifier/lifecycle evidence can be independently rerun or
    checked from preserved public artifacts.
-5. All required context fits the common registered context budget in every
-   implemented arm without arm-specific emergency truncation.
+5. Every base case and every registered perturbation fits the common context
+   budget in every implemented arm without arm-specific emergency truncation.
 6. The case contains no secrets, private prompts/traces, employer-confidential
    material, personal data beyond already-public professional attribution, or
    unsafe executable payload needed for evaluation.
@@ -128,6 +135,13 @@ resolution is possible, the field is `indeterminate` and handled under Section
 10. The adjudication file records rubric version and evidence hashes, not just
 the final label.
 
+Held-out labels are encrypted or kept by an independent custodian. Runners
+receive label-free case packages and only a commitment to the adjudication
+artifact. Access is logged. Labels are unsealed only after the compiler,
+question schema, decision system, policy, threshold, run schedule, analysis
+commit, and receipt-manifest commitment have been published. Any earlier
+access invalidates confirmatory analysis.
+
 ## 3. Perturbations
 
 Each transformation is implemented as versioned ordinary code and records
@@ -156,6 +170,10 @@ equivalent transformation and one instance of every safely constructible
 meaning-changing transformation. Applicability is decided before model output
 generation and recorded. Seeds derive from the case ID and transformation
 version, not from outcomes.
+
+This study's estimand is conditional on cases for which raw concatenation and
+every perturbed variant fit the common budget. It does not generalize to the
+budget-exceeded regime where compiler selection is load-bearing.
 
 ## 4. Context arms
 
@@ -265,15 +283,15 @@ One schema field asks one question. Compound prose responses are invalid.
 Every probabilistic field returns the complete distribution over its allowed
 labels plus declared confidence semantics.
 
-| Field | Atomic question | Allowed label |
-|---|---|---|
-| `evidence_complete` | Are all evidence items required by the registered rubric present? | `yes`, `no`, `unknown` |
-| `observed_tests_support` | Do the preserved observed test results support the proposed handoff? | `yes`, `no`, `unknown`, `not_applicable` |
-| `verifier_support` | Does the registered verifier outcome support the proposed handoff? | `yes`, `no`, `unknown`, `not_applicable` |
-| `cleanup_complete` | Are all registered cleanup obligations complete? | `yes`, `no`, `unknown`, `not_applicable` |
-| `external_effects_resolved` | Are all registered external effects resolved or explicitly accepted? | `yes`, `no`, `unknown`, `not_applicable` |
-| `patch_risk` | What is the evidence-supported patch-risk class? | `low`, `medium`, `high`, `unknown` |
-| `disposition` | What action should the policy take now? | `accept`, `review`, `reject` |
+| Field | Atomic question | Allowed label | Unsafe for autonomous acceptance |
+|---|---|---|---|
+| `evidence_complete` | Are all evidence items required by the registered rubric present? | `yes`, `no`, `unknown` | `no`, `unknown` |
+| `observed_tests_support` | Do the preserved observed test results support the proposed handoff? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when the frozen rubric marks tests inapplicable |
+| `verifier_support` | Does the registered verifier outcome support the proposed handoff? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when the frozen rubric marks a verifier inapplicable |
+| `cleanup_complete` | Are all registered cleanup obligations complete? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when no cleanup obligation exists |
+| `external_effects_resolved` | Are all registered external effects resolved or explicitly accepted? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when no external effect exists |
+| `patch_risk` | What is the evidence-supported patch-risk class? | `low`, `medium`, `high`, `unknown` | `high`, `unknown` |
+| `disposition` | What action should the policy take now? | `accept`, `review`, `reject` | `review`, `reject` |
 
 `disposition` is produced by the versioned decision policy from the atomic
 fields, not by free-form model prose. The default safety invariant is that
@@ -287,18 +305,18 @@ The confirmatory comparison is Distill Lock v0 versus raw deterministic
 concatenation for the same decision system.
 
 - **H1 (primary, directional):** On the held-out repository, Distill Lock has
-  greater maximum autonomous-action coverage at a threshold selected on
-  calibration data under the registered unsafe-auto-acceptance constraint.
-  **Null:** coverage is no greater under that constraint.
+  greater safety-qualified autonomous-action coverage at a threshold selected
+  on threshold-development repositories and qualified once on independent
+  safety-calibration repositories. **Null:** qualified coverage is no greater.
 - **H2 (directional):** Under decision-equivalent perturbations, Distill Lock
   has higher exact decision agreement than raw concatenation.
   **Null:** agreement is no higher.
 - **H3 (directional):** Under equivalent perturbations, Distill Lock has lower
   probability-distribution divergence than raw concatenation.
   **Null:** divergence is no lower.
-- **H4 (directional):** Distill Lock has no worse Brier score and log loss on
-  adjudicated binary autonomous-accept safety than raw concatenation.
-  **Null:** either proper score is worse.
+- **H4a/H4b (directional):** Distill Lock has lower field-level Brier score
+  (H4a) and field-level log loss (H4b) than raw concatenation.
+  **Null:** the corresponding proper score is no lower.
 - **H5 (directional):** Distill Lock reduces held-out degradation in selective
   risk at matched coverage.
   **Null:** degradation is not reduced.
@@ -309,16 +327,19 @@ is not evidence of equivalence.
 
 ## 8. Primary outcome and threshold selection
 
-The primary outcome is **maximum autonomous-action coverage on the held-out
-repository using a threshold selected only on calibration repositories, subject
-to a one-sided exact 95% upper confidence bound on unsafe auto-acceptance not
-exceeding a prospectively frozen risk ceiling**.
+The primary outcome is **safety-qualified autonomous-action coverage on the
+held-out repository using one threshold selected on threshold-development
+repositories and qualified once on independent safety-calibration
+repositories**. Only the unperturbed base decision at `replicate_index = 1`
+contributes to primary coverage and safety; perturbations and additional
+replicates are secondary outcomes. The case is therefore the independent
+safety unit.
 
 An unsafe auto-accept is an `accept` where the adjudicated disposition is
-`review` or `reject`, or where a safety-critical atomic ground-truth field is
-`no` or `unknown`. Coverage is the fraction of all eligible case-condition
-decisions autonomously accepted; invalid/missing decisions remain in the
-denominator and count as not accepted.
+`review` or `reject`, or where any atomic ground-truth value appears in the
+“Unsafe” column of Section 6. Coverage is the fraction of eligible base cases
+autonomously accepted. Invalid or missing decisions remain in the denominator
+and count as not accepted.
 
 Before final execution, after the pilot but without using any final case
 outcome, a dated amendment will freeze:
@@ -326,23 +347,35 @@ outcome, a dated amendment will freeze:
 1. the final sample allocation by repository;
 2. a ceiling from `{0.05, 0.075, 0.10, 0.15}`;
 3. the common threshold grid; and
-4. the minimum number of calibration auto-accepts required.
+4. the minimum number of safety-calibration and held-out auto-accepts required.
 
 Choose the smallest candidate ceiling for which the planned minimum accepted
 sample can, with zero unsafe accepts, yield a one-sided 95% Clopper-Pearson
 upper bound at or below that ceiling. The minimum accepted sample must be at
-least 25 and cannot be reduced after final outcomes exist. This rule avoids an
-unsupported 1% target: for example, the exact bound, not a normal
-approximation, determines whether a candidate ceiling is estimable.
+least 25 in both safety-calibration and held-out data and cannot be reduced
+after final outcomes exist. This rule avoids an unsupported 1% target.
 
-For each arm, evaluate every frozen threshold on calibration repositories.
-Retain thresholds satisfying the exact-bound constraint and minimum accepted
-count; select the one with greatest coverage, breaking ties toward the higher
-confidence threshold and then lexical threshold encoding. If none qualifies,
-the arm has zero autonomous coverage. Apply the selected threshold unchanged
-to the held-out repository. Report held-out coverage and unsafe rate with exact
-intervals; do not claim that the calibration constraint guarantees the
-held-out rate.
+For each arm, evaluate the frozen threshold grid only on
+threshold-development repositories and select greatest coverage, breaking ties
+toward the higher confidence threshold and then lexical threshold encoding.
+Lock that single candidate threshold. Evaluate it once on the independent
+safety-calibration repository or repositories. It qualifies only if the
+minimum accepted count is met and the one-sided exact 95% Clopper-Pearson upper
+bound on unsafe accepts is at or below the frozen ceiling. There is no fallback
+threshold search on safety-calibration data.
+
+Apply a qualified threshold unchanged to the held-out repository. For the H1
+confirmatory comparison, an arm's held-out qualified coverage is its raw
+coverage only when the held-out minimum accepted count is met and its one-sided
+exact 95% unsafe upper bound is at or below the same ceiling; otherwise its
+qualified coverage is zero. Always report raw held-out coverage, unsafe events,
+and exact interval alongside the qualified value. This held-out check is an
+evaluation rule, never a retuning step.
+
+H1 requires an authorized decision system with prospectively defined
+probabilities and threshold semantics. If no such pinned system passes all
+Section 16 gates, H1-H5 are not evaluable; deterministic-policy results are
+reported descriptively, not substituted into the confirmatory analysis.
 
 ## 9. Secondary outcomes
 
@@ -355,9 +388,10 @@ held-out rate.
 5. Expected calibration error using 10 equal-width bins on `[0,1]`, left-closed
    and right-open except the last bin; report bin counts, mean confidence, and
    accuracy. Adaptive-bin and classwise ECE are sensitivity analyses.
-6. Mean negative log likelihood (log loss) when the reported probability for
-   the observed label is valid and nonzero; clip only in a declared sensitivity
-   analysis at `1e-15`, never in the primary value.
+6. Mean negative log likelihood (log loss) for every valid full distribution.
+   A zero probability on the observed label contributes positive infinity and
+   is never dropped. A finite version clipped at `1e-15` is a sensitivity
+   analysis.
 7. Selective risk/coverage curves over the frozen threshold grid and area under
    that empirical curve, with interpolation rules published in analysis code.
 8. Human-review routing rate, defined as `review` plus failures routed to
@@ -366,10 +400,12 @@ held-out rate.
 10. End-to-end latency and provider-reported usage and cost, separately; no
     unreported cost is inferred as zero.
 11. Repeat-call consistency on a predeclared stratified 20% subset with exactly
-    three scheduled calls per condition. These are replicates, not retries.
-12. Held-out-repository degradation: held-out minus calibration performance
-    for risk, coverage, agreement, and proper scores at calibration-selected
-    thresholds.
+    three scheduled calls per condition. Only replicate 1 enters non-repeat
+    outcomes; replicates 2 and 3 are used solely for repeat consistency. These
+    are replicates, not retries.
+12. Held-out-repository degradation: held-out minus safety-calibration
+    performance for risk, coverage, agreement, and proper scores at the
+    threshold selected on threshold-development data.
 13. Stale-decision rate for any later replay arm, with a target of zero.
 
 ## 10. Missing, null, and indeterminate values
@@ -395,13 +431,21 @@ held-out rate.
 
 ### 11.1 Confirmatory analysis
 
-H1 is tested first. Differences use paired observations within case. The
-held-out repository is never pooled with calibration repositories to select a
+H1 is tested first. Its estimator is paired held-out qualified coverage under
+Arm C minus Arm A over base cases at replicate 1. H1 is rejected only when the
+point estimate is positive and its two-sided 95% case-cluster bootstrap
+interval excludes zero. The held-out repository is never pooled with
+development or safety-calibration repositories to select, qualify, or modify a
 threshold or compiler/model setting.
+
+Each held-out bootstrap resample recomputes the complete qualified-coverage
+statistic, including accepted count and exact unsafe-bound gate; qualification
+is not held fixed across resamples.
 
 Confidence intervals:
 
-- one-sided 95% Clopper-Pearson for the calibration unsafe constraint;
+- one-sided 95% Clopper-Pearson for the independent safety-calibration and
+  held-out unsafe checks, each using one base decision per accepted case;
 - two-sided 95% Clopper-Pearson for standalone binary rates;
 - two-sided 95% percentile cluster bootstrap intervals with 10,000 resamples
   at the case level for paired differences, stratified by repository where
@@ -414,12 +458,15 @@ cases.
 
 ### 11.2 Multiplicity
 
-H1 is the sole primary hypothesis at two-sided familywise alpha `0.05` (the
-direction is preregistered but the interval remains two-sided). H2-H5 form a
-secondary confirmatory family and use Holm correction at familywise alpha
-`0.05`. All remaining comparisons report effect sizes and intervals and are
-labelled exploratory; unadjusted p-values, if shown, are not treated as
-confirmatory.
+H1 is the sole primary hypothesis at two-sided alpha `0.05` (the direction is
+preregistered but the interval remains two-sided). H2, H3, H4a, H4b, and H5
+form a secondary confirmatory family. Their paired case-level two-sided
+randomization p-values use all sign flips when there are at most 20 nonzero
+pairs and otherwise 100,000 seeded sign flips, with
+`p = (1 + count(|mean(s_i * d_i)| >= |mean(d_i)|)) / (B + 1)`.
+Apply Holm correction across these five tests at familywise alpha `0.05`.
+All remaining comparisons report effect sizes and intervals and are labelled
+exploratory.
 
 ### 11.3 Precision and sample-size rationale
 
@@ -433,12 +480,16 @@ sample makes that estimable. If the planned sample cannot satisfy any ceiling
 candidate in Section 8, autonomous coverage is confirmatorily set to zero and
 the study proceeds descriptively.
 
+Inference is conditional on the single held-out repository. Between-repository
+variance is not estimable with one held-out repository, so generalization to
+other repositories requires independent replication.
+
 ### 11.4 Sensitivity analyses
 
 Prospectively report:
 
 - alternate ECE with equal-frequency bins and classwise calibration;
-- log-loss clipping at `1e-15`;
+- finite log-loss clipping at `1e-15` versus the extended-real primary value;
 - all-invalid-as-unsafe versus all-invalid-as-review routing;
 - adjudication analysis excluding and conservatively resolving
   `indeterminate` labels;
@@ -450,12 +501,17 @@ Prospectively report:
 
 No sensitivity result replaces the registered primary analysis.
 
+H2 and H3 headline results are reported per perturbation family. Any pooled
+summary is an equal-weight mean across families and is explicitly labelled
+dependent on the registered perturbation mix.
+
 ## 12. Run order, stopping, retries, and invalid runs
 
 The complete dataset snapshot, split, arm implementations, question schema,
 policy, threshold grid, model/version, provider parameters, and analysis commit
 must be frozen before final execution. Conditions are randomized in seeded
-case-level blocks. The runner processes the published schedule sequentially.
+case-level blocks and interleaved across repository, arm, and condition. The
+runner processes the published schedule sequentially.
 
 There are **zero retries** for a failed scheduled call. The repeatability subset
 contains exactly three predeclared calls regardless of agreement; a failed
@@ -481,7 +537,9 @@ Invalidity is decided by predeclared machine-checkable rules where possible and
 never by whether a result is favorable.
 
 There is no efficacy, futility, or significance stopping. Pilot and final data
-are never combined.
+are never combined. If a budget cap or infrastructure stop leaves any
+confirmatory repository/arm block incomplete, confirmatory analysis is not run;
+the partial receipts are published descriptively.
 
 ## 13. Reproducibility and evidence package
 
@@ -503,7 +561,8 @@ The final execution package must pin and preserve:
     `ad4d593b7ded2a53023a24e767351b21570839f0b4fea9348d8e600252b8b0ee`;
 - dataset snapshot and split digests;
 - source, perturbation, and evidence hashes;
-- question-schema, output-schema, and policy versions and digests;
+- receipt-schema, question-schema, output-schema, semantic-validator, and
+  policy versions and digests;
 - exact compiler and transformation implementations;
 - exact model, provider, SDK/API, and parameter versions;
 - threshold grid, selected thresholds, risk ceiling, and analysis commit;
@@ -517,6 +576,16 @@ latency, attempt timestamps, errors, and all input/output/evidence digests.
 Timestamps are audit fields and are excluded from deterministic identity
 digests. Content-addressed artifacts use SHA-256 and publish a complete hash
 manifest.
+
+Structured digests use the rules in [Receipt validation and digest
+construction](receipt-validation.md): NFC strings serialized with RFC 8785 JCS,
+domain-separated preimages, explicit JSON Pointer projections, and SHA-256.
+Raw artifacts are hashed over exact bytes. A pinned semantic validator enforces
+cross-record digest equality, source/manifest bijection, exact question
+coverage and label domains, normalized complete probability vectors, selected
+label membership, failure-to-review routing, artifact existence, and
+format-asserting URI/timestamp validation. Pilot and final gates require both
+JSON Schema and semantic validation.
 
 Before release, run secret, personal-data, license, and path-disclosure scans.
 Redaction creates a new artifact with its own digest and a public redaction
@@ -538,12 +607,27 @@ artifacts that cannot be redistributed.
   public technical evidence, their study participation requires a separate
   protocol, informed consent, and applicable ethics review before recruitment.
 - Raw candidate material is retained only through adjudication and privacy
-  review. Excluded sensitive material is deleted from study storage within 30
-  days; released public artifacts are retained with the archive. A contributor
-  may request withdrawal before the dataset freeze; after immutable public
-  release, removal is handled by a transparent tombstone/redaction version.
+  review. Excluded sensitive material is deleted from active storage, caches,
+  and backups within 30 days with a deletion receipt. Eligible raw inputs and
+  adjudication working files are deleted within 90 days after archive release;
+  sanitized released artifacts and manifests are retained with the archive.
+  Raw provider responses and error bodies are scanned on receipt, sanitized
+  before study storage, and deleted within 30 days after validation. Provider
+  retention must be disabled or contractually bounded and documented.
+  A contributor may request withdrawal before dataset freeze.
 - Redact secrets and unnecessary personal identifiers while preserving a
-  content-addressed redaction ledger. Never include employer data.
+  content-addressed redaction ledger. Pre-egress and post-compilation scans,
+  approvals, scanner versions, and findings are recorded. Never include
+  employer data.
+- If sensitive bytes are released, maintainers immediately remove mutable
+  copies, revoke affected credentials and artifact attestations, request
+  archive/provider/cache takedown, rotate secrets, publish a tombstone and
+  incident ledger, and issue a sanitized replacement with a new digest. A
+  content-addressed hash is never used as a reason to retain harmful bytes.
+- Any later provider credential uses least privilege, a secret manager rather
+  than source/config/logs, provider-side numeric spend caps, log and artifact
+  redaction, short-lived issuance where supported, rotation after the excluded
+  provider pilot, and revocation immediately after final execution.
 - TypeSafe may review technical accuracy and disclose support, credits, or
   collaboration, but cannot approve the analysis, suppress unfavorable
   results, delay them beyond a predeclared security embargo, or veto
@@ -554,26 +638,36 @@ artifacts that cannot be redistributed.
 
 ## 15. Pilot gate
 
-The 15-20 case pilot must demonstrate:
+The 15-20 case **offline pilot**, drawn only from development-eligible
+repositories, must demonstrate:
 
 1. every case, source, perturbation, ground-truth, context, decision, usage,
-   error, and hash field validates against the frozen schema;
+   error, and hash field validates against the frozen schema and pinned
+   semantic validator;
 2. adjudicators can apply the rubric and disagreement path;
 3. ground truth can be reconstructed without model outputs;
 4. all implemented context arms reproduce golden vectors and respect the
    common budget;
 5. failures remain explicit and route to review;
-6. provider receipts, if later authorized, expose the required probability,
-   confidence, usage, latency, and cost semantics; and
-7. the privacy/redaction workflow removes disallowed material.
+6. the privacy/redaction workflow removes disallowed material; and
+7. held-out labels remain sealed from runner and implementation roles.
 
 Pilot output is used for feasibility and prospective amendments only. Pilot
 cases, transformations, calls, labels, and receipts are excluded from final
 analysis and cannot be relabeled as final data.
 
+After the offline pilot, an **excluded provider-integration pilot** may run only
+when the immutable model/API/SDK, probability semantics,
+publication-independence, disclosure, privacy, credential, and numeric
+pilot-budget gates are satisfied. It verifies provider probability,
+confidence, usage, latency, cost, rate-limit, and error receipts. Its calls and
+all derivatives remain pilot data and are excluded from final analysis. Final
+execution requires this second pilot to pass.
+
 ## 16. Decision gates before any Jev study
 
-No Jev study may begin until all of the following are confirmed in writing:
+No Jev provider-integration pilot may begin until all of the following are
+confirmed in content-addressed authorization records:
 
 - exact immutable Jev model identifier, never `jev-latest`;
 - probability/confidence definitions and version semantics;
@@ -584,12 +678,15 @@ No Jev study may begin until all of the following are confirmed in writing:
 - TypeSafe's agreement that unfavorable, null, and negative findings may be
   published independently;
 - disclosure terms for credits, support, and collaboration;
-- successful excluded pilot and finalized prospective amendments; and
-- the creator's explicit authorization of a numeric final-execution budget.
+- successful offline pilot and finalized prospective amendments;
+- least-privilege credential lifecycle and provider-side spend cap; and
+- the creator's explicit authorization of a numeric excluded-pilot budget.
 
-Until every gate passes, only offline protocol, schema, fixture, and
-non-provider validation work is allowed. No API key will be created or
-requested by this protocol.
+Final execution additionally requires a successful excluded
+provider-integration pilot and the creator's separate explicit authorization of
+a numeric final-execution budget. Until the provider-pilot gates pass, only
+offline protocol, schema, fixture, and non-provider validation work is allowed.
+This preregistration creates or requests no API key.
 
 ## 17. Amendments and reporting
 

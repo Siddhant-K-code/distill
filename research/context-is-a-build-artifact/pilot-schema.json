@@ -1,35 +1,53 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Siddhant-K-code/distill/blob/main/research/context-is-a-build-artifact/pilot-schema.json",
+  "$id": "urn:distill:context-build-artifact:receipt:v1",
   "title": "Context Is a Build Artifact Pilot Record",
-  "description": "Data and receipt structures for an excluded pilot or later final run. This schema makes no provider call. Fields named *_digest contain lowercase SHA-256 of separately specified canonical bytes. Deterministic identities MUST exclude timestamps, latency, usage, cost, provider request IDs, and other execution metadata.",
+  "description": "Data and receipt structures for an excluded pilot or later final run. This schema makes no provider call. Digest construction and required semantic validation are frozen in receipt-validation.md. Deterministic condition identities exclude ground truth, outcomes, timestamps, latency, usage, cost, provider request IDs, and other execution metadata.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "receipt_schema_digest",
     "study_phase",
+    "record_stage",
     "case",
     "source_set",
     "perturbation",
+    "ground_truth_commitment_digest",
     "ground_truth",
+    "custody",
     "compiled_context",
     "question_schema",
     "decision_system",
+    "execution_authorization",
     "decision",
     "policy",
+    "run_validity",
+    "validator",
     "measurement",
     "evidence_hashes",
     "identity_digest",
+    "outcome_digest",
     "receipt_digest"
   ],
   "properties": {
     "schema_version": {
       "const": "context-build-artifact/receipt/v1"
     },
+    "receipt_schema_digest": {
+      "$ref": "#/$defs/sha256",
+      "description": "SHA-256 of the exact pilot-schema.json bytes used to validate this receipt."
+    },
     "study_phase": {
       "enum": [
         "pilot",
         "final"
+      ]
+    },
+    "record_stage": {
+      "enum": [
+        "runner",
+        "analysis"
       ]
     },
     "case": {
@@ -41,8 +59,21 @@
     "perturbation": {
       "$ref": "#/$defs/perturbation"
     },
+    "ground_truth_commitment_digest": {
+      "$ref": "#/$defs/sha256"
+    },
     "ground_truth": {
-      "$ref": "#/$defs/groundTruth"
+      "oneOf": [
+        {
+          "$ref": "#/$defs/groundTruth"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "custody": {
+      "$ref": "#/$defs/custody"
     },
     "compiled_context": {
       "$ref": "#/$defs/compiledContext"
@@ -53,11 +84,27 @@
     "decision_system": {
       "$ref": "#/$defs/decisionSystem"
     },
+    "execution_authorization": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/executionAuthorization"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "decision": {
       "$ref": "#/$defs/decision"
     },
     "policy": {
       "$ref": "#/$defs/policy"
+    },
+    "run_validity": {
+      "$ref": "#/$defs/runValidity"
+    },
+    "validator": {
+      "$ref": "#/$defs/validatorIdentity"
     },
     "measurement": {
       "$ref": "#/$defs/measurement"
@@ -71,7 +118,11 @@
     },
     "identity_digest": {
       "$ref": "#/$defs/sha256",
-      "description": "Digest of canonical identity material only: schema version, phase, case, source identities, perturbation, ground truth, compiled-context identity, question-schema identity, decision-system identity, decision output, policy identity/result, and evidence hashes. Excludes all measurement fields, timestamps, latency, usage, cost, provider request IDs, identity_digest, and receipt_digest."
+      "description": "Domain-separated digest of the pre-execution condition projection frozen in receipt-validation.md. It binds execution authorization but excludes ground truth, decision and error outcomes, policy result, run validity, measurement, custody audit metadata, identity_digest, outcome_digest, and receipt_digest."
+    },
+    "outcome_digest": {
+      "$ref": "#/$defs/sha256",
+      "description": "Domain-separated digest of the ground-truth, decision, policy-result, and run-validity projection frozen in receipt-validation.md. It excludes measurement metadata."
     },
     "receipt_digest": {
       "$ref": "#/$defs/sha256",
@@ -93,6 +144,9 @@
             "properties": {
               "split": {
                 "const": "pilot"
+              },
+              "repository_role": {
+                "const": "pilot_development"
               }
             }
           }
@@ -116,6 +170,165 @@
                   "calibration",
                   "held_out_repository"
                 ]
+              },
+              "repository_role": {
+                "enum": [
+                  "threshold_development",
+                  "safety_calibration",
+                  "held_out"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_stage": {
+            "const": "runner"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "ground_truth": {
+            "type": "null"
+          },
+          "custody": {
+            "properties": {
+              "unsealed_at": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_stage": {
+            "const": "analysis"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "ground_truth": {
+            "$ref": "#/$defs/groundTruth"
+          },
+          "custody": {
+            "properties": {
+              "unsealed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "result": {
+                "const": "review"
+              },
+              "reason_codes": {
+                "contains": {
+                  "const": "decision_failed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision_system": {
+            "properties": {
+              "kind": {
+                "const": "deterministic_policy"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution_authorization": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "execution_authorization": {
+            "$ref": "#/$defs/executionAuthorization"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision_system": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "jev_pinned",
+                  "frontier_llm_pinned"
+                ]
+              }
+            }
+          },
+          "decision": {
+            "properties": {
+              "status": {
+                "const": "valid"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "outputs": {
+                "items": {
+                  "properties": {
+                    "probabilities": {
+                      "type": "object"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "confidence_semantics": {
+                      "enum": [
+                        "selected_label_probability",
+                        "provider_defined_versioned"
+                      ]
+                    }
+                  }
+                }
               }
             }
           }
@@ -140,7 +353,10 @@
         "repository_url",
         "repository_commit",
         "split",
+        "repository_role",
         "task_kind",
+        "dataset_snapshot_digest",
+        "split_assignment_digest",
         "case_manifest_digest"
       ],
       "properties": {
@@ -163,6 +379,14 @@
             "held_out_repository"
           ]
         },
+        "repository_role": {
+          "enum": [
+            "pilot_development",
+            "threshold_development",
+            "safety_calibration",
+            "held_out"
+          ]
+        },
         "task_kind": {
           "enum": [
             "evidence_handoff",
@@ -171,10 +395,57 @@
             "external_effect_verification"
           ]
         },
+        "dataset_snapshot_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_assignment_digest": {
+          "$ref": "#/$defs/sha256"
+        },
         "case_manifest_digest": {
           "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "repository_role": {
+                "const": "held_out"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "split": {
+                "const": "held_out_repository"
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "repository_role": {
+                  "const": "pilot_development"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "pilot"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "split": {
+                  "const": "calibration"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "sourceSet": {
       "type": "object",
@@ -314,7 +585,40 @@
         "transformation_receipt_digest": {
           "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "none",
+                  "source_reorder",
+                  "exact_duplicate_insertion",
+                  "line_ending_change",
+                  "metadata_noise",
+                  "path_rename_identical_content",
+                  "irrelevant_appended_text"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "expected_equivalence": {
+                "const": "equivalent"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "expected_equivalence": {
+                "const": "meaning_changing"
+              }
+            }
+          }
+        }
+      ]
     },
     "groundTruth": {
       "type": "object",
@@ -399,6 +703,38 @@
         }
       }
     },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "labels_available_to_runner",
+        "commitment_published_digest",
+        "access_log_digest",
+        "unsealed_at"
+      ],
+      "properties": {
+        "labels_available_to_runner": {
+          "const": false
+        },
+        "commitment_published_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "access_log_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "unsealed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "compiledContext": {
       "type": "object",
       "additionalProperties": false,
@@ -416,8 +752,7 @@
           "enum": [
             "raw_deterministic_concatenation",
             "deterministic_lexical_chunk_rank",
-            "distill_lock_v0",
-            "distill_lock_content_addressed_replay"
+            "distill_lock_v0"
           ]
         },
         "compiler_version": {
@@ -529,7 +864,44 @@
             }
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "deterministic_policy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "type": "null"
+              },
+              "api_version": {
+                "type": "null"
+              },
+              "sdk": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "model": {
+                "$ref": "#/$defs/modelIdentity"
+              },
+              "api_version": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "sdk": {
+                "$ref": "#/$defs/sdkIdentity"
+              }
+            }
+          }
+        }
+      ]
     },
     "modelIdentity": {
       "type": "object",
@@ -538,6 +910,7 @@
         "provider",
         "model_id",
         "model_version",
+        "model_snapshot_digest",
         "parameters_digest",
         "confidence_semantics_version"
       ],
@@ -549,11 +922,18 @@
           "type": "string",
           "minLength": 1,
           "not": {
-            "pattern": "(^|[-_/])[Ll][Aa][Tt][Ee][Ss][Tt]$"
+            "pattern": "(^|[-_/:@.])[Ll][Aa][Tt][Ee][Ss][Tt]$"
           }
         },
         "model_version": {
-          "$ref": "#/$defs/nonEmptyString"
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "(^|[-_/:@.])[Ll][Aa][Tt][Ee][Ss][Tt]$"
+          }
+        },
+        "model_snapshot_digest": {
+          "$ref": "#/$defs/sha256"
         },
         "parameters_digest": {
           "$ref": "#/$defs/sha256"
@@ -579,6 +959,73 @@
           "$ref": "#/$defs/nonEmptyString"
         },
         "package_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "executionAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "authorization_record_digest",
+        "publication_independence_digest",
+        "credential_policy_digest",
+        "authorized_budget",
+        "provider_spend_cap"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "excluded_provider_pilot",
+            "final"
+          ]
+        },
+        "authorization_record_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "publication_independence_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "credential_policy_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authorized_budget": {
+          "$ref": "#/$defs/cost"
+        },
+        "provider_spend_cap": {
+          "$ref": "#/$defs/cost"
+        }
+      }
+    },
+    "validatorIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "json_schema_validator",
+        "json_schema_validator_version",
+        "format_assertion_enabled",
+        "validator_config_digest",
+        "semantic_validator_version",
+        "semantic_validator_digest"
+      ],
+      "properties": {
+        "json_schema_validator": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "json_schema_validator_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "format_assertion_enabled": {
+          "const": true
+        },
+        "validator_config_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "semantic_validator_version": {
+          "const": "context-build-artifact/semantic-validator/v1"
+        },
+        "semantic_validator_digest": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -768,12 +1215,63 @@
         }
       }
     },
+    "runValidity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason_codes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "invalid"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason_codes": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
     "measurement": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "scheduled_call_id",
         "replicate_index",
+        "attempt_count",
+        "retry_count",
+        "rate_limit_waits",
         "attempt_started_at",
         "attempt_finished_at",
         "latency_ms",
@@ -789,6 +1287,18 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 3
+        },
+        "attempt_count": {
+          "const": 1
+        },
+        "retry_count": {
+          "const": 0
+        },
+        "rate_limit_waits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rateLimitWait"
+          }
         },
         "attempt_started_at": {
           "type": "string",
@@ -834,6 +1344,28 @@
         }
       },
       "description": "Execution metadata for audit and secondary outcomes. This entire object is excluded from identity_digest but included in receipt_digest."
+    },
+    "rateLimitWait": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "duration_ms",
+        "provider_reason_code"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "provider_reason_code": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
     },
     "usage": {
       "type": "object",
@@ -891,6 +1423,7 @@
         "stage",
         "code",
         "retry_count",
+        "sanitized_error_artifact_id",
         "error_detail_digest"
       ],
       "properties": {
@@ -911,6 +1444,10 @@
         },
         "retry_count": {
           "const": 0
+        },
+        "sanitized_error_artifact_id": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Must identify an evidence_hashes entry with the same SHA-256 as error_detail_digest; enforced by the pinned semantic validator."
         },
         "error_detail_digest": {
           "$ref": "#/$defs/sha256"

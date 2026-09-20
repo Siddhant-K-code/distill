@@ -25,6 +25,8 @@ credential, outcome, or claim that an experiment has run.
 - [Pilot receipt schema](pilot-schema.json): JSON Schema for case, context,
   decision, usage, error, and evidence records. It defines records only and
   executes nothing.
+- [Receipt validation](receipt-validation.md): canonical digest projections
+  and cross-record checks required in addition to JSON Schema validation.
 
 ## Distill Lock v0 anchors
 
@@ -56,8 +58,9 @@ Recommended review order:
    inspect its deterministic identity exclusions.
 3. Verify every related-work URL and the distinction between first-party
    claims and independent evidence.
-4. Recompute the four Distill Lock artifact hashes with
-   `make distill-lock-demo` on a supported runtime.
+4. Recompute all four Distill Lock artifact hashes with
+   `go test ./pkg/lock -run '^TestGoldenFixture$' -count=1`, then run
+   `make distill-lock-demo` for repeatability and mutation evidence.
 5. File review comments before any dated execution amendment is accepted.
 
 Material protocol changes require a versioned, dated amendment with rationale
