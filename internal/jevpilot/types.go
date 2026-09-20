@@ -1,6 +1,8 @@
 package jevpilot
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Siddhant-K-code/distill/internal/studypilot"
@@ -20,6 +22,7 @@ const (
 	PricingVersion     = "typesafe-models-docs-2026-09-20"
 	InputNanoUSD       = int64(42)
 	MaxInputTokens     = int64(64_000)
+	MaxOutputTokens    = int64(64_000)
 	AuthorizedNanoUSD  = int64(5_000_000_000)
 	WorstCallNanoUSD   = MaxInputTokens * InputNanoUSD
 	RequestTimeout     = 30 * time.Second
@@ -131,8 +134,28 @@ type ChoiceAnswer struct {
 }
 
 type Usage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens   int `json:"input_tokens"`
+	OutputTokens  int `json:"output_tokens"`
+	inputPresent  bool
+	outputPresent bool
+}
+
+func (usage *Usage) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		InputTokens  *int `json:"input_tokens"`
+		OutputTokens *int `json:"output_tokens"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.InputTokens == nil || wire.OutputTokens == nil {
+		return fmt.Errorf("usage must contain input_tokens and output_tokens")
+	}
+	usage.InputTokens = *wire.InputTokens
+	usage.OutputTokens = *wire.OutputTokens
+	usage.inputPresent = true
+	usage.outputPresent = true
+	return nil
 }
 
 type APIResponse struct {

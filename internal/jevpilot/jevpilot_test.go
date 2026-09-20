@@ -171,6 +171,19 @@ func TestMappingRejectsAliasesAndAdversarialProbabilities(t *testing.T) {
 	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
 		t.Fatal("incomplete probability vector unexpectedly accepted")
 	}
+	response = fakeResponse(pilot.Requests[0], pilot.Cases[0])
+	response.Usage.InputTokens = int(MaxInputTokens + 1)
+	raw, _ = json.Marshal(response)
+	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
+		t.Fatal("over-limit usage unexpectedly accepted")
+	}
+	response = fakeResponse(pilot.Requests[0], pilot.Cases[0])
+	raw, _ = json.Marshal(map[string]any{
+		"model": response.Model, "answers": response.Answers, "usage": map[string]any{"input_tokens": 100},
+	})
+	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
+		t.Fatal("missing output usage unexpectedly accepted")
+	}
 }
 
 func TestZeroRetryTransportFailureAndBudgetGuard(t *testing.T) {

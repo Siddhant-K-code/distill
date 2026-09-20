@@ -193,7 +193,9 @@ func parseAPIResponse(raw []byte, request studypilot.RequestRecord) (APIResponse
 			return APIResponse{}, fmt.Errorf("provider answer %q has invalid confidence", question.Field)
 		}
 	}
-	if response.Usage.InputTokens < 0 || response.Usage.OutputTokens < 0 {
+	if !response.Usage.inputPresent || !response.Usage.outputPresent ||
+		response.Usage.InputTokens < 0 || int64(response.Usage.InputTokens) > MaxInputTokens ||
+		response.Usage.OutputTokens < 0 || int64(response.Usage.OutputTokens) > MaxOutputTokens {
 		return APIResponse{}, fmt.Errorf("provider response has invalid usage")
 	}
 	return response, nil

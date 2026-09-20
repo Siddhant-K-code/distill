@@ -1,6 +1,7 @@
 package jevpilot
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -117,17 +118,46 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 			}
 			summary.NotAttemptedCalls++
 		} else {
+			reservationBytes, encodeErr := canonicalJSON(map[string]any{
+				"scheduled_call_id": entry.ScheduledCallID,
+				"request_sha256":    digest(requestBody),
+				"reserved_nano_usd": WorstCallNanoUSD,
+				"reserved_at":       time.Now().UTC().Format(time.RFC3339Nano),
+			})
+			if encodeErr != nil {
+				return summary, encodeErr
+			}
+			if err := writeExclusive(filepath.Join(callDirectory, "attempt-reservation.json"), reservationBytes); err != nil {
+				return summary, err
+			}
+			if err := syncDirectory(callDirectory); err != nil {
+				return summary, err
+			}
+			if err := syncDirectory(callsDirectory); err != nil {
+				return summary, err
+			}
 			result = client.call(ctx, requestRecord)
 			summary.AttemptedCalls++
-			if result.Response != nil && providerRequestIDs[result.Metadata.ProviderRequestID] {
+			if result.Metadata.ProviderRequestID != "" && providerRequestIDs[result.Metadata.ProviderRequestID] {
 				duplicateProviderID = true
 				result.Response = nil
 				result.Err = fmt.Errorf("provider request identity was reused")
 				result.ErrorStage = "parse"
 				result.ErrorCode = "duplicate_provider_request_id"
 			}
-			if result.Response != nil {
+			if result.Metadata.ProviderRequestID != "" {
 				providerRequestIDs[result.Metadata.ProviderRequestID] = true
+			}
+			if result.Response != nil {
+				inferredCost := int64(result.Response.Usage.InputTokens) * InputNanoUSD
+				if inferredCost > authorization.AuthorizedBudgetNanoUSD-summary.InferredCostNanoUSD {
+					result.Response = nil
+					result.Err = fmt.Errorf("provider usage exceeded the reserved budget")
+					result.ErrorStage = "receipt"
+					result.ErrorCode = "provider_usage_exceeded_budget"
+				}
+			}
+			if result.Response != nil {
 				summary.CompletedCalls++
 				summary.InputTokens += result.Response.Usage.InputTokens
 				summary.OutputTokens += result.Response.Usage.OutputTokens
@@ -424,6 +454,11 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		if err != nil {
 			return summary, err
 		}
+		mappingClient := &Client{model: ModelID}
+		_, expectedRequestBody, err := mappingClient.buildRequest(requests[entry.RequestID])
+		if err != nil || !bytes.Equal(requestBody, expectedRequestBody) {
+			return summary, fmt.Errorf("stored provider request differs from frozen mapping for %s", entry.ScheduledCallID)
+		}
 		storedReceipt, err := os.ReadFile(filepath.Join(callDirectory, "receipt.json"))
 		if err != nil {
 			return summary, err
@@ -432,7 +467,10 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		if err := json.Unmarshal(storedReceipt, &receiptDocument); err != nil {
 			return summary, err
 		}
-		measurement := receiptDocument["measurement"].(map[string]any)
+		measurement, ok := receiptDocument["measurement"].(map[string]any)
+		if !ok {
+			return summary, fmt.Errorf("receipt measurement is missing or invalid")
+		}
 		result := callResult{RequestBody: requestBody}
 		ledgerEntry := ledgerEntries[entry.ScheduleIndex]
 		switch ledgerEntry.Status {
@@ -547,11 +585,16 @@ func loadAttemptMetadata(callDirectory string, measurement map[string]any, resul
 	if err := json.Unmarshal(metadataBytes, &result.Metadata); err != nil {
 		return err
 	}
-	started, err := time.Parse(time.RFC3339Nano, measurement["attempt_started_at"].(string))
+	startedText, startedOK := measurement["attempt_started_at"].(string)
+	finishedText, finishedOK := measurement["attempt_finished_at"].(string)
+	if !startedOK || !finishedOK {
+		return fmt.Errorf("receipt attempt timestamps are missing or invalid")
+	}
+	started, err := time.Parse(time.RFC3339Nano, startedText)
 	if err != nil {
 		return err
 	}
-	finished, err := time.Parse(time.RFC3339Nano, measurement["attempt_finished_at"].(string))
+	finished, err := time.Parse(time.RFC3339Nano, finishedText)
 	if err != nil {
 		return err
 	}
@@ -576,4 +619,16 @@ func loadPreservedError(callDirectory string, result *callResult) error {
 	result.ErrorStage = preserved.Stage
 	result.ErrorCode = preserved.Code
 	return nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	return directory.Close()
 }
