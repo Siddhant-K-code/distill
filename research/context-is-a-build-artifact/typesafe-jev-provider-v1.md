@@ -1,7 +1,9 @@
 # TypeSafe / Jev Excluded-Pilot Provider Record v1
 
-**Status:** implementation evidence for an excluded integration pilot only  
-**Retrieved:** 2026-09-20  
+**Status:** implementation evidence for an excluded integration pilot only
+
+**Retrieved:** 2026-09-20
+
 **Final-study eligible:** no
 
 The research-only `distill-typesafe-jev-pilot` command consumes the immutable
