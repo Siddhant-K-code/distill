@@ -122,14 +122,14 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 		result.ErrorCode = "response_too_large"
 		return result
 	}
+	if usage, usageErr := parseUsageEnvelope(raw); usageErr == nil {
+		result.ObservedUsage = &usage
+	}
 	if response.StatusCode != http.StatusOK {
 		result.Err = fmt.Errorf("provider returned HTTP %d", response.StatusCode)
 		result.ErrorStage = "provider"
 		result.ErrorCode = fmt.Sprintf("http_%d", response.StatusCode)
 		return result
-	}
-	if usage, usageErr := parseUsageEnvelope(raw); usageErr == nil {
-		result.ObservedUsage = &usage
 	}
 	if result.Metadata.ProviderRequestID == "" {
 		result.Err = fmt.Errorf("provider response lacks request identity")

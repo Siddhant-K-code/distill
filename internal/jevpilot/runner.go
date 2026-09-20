@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -52,6 +53,9 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 	if err := validateModelEvidence(options.RunDirectory, provider); err != nil {
 		return RunSummary{}, err
 	}
+	if authorization.ExecutionRuntime != runtime.Version() {
+		return RunSummary{}, fmt.Errorf("execution runtime %q does not match authorization %q", runtime.Version(), authorization.ExecutionRuntime)
+	}
 	cases, requests, _, err := indexPilot(pilot)
 	if err != nil {
 		return RunSummary{}, err
@@ -64,11 +68,52 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 	callsDirectory := filepath.Join(options.RunDirectory, "calls")
+	summary := RunSummary{
+		ScheduledCalls: len(schedule), AuthorizationSHA256: digest(authorizationBytes),
+		ScheduleSHA256: digest(scheduleBytes),
+	}
+	startIndex := 0
+	providerRequestIDs := make(map[string]bool, len(schedule))
 	if err := os.Mkdir(callsDirectory, 0o700); err != nil {
-		return RunSummary{}, fmt.Errorf("create fresh calls directory: %w", err)
+		if !os.IsExist(err) {
+			return RunSummary{}, fmt.Errorf("create calls directory: %w", err)
+		}
+		partial, validateErr := validateRunState(options.PilotDirectory, options.RunDirectory, false)
+		if validateErr != nil {
+			return RunSummary{}, fmt.Errorf("validate resumable run: %w", validateErr)
+		}
+		ledgerBytes, readErr := os.ReadFile(filepath.Join(options.RunDirectory, "call-ledger.jsonl"))
+		if readErr != nil {
+			return RunSummary{}, readErr
+		}
+		ledgerEntries, parseErr := parseJSONL[LedgerEntry](ledgerBytes)
+		if parseErr != nil {
+			return RunSummary{}, parseErr
+		}
+		summary = partial
+		startIndex = len(ledgerEntries)
+		if startIndex == len(schedule) {
+			return RunSummary{}, fmt.Errorf("execution schedule is already complete")
+		}
+		entries, readErr := os.ReadDir(callsDirectory)
+		if readErr != nil {
+			return RunSummary{}, readErr
+		}
+		if len(entries) != startIndex {
+			return RunSummary{}, fmt.Errorf("ambiguous unledgered attempt prevents safe resume")
+		}
+		for _, entry := range ledgerEntries {
+			if entry.ProviderRequestID != nil {
+				providerRequestIDs[*entry.ProviderRequestID] = true
+			}
+		}
 	}
 	ledgerPath := filepath.Join(options.RunDirectory, "call-ledger.jsonl")
-	ledger, err := os.OpenFile(ledgerPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL|os.O_APPEND, 0o600)
+	ledgerFlags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	if startIndex == 0 {
+		ledgerFlags |= os.O_EXCL
+	}
+	ledger, err := os.OpenFile(ledgerPath, ledgerFlags, 0o600)
 	if err != nil {
 		return RunSummary{}, fmt.Errorf("create call ledger: %w", err)
 	}
@@ -76,18 +121,11 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		_ = ledger.Close()
 	}()
 
-	summary := RunSummary{
-		ScheduledCalls: len(schedule), AuthorizationSHA256: digest(authorizationBytes),
-		ScheduleSHA256: digest(scheduleBytes),
-	}
-	receipts := make([][]byte, 0, len(schedule))
-	registries := make(map[string]studypilot.ReceiptRegistry, len(schedule))
-	providerRequestIDs := make(map[string]bool, len(schedule))
 	duplicateProviderID := false
 	stopped := false
 	stopCode := ""
 	stopMessage := ""
-	for _, entry := range schedule {
+	for _, entry := range schedule[startIndex:] {
 		caseRecord := cases[entry.CaseID]
 		requestRecord := requests[entry.RequestID]
 		baseSchedule, ok := scheduleForCase(pilot.Schedules, entry.CaseID)
@@ -215,8 +253,6 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		if err := writeExclusive(filepath.Join(callDirectory, "receipt.json"), material.Receipt); err != nil {
 			return summary, err
 		}
-		receipts = append(receipts, material.Receipt)
-		registries[entry.ScheduledCallID] = material.Registry
 		ledgerEntry := makeLedgerEntry(entry, result, material.Receipt, summary.InferredCostNanoUSD)
 		ledgerBytes, err := canonicalJSON(ledgerEntry)
 		if err != nil {
@@ -228,19 +264,21 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		if err := ledger.Sync(); err != nil {
 			return summary, fmt.Errorf("sync call ledger: %w", err)
 		}
+		if result.Err != nil && shouldPauseAfterFailure(result) {
+			if err := ledger.Close(); err != nil {
+				return summary, err
+			}
+			return summary, fmt.Errorf("execution paused after %s; rerun the same command to continue at the next unattempted call", result.ErrorCode)
+		}
 	}
-	if err := studypilot.ValidateReceiptStageCollection(receipts, registries, "runner"); err != nil {
-		return summary, fmt.Errorf("validate receipt collection: %w", err)
-	}
-	collection := make([]any, 0, len(receipts))
-	for _, receipt := range receipts {
-		collection = append(collection, digest(receipt))
-	}
-	collectionBytes, err := canonicalJSON(collection)
-	if err != nil {
+	if err := ledger.Close(); err != nil {
 		return summary, err
 	}
-	summary.ReceiptCollectionSHA256 = digest(collectionBytes)
+	validated, err := validateRunState(options.PilotDirectory, options.RunDirectory, true)
+	if err != nil {
+		return summary, fmt.Errorf("validate completed run: %w", err)
+	}
+	summary = validated
 	summaryBytes, err := canonicalJSON(summary)
 	if err != nil {
 		return summary, err
@@ -350,6 +388,7 @@ func validateAuthorizationAgainstPilot(
 		authorization.Stage != "excluded_provider_pilot" || !authorization.Excluded ||
 		authorization.FinalStudyEligible || authorization.AuthorizedBudgetUSD != "5.000000" ||
 		authorization.AuthorizedBudgetNanoUSD != AuthorizedNanoUSD || authorization.ModelID != ModelID ||
+		!strings.HasPrefix(authorization.ExecutionRuntime, "go") ||
 		authorization.PricingVersion != PricingVersion || authorization.InputPriceUSDPerMillion != "0.042000" ||
 		authorization.MaxInputTokensPerCall != MaxInputTokens ||
 		authorization.WorstCaseCostUSDPerCall != formatNanoUSD(WorstCallNanoUSD) ||
@@ -412,7 +451,16 @@ func shouldStopAfterFailure(result callResult) bool {
 		result.ErrorCode == "response_too_large" {
 		return true
 	}
+
 	return result.Metadata.HTTPStatus == http.StatusUnauthorized || result.Metadata.HTTPStatus == http.StatusForbidden
+}
+
+func shouldPauseAfterFailure(result callResult) bool {
+	return result.ErrorCode == "transport_failure" ||
+		result.ErrorCode == "response_read_failed" ||
+		result.ErrorCode == "response_close_failed" ||
+		result.Metadata.HTTPStatus == http.StatusTooManyRequests ||
+		result.Metadata.HTTPStatus == 529
 }
 
 func makeLedgerEntry(entry ExecutionScheduleEntry, result callResult, receipt []byte, cumulative int64) LedgerEntry {
@@ -462,6 +510,10 @@ func writeExclusive(path string, data []byte) error {
 }
 
 func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
+	return validateRunState(pilotDirectory, runDirectory, true)
+}
+
+func validateRunState(pilotDirectory, runDirectory string, requireComplete bool) (RunSummary, error) {
 	pilot, _, err := loadPilot(pilotDirectory)
 	if err != nil {
 		return RunSummary{}, err
@@ -488,7 +540,7 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 	ledgerEntries, err := parseJSONL[LedgerEntry](ledgerBytes)
-	if err != nil || len(ledgerEntries) != len(schedule) {
+	if err != nil || len(ledgerEntries) > len(schedule) || (requireComplete && len(ledgerEntries) != len(schedule)) {
 		return RunSummary{}, fmt.Errorf("ledger/schedule cardinality mismatch")
 	}
 	var summary RunSummary
@@ -498,7 +550,7 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 	receipts := make([][]byte, 0, len(schedule))
 	registries := make(map[string]studypilot.ReceiptRegistry, len(schedule))
 	providerRequestIDs := make(map[string]bool, len(schedule))
-	for _, entry := range schedule {
+	for _, entry := range schedule[:len(ledgerEntries)] {
 		callDirectory := filepath.Join(runDirectory, "calls", fmt.Sprintf("%03d-%s", entry.ScheduleIndex, entry.ScheduledCallID))
 		requestBody, err := os.ReadFile(filepath.Join(callDirectory, "request.json"))
 		if err != nil {

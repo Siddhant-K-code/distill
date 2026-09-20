@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"runtime"
 	"sort"
 
 	"github.com/Siddhant-K-code/distill/internal/studypilot"
@@ -230,8 +229,8 @@ func buildReceipt(input receiptInput) (receiptMaterial, error) {
 			},
 			"api_version": APIVersion,
 			"sdk": map[string]any{
-				"name": "go-standard-library-net-http", "version": runtime.Version(),
-				"package_digest": digest([]byte("go-standard-library/net/http/" + runtime.Version())),
+				"name": "go-standard-library-net-http", "version": input.Authorization.ExecutionRuntime,
+				"package_digest": digest([]byte("go-standard-library/net/http/" + input.Authorization.ExecutionRuntime)),
 			},
 		},
 		"execution_authorization": executionAuthorization,
@@ -281,8 +280,8 @@ func buildReceipt(input receiptInput) (receiptMaterial, error) {
 		DecisionSystemVersion: "context-build-artifact/typesafe-jev-adapter/v1",
 		Provider:              ProviderName, ModelID: ModelID, ModelVersion: ModelVersion,
 		ModelSnapshotDigest: modelSnapshotDigest, ParametersDigest: parametersDigest,
-		APIVersion: APIVersion, SDKName: "go-standard-library-net-http", SDKVersion: runtime.Version(),
-		SDKPackageDigest:             digest([]byte("go-standard-library/net/http/" + runtime.Version())),
+		APIVersion: APIVersion, SDKName: "go-standard-library-net-http", SDKVersion: input.Authorization.ExecutionRuntime,
+		SDKPackageDigest:             digest([]byte("go-standard-library/net/http/" + input.Authorization.ExecutionRuntime)),
 		ConfidenceSemanticsVersion:   "context-build-artifact/selected-label-probability/v1; typesafe raw confidence preserved",
 		ExecutionAuthorizationDigest: digest(executionAuthorizationBytes),
 		PolicyID:                     studypilot.PolicyID, PolicyVersion: studypilot.PolicyVersion,

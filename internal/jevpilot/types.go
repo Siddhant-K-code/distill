@@ -98,6 +98,7 @@ type Authorization struct {
 	AuthorizedBudgetUSD     string   `json:"authorized_budget_usd"`
 	AuthorizedBudgetNanoUSD int64    `json:"authorized_budget_nano_usd"`
 	ModelID                 string   `json:"model_id"`
+	ExecutionRuntime        string   `json:"execution_runtime"`
 	PricingVersion          string   `json:"pricing_version"`
 	InputPriceUSDPerMillion string   `json:"input_price_usd_per_million"`
 	MaxInputTokensPerCall   int64    `json:"max_input_tokens_per_call"`

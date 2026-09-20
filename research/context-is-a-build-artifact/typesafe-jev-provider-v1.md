@@ -68,7 +68,9 @@ not established by the public API. They remain unresolved external
 collaboration gates. This excluded integration pilot does not submit held-out
 or final-study data. Its local authorization reserves the documented
 64,000-input-token worst case before every call and stops fail-closed under an
-exact USD 5.000000 cap.
+exact USD 5.000000 cap. Infrastructure failures pause execution after the
+single failed attempt; rerunning the same command validates the existing
+prefix and continues only at the next never-attempted schedule entry.
 
 ## Retrieved evidence
 

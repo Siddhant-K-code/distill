@@ -259,7 +259,7 @@ func TestZeroRetryTransportFailureAndBudgetGuard(t *testing.T) {
 	}
 }
 
-func TestFailedCallStopsWithoutRetriesAndRecordsRemainder(t *testing.T) {
+func TestTransportFailurePausesAndResumesWithoutRetry(t *testing.T) {
 	root := realTempDir(t)
 	pilotDirectory := filepath.Join(root, "pilot")
 	if _, err := studypilot.Prepare(pilotDirectory); err != nil {
@@ -271,11 +271,34 @@ func TestFailedCallStopsWithoutRetriesAndRecordsRemainder(t *testing.T) {
 		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
 		APIKey: "test-secret-key", Transport: transport,
 	})
+	if err == nil || transport.calls != 1 || summary.FailedCalls != 1 || summary.AttemptedCalls != 1 {
+		t.Fatalf("transport failure did not pause after one attempt: %+v calls=%d err=%v", summary, transport.calls, err)
+	}
+	pilot, _, err := loadPilot(pilotDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if transport.calls != 28 || summary.FailedCalls != 28 || summary.NotAttemptedCalls != 0 {
-		t.Fatalf("failed calls were retried or omitted: %+v calls=%d", summary, transport.calls)
+	cases := make(map[string]studypilot.CaseRecord, len(pilot.Cases))
+	for _, record := range pilot.Cases {
+		cases[record.CaseID] = record
+	}
+	responses := make(map[string]APIResponse, len(pilot.Requests))
+	for _, request := range pilot.Requests {
+		responses[request.State.Content] = fakeResponse(request, cases[request.CaseID])
+	}
+	resumed := &fakeTransport{t: t, responses: responses}
+	summary, err = Run(context.Background(), RunOptions{
+		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
+		APIKey: "test-secret-key", Transport: resumed,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.calls != 27 || summary.AttemptedCalls != 28 || summary.CompletedCalls != 27 || summary.FailedCalls != 1 {
+		t.Fatalf("resume repeated or omitted a call: %+v resumed_calls=%d", summary, resumed.calls)
+	}
+	if _, err := ValidateRun(pilotDirectory, runDirectory); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := Run(context.Background(), RunOptions{
 		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,

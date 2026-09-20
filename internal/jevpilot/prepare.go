@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -84,6 +85,7 @@ func Prepare(options PrepareOptions) (Authorization, error) {
 		AuthorizedBudgetUSD:     "5.000000",
 		AuthorizedBudgetNanoUSD: AuthorizedNanoUSD,
 		ModelID:                 ModelID,
+		ExecutionRuntime:        runtime.Version(),
 		PricingVersion:          PricingVersion,
 		InputPriceUSDPerMillion: "0.042000",
 		MaxInputTokensPerCall:   MaxInputTokens,
@@ -96,7 +98,7 @@ func Prepare(options PrepareOptions) (Authorization, error) {
 		RequestsSHA256:          digest(pilot.Files["requests.jsonl"]),
 		ProviderRecordSHA256:    digest(providerBytes),
 		ZeroAdaptiveExtension:   true,
-		StopBehavior:            "Before every call reserve the documented 64k-token worst case; stop and emit not_attempted receipts if the USD 5.000000 cap cannot be preserved.",
+		StopBehavior:            "Before every call reserve the documented 64k-token worst case. Pause after infrastructure failures and resume only at the next ledger-confirmed unattempted call. Stop with terminal not_attempted receipts after integrity, authorization, or budget failures.",
 		RepeatabilityDesign:     "Five predeclared representative strata; each selected case has exactly three total calls, matching the preregistered repeat-call count. Replicates are not retries.",
 		RepeatabilityCaseIDs:    repeatabilityCaseIDs(pilot),
 		UnresolvedExternalGates: []string{
