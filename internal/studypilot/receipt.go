@@ -506,7 +506,7 @@ func validateReceiptQuestions(receipt map[string]any, registry ReceiptRegistry) 
 		if !ok || math.IsNaN(confidence) || math.IsInf(confidence, 0) ||
 			stringAt(output, "confidence_semantics") != "selected_label_probability" ||
 			math.Abs(confidence-probabilities[selected].(float64)) > 1e-12 {
-			return fmt.Errorf("question %s confidence mismatch", questionID)
+			return fmt.Errorf("question %s confidence semantics mismatch", questionID)
 		}
 	}
 	return nil
@@ -572,9 +572,8 @@ func validateReceiptMeasurement(receipt map[string]any) error {
 	}
 	if status == "valid" && stringAt(receipt, "decision_system", "kind") != "deterministic_policy" {
 		if valueAt(receipt, "measurement", "usage") == nil ||
-			valueAt(receipt, "measurement", "provider_reported_cost") == nil ||
 			stringAt(receipt, "measurement", "provider_request_id") == "" {
-			return fmt.Errorf("valid provider decision lacks usage, cost, or request identity")
+			return fmt.Errorf("valid provider decision lacks usage or request identity")
 		}
 		usage := mapAt(receipt, "measurement", "usage")
 		if intAt(usage, "total_tokens") != intAt(usage, "input_tokens")+intAt(usage, "output_tokens") {

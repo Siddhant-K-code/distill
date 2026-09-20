@@ -119,6 +119,7 @@ func TestValidateReceiptAdversarialOutputs(t *testing.T) {
 			output["confidence"] = 0.05
 		},
 	}
+
 	for name, mutate := range tests {
 		t.Run(name, func(t *testing.T) {
 			receipt, registry := validReceiptFixture(t)
@@ -134,6 +135,40 @@ func TestValidateReceiptAdversarialOutputs(t *testing.T) {
 				t.Fatal("adversarial receipt unexpectedly validated")
 			}
 		})
+	}
+}
+
+func TestValidateReceiptAcceptsMissingReportedCost(t *testing.T) {
+	receipt, registry := validReceiptFixture(t)
+	receipt["measurement"].(map[string]any)["provider_reported_cost"] = nil
+	rawOutput := registry.Artifacts["pilot-raw-output"]
+	var provider map[string]any
+	if err := json.Unmarshal(rawOutput, &provider); err != nil {
+		t.Fatal(err)
+	}
+	provider["provider_reported_cost"] = nil
+	rawOutput, err := canonicalJSON(provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry.Artifacts["pilot-raw-output"] = rawOutput
+	receipt["decision"].(map[string]any)["raw_output_digest"] = digestBytes(rawOutput)
+	for _, raw := range receipt["receipt_artifact_hashes"].([]any) {
+		entry := raw.(map[string]any)
+		if entry["artifact_id"] == "pilot-raw-output" {
+			entry["byte_length"] = len(rawOutput)
+			entry["sha256"] = digestBytes(rawOutput)
+		}
+	}
+	if err := SealReceipt(receipt); err != nil {
+		t.Fatal(err)
+	}
+	data, err := canonicalJSON(receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateReceipt(data, registry); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -474,10 +509,11 @@ func validReceiptFixture(t *testing.T) (map[string]any, ReceiptRegistry) {
 		if err != nil {
 			return ProviderObservation{}, err
 		}
+		cost, _ := raw["provider_reported_cost"].(map[string]any)
 		return ProviderObservation{
 			Outputs:           raw["outputs"].([]any),
 			Usage:             usageRaw.(map[string]any),
-			Cost:              raw["provider_reported_cost"].(map[string]any),
+			Cost:              cost,
 			ProviderRequestID: raw["provider_request_id"].(string),
 		}, nil
 	}

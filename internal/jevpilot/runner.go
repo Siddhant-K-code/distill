@@ -1,0 +1,579 @@
+package jevpilot
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/Siddhant-K-code/distill/internal/studypilot"
+)
+
+type RunOptions struct {
+	PilotDirectory string
+	RunDirectory   string
+	APIKey         string
+	Transport      HTTPDoer
+}
+
+type RunSummary struct {
+	ScheduledCalls          int
+	AttemptedCalls          int
+	CompletedCalls          int
+	FailedCalls             int
+	NotAttemptedCalls       int
+	InputTokens             int
+	OutputTokens            int
+	InferredCostNanoUSD     int64
+	ProviderReportedCostUSD *string
+	AuthorizationSHA256     string
+	ScheduleSHA256          string
+	ReceiptCollectionSHA256 string
+}
+
+func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
+	pilot, _, err := loadPilot(options.PilotDirectory)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule, err := loadAuthorization(options.RunDirectory)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	if err := validateAuthorizationAgainstPilot(pilot, authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule); err != nil {
+		return RunSummary{}, err
+	}
+	cases, requests, _, err := indexPilot(pilot)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	if err := validateExecutionSchedule(schedule, cases, requests); err != nil {
+		return RunSummary{}, err
+	}
+	client, err := NewClient(options.APIKey, options.Transport)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	callsDirectory := filepath.Join(options.RunDirectory, "calls")
+	if err := os.Mkdir(callsDirectory, 0o700); err != nil {
+		return RunSummary{}, fmt.Errorf("create fresh calls directory: %w", err)
+	}
+	ledgerPath := filepath.Join(options.RunDirectory, "call-ledger.jsonl")
+	ledger, err := os.OpenFile(ledgerPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL|os.O_APPEND, 0o600)
+	if err != nil {
+		return RunSummary{}, fmt.Errorf("create call ledger: %w", err)
+	}
+	defer func() {
+		_ = ledger.Close()
+	}()
+
+	summary := RunSummary{
+		ScheduledCalls: len(schedule), AuthorizationSHA256: digest(authorizationBytes),
+		ScheduleSHA256: digest(scheduleBytes),
+	}
+	receipts := make([][]byte, 0, len(schedule))
+	registries := make(map[string]studypilot.ReceiptRegistry, len(schedule))
+	providerRequestIDs := make(map[string]bool, len(schedule))
+	duplicateProviderID := false
+	stopped := false
+	stopCode := ""
+	stopMessage := ""
+	for _, entry := range schedule {
+		caseRecord := cases[entry.CaseID]
+		requestRecord := requests[entry.RequestID]
+		baseSchedule, ok := scheduleForCase(pilot.Schedules, entry.CaseID)
+		if !ok {
+			return summary, fmt.Errorf("missing base schedule for %q", entry.CaseID)
+		}
+		_, requestBody, mapErr := client.buildRequest(requestRecord)
+		if mapErr != nil {
+			return summary, mapErr
+		}
+		callDirectory := filepath.Join(callsDirectory, fmt.Sprintf("%03d-%s", entry.ScheduleIndex, entry.ScheduledCallID))
+		if err := os.Mkdir(callDirectory, 0o700); err != nil {
+			return summary, fmt.Errorf("create call directory: %w", err)
+		}
+		if err := writeExclusive(filepath.Join(callDirectory, "request.json"), requestBody); err != nil {
+			return summary, err
+		}
+
+		var result callResult
+		if stopped {
+			result = callResult{
+				RequestBody: requestBody, Err: fmt.Errorf("%s", stopMessage),
+				ErrorStage: "scheduler", ErrorCode: stopCode, NotAttempted: true,
+			}
+			summary.NotAttemptedCalls++
+		} else if err := reserveBudget(summary.InferredCostNanoUSD, authorization.AuthorizedBudgetNanoUSD); err != nil {
+			stopped, stopCode, stopMessage = true, "budget_reservation_failed", err.Error()
+			result = callResult{
+				RequestBody: requestBody, Err: fmt.Errorf("%s", stopMessage),
+				ErrorStage: "scheduler", ErrorCode: stopCode, NotAttempted: true,
+			}
+			summary.NotAttemptedCalls++
+		} else {
+			result = client.call(ctx, requestRecord)
+			summary.AttemptedCalls++
+			if result.Response != nil && providerRequestIDs[result.Metadata.ProviderRequestID] {
+				duplicateProviderID = true
+				result.Response = nil
+				result.Err = fmt.Errorf("provider request identity was reused")
+				result.ErrorStage = "parse"
+				result.ErrorCode = "duplicate_provider_request_id"
+			}
+			if result.Response != nil {
+				providerRequestIDs[result.Metadata.ProviderRequestID] = true
+				summary.CompletedCalls++
+				summary.InputTokens += result.Response.Usage.InputTokens
+				summary.OutputTokens += result.Response.Usage.OutputTokens
+				summary.InferredCostNanoUSD += int64(result.Response.Usage.InputTokens) * InputNanoUSD
+			} else {
+				summary.FailedCalls++
+				stopped, stopCode, stopMessage = true, "prior_call_failed", "execution stopped after a failed scheduled call; no retry or replacement was attempted"
+			}
+		}
+		if len(result.RawBody) > 0 {
+			if err := writeExclusive(filepath.Join(callDirectory, "raw-response.bin"), result.RawBody); err != nil {
+				return summary, err
+			}
+		}
+		if !result.NotAttempted {
+			metadataBytes, encodeErr := canonicalJSON(result.Metadata)
+			if encodeErr != nil {
+				return summary, encodeErr
+			}
+			if err := writeExclusive(filepath.Join(callDirectory, "response-metadata.json"), metadataBytes); err != nil {
+				return summary, err
+			}
+		}
+		material, err := buildReceipt(receiptInput{
+			Case: caseRecord, Request: requestRecord, BaseSchedule: baseSchedule,
+			ExecutionSchedule: entry, Authorization: authorization, AuthorizationBytes: authorizationBytes,
+			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes, Result: result,
+		})
+		if err != nil {
+			return summary, fmt.Errorf("%s: %w", entry.ScheduledCallID, err)
+		}
+		if result.Response != nil {
+			if data := material.Artifacts[entry.ScheduledCallID+"-usage"]; len(data) > 0 {
+				if err := writeExclusive(filepath.Join(callDirectory, "usage.json"), data); err != nil {
+					return summary, err
+				}
+			}
+		} else {
+			if data := material.Artifacts[entry.ScheduledCallID+"-sanitized-error"]; len(data) > 0 {
+				if err := writeExclusive(filepath.Join(callDirectory, "error.json"), data); err != nil {
+					return summary, err
+				}
+			}
+		}
+		if err := writeExclusive(filepath.Join(callDirectory, "receipt.json"), material.Receipt); err != nil {
+			return summary, err
+		}
+		receipts = append(receipts, material.Receipt)
+		registries[entry.ScheduledCallID] = material.Registry
+		ledgerEntry := makeLedgerEntry(entry, result, material.Receipt, summary.InferredCostNanoUSD)
+		ledgerBytes, err := canonicalJSON(ledgerEntry)
+		if err != nil {
+			return summary, err
+		}
+		if _, err := ledger.Write(append(ledgerBytes, '\n')); err != nil {
+			return summary, fmt.Errorf("append call ledger: %w", err)
+		}
+		if err := ledger.Sync(); err != nil {
+			return summary, fmt.Errorf("sync call ledger: %w", err)
+		}
+	}
+	if err := studypilot.ValidateReceiptStageCollection(receipts, registries, "runner"); err != nil {
+		return summary, fmt.Errorf("validate receipt collection: %w", err)
+	}
+	collection := make([]any, 0, len(receipts))
+	for _, receipt := range receipts {
+		collection = append(collection, digest(receipt))
+	}
+	collectionBytes, err := canonicalJSON(collection)
+	if err != nil {
+		return summary, err
+	}
+	summary.ReceiptCollectionSHA256 = digest(collectionBytes)
+	summaryBytes, err := canonicalJSON(summary)
+	if err != nil {
+		return summary, err
+	}
+	if err := writeExclusive(filepath.Join(options.RunDirectory, "integration-summary.json"), summaryBytes); err != nil {
+		return summary, err
+	}
+	if duplicateProviderID {
+		return summary, fmt.Errorf("duplicate provider request ID invalidated the run")
+	}
+	return summary, nil
+}
+
+func loadAuthorization(directory string) ([]byte, []byte, []byte, Authorization, ProviderRecord, []ExecutionScheduleEntry, error) {
+	authorizationBytes, err := os.ReadFile(filepath.Join(directory, "authorization.json"))
+	if err != nil {
+		return nil, nil, nil, Authorization{}, ProviderRecord{}, nil, err
+	}
+	providerBytes, err := os.ReadFile(filepath.Join(directory, "provider-record.json"))
+	if err != nil {
+		return nil, nil, nil, Authorization{}, ProviderRecord{}, nil, err
+	}
+	scheduleBytes, err := os.ReadFile(filepath.Join(directory, "execution-schedule.jsonl"))
+	if err != nil {
+		return nil, nil, nil, Authorization{}, ProviderRecord{}, nil, err
+	}
+	var authorization Authorization
+	if err := json.Unmarshal(authorizationBytes, &authorization); err != nil {
+		return nil, nil, nil, Authorization{}, ProviderRecord{}, nil, err
+	}
+	var provider ProviderRecord
+	if err := json.Unmarshal(providerBytes, &provider); err != nil {
+		return nil, nil, nil, Authorization{}, ProviderRecord{}, nil, err
+	}
+	schedule, err := parseJSONL[ExecutionScheduleEntry](scheduleBytes)
+	return authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule, err
+}
+
+func validateExecutionSchedule(
+	schedule []ExecutionScheduleEntry,
+	cases map[string]studypilot.CaseRecord,
+	requests map[string]studypilot.RequestRecord,
+) error {
+	seen := make(map[string]bool, len(schedule))
+	replicates := make(map[string]map[int]bool)
+	for index, entry := range schedule {
+		if entry.SchemaVersion != ScheduleSchema || entry.ScheduleIndex != index {
+			return fmt.Errorf("execution schedule index or schema mismatch")
+		}
+
+		if seen[entry.ScheduledCallID] {
+			return fmt.Errorf("duplicate scheduled call %q", entry.ScheduledCallID)
+		}
+		seen[entry.ScheduledCallID] = true
+		caseRecord, caseOK := cases[entry.CaseID]
+		requestRecord, requestOK := requests[entry.RequestID]
+		if !caseOK || !requestOK || requestRecord.CaseID != entry.CaseID || caseRecord.Category != entry.Category {
+			return fmt.Errorf("execution schedule references mismatched frozen record")
+		}
+		if entry.ReplicateIndex < 1 || entry.ReplicateIndex > 3 {
+			return fmt.Errorf("invalid replicate index")
+		}
+		if replicates[entry.CaseID] == nil {
+			replicates[entry.CaseID] = make(map[int]bool)
+		}
+		if replicates[entry.CaseID][entry.ReplicateIndex] {
+			return fmt.Errorf("duplicate case replicate")
+		}
+		replicates[entry.CaseID][entry.ReplicateIndex] = true
+	}
+	return nil
+}
+
+func validateAuthorizationAgainstPilot(
+	pilot pilotData,
+	authorizationBytes, providerBytes, scheduleBytes []byte,
+	authorization Authorization,
+	provider ProviderRecord,
+	schedule []ExecutionScheduleEntry,
+) error {
+	expectedSchedule, err := buildExecutionSchedule(pilot)
+	if err != nil {
+		return err
+	}
+	expectedScheduleBytes, err := canonicalJSONL(expectedSchedule)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(digest(scheduleBytes), digest(expectedScheduleBytes)) ||
+		!strings.EqualFold(authorization.ScheduleSHA256, digest(expectedScheduleBytes)) {
+		return fmt.Errorf("execution schedule differs from the fixed pilot schedule")
+	}
+	expectedProvider := newProviderRecord(provider.ModelListAliases, provider.ModelListResponseSHA256)
+	expectedProviderBytes, err := canonicalJSON(expectedProvider)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(digest(providerBytes), digest(expectedProviderBytes)) {
+		return fmt.Errorf("provider record differs from the pinned contract")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, authorization.CreatedAt)
+	if err != nil || createdAt.After(time.Now().UTC().Add(time.Minute)) {
+		return fmt.Errorf("authorization timestamp is invalid")
+	}
+	if authorization.SchemaVersion != AuthorizationSchema ||
+		authorization.Stage != "excluded_provider_pilot" || !authorization.Excluded ||
+		authorization.FinalStudyEligible || authorization.AuthorizedBudgetUSD != "5.000000" ||
+		authorization.AuthorizedBudgetNanoUSD != AuthorizedNanoUSD || authorization.ModelID != ModelID ||
+		authorization.PricingVersion != PricingVersion || authorization.InputPriceUSDPerMillion != "0.042000" ||
+		authorization.MaxInputTokensPerCall != MaxInputTokens ||
+		authorization.WorstCaseCostUSDPerCall != formatNanoUSD(WorstCallNanoUSD) ||
+		authorization.ScheduledCalls != len(expectedSchedule) ||
+		authorization.MaxScheduledCostUSD != formatNanoUSD(int64(len(expectedSchedule))*WorstCallNanoUSD) ||
+		authorization.OfflineChecksumsSHA256 != digest(pilot.Files["SHA256SUMS"]) ||
+		authorization.OfflineManifestSHA256 != digest(pilot.Files["pilot-manifest.json"]) ||
+		authorization.RequestsSHA256 != digest(pilot.Files["requests.jsonl"]) ||
+		authorization.ProviderRecordSHA256 != digest(expectedProviderBytes) ||
+		!authorization.ZeroAdaptiveExtension ||
+		!equalStrings(authorization.RepeatabilityCaseIDs, repeatabilityCaseIDs(pilot)) {
+		return fmt.Errorf("authorization identity mismatch")
+	}
+	if len(authorization.UnresolvedExternalGates) != 4 || len(authorizationBytes) == 0 {
+		return fmt.Errorf("authorization omits unresolved external gates")
+	}
+	if movingModelAlias(authorization.ModelID) || authorization.ModelID != provider.ModelID ||
+		int64(len(schedule))*WorstCallNanoUSD > authorization.AuthorizedBudgetNanoUSD {
+		return fmt.Errorf("authorization contains a moving model or unsafe budget")
+	}
+	return nil
+}
+
+func reserveBudget(spentNanoUSD, capNanoUSD int64) error {
+	if spentNanoUSD < 0 || capNanoUSD < 0 || spentNanoUSD > capNanoUSD-WorstCallNanoUSD {
+		return fmt.Errorf("worst-case reservation %s would exceed remaining cap %s",
+			formatNanoUSD(WorstCallNanoUSD), formatNanoUSD(capNanoUSD-spentNanoUSD))
+	}
+	return nil
+}
+
+func makeLedgerEntry(entry ExecutionScheduleEntry, result callResult, receipt []byte, cumulative int64) LedgerEntry {
+	ledger := LedgerEntry{
+		SchemaVersion: LedgerSchema, ScheduleIndex: entry.ScheduleIndex,
+		ScheduledCallID: entry.ScheduledCallID, CaseID: entry.CaseID, ReplicateIndex: entry.ReplicateIndex,
+		Status: "failed", RequestSHA256: digest(result.RequestBody), ReceiptSHA256: digest(receipt),
+		CumulativeInferredUSD: formatNanoUSD(cumulative),
+	}
+	if result.NotAttempted {
+		ledger.Status = "not_attempted"
+		return ledger
+	}
+	ledger.LatencyMilliseconds = float64(result.FinishedAt.Sub(result.StartedAt).Microseconds()) / 1000
+	if len(result.RawBody) > 0 {
+		responseDigest := digest(result.RawBody)
+		ledger.ResponseSHA256 = &responseDigest
+	}
+	if result.Metadata.ProviderRequestID != "" {
+		requestID := result.Metadata.ProviderRequestID
+		ledger.ProviderRequestID = &requestID
+	}
+	if result.Response != nil {
+		ledger.Status = "valid"
+		inputTokens, outputTokens := result.Response.Usage.InputTokens, result.Response.Usage.OutputTokens
+		ledger.InputTokens, ledger.OutputTokens = &inputTokens, &outputTokens
+		cost := formatNanoUSD(int64(inputTokens) * InputNanoUSD)
+		ledger.InferredCostUSD = &cost
+	}
+	return ledger
+}
+
+func writeExclusive(path string, data []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Base(path), err)
+	}
+	if _, err := file.Write(data); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Sync(); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	return file.Close()
+}
+
+func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
+	pilot, _, err := loadPilot(pilotDirectory)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule, err := loadAuthorization(runDirectory)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	if err := validateAuthorizationAgainstPilot(pilot, authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule); err != nil {
+		return RunSummary{}, err
+	}
+	cases, requests, _, err := indexPilot(pilot)
+	if err != nil {
+		return RunSummary{}, err
+	}
+	if err := validateExecutionSchedule(schedule, cases, requests); err != nil {
+		return RunSummary{}, err
+	}
+	ledgerBytes, err := os.ReadFile(filepath.Join(runDirectory, "call-ledger.jsonl"))
+	if err != nil {
+		return RunSummary{}, err
+	}
+	ledgerEntries, err := parseJSONL[LedgerEntry](ledgerBytes)
+	if err != nil || len(ledgerEntries) != len(schedule) {
+		return RunSummary{}, fmt.Errorf("ledger/schedule cardinality mismatch")
+	}
+	var summary RunSummary
+	summary.ScheduledCalls = len(schedule)
+	summary.AuthorizationSHA256 = digest(authorizationBytes)
+	summary.ScheduleSHA256 = digest(scheduleBytes)
+	receipts := make([][]byte, 0, len(schedule))
+	registries := make(map[string]studypilot.ReceiptRegistry, len(schedule))
+	providerRequestIDs := make(map[string]bool, len(schedule))
+	for _, entry := range schedule {
+		callDirectory := filepath.Join(runDirectory, "calls", fmt.Sprintf("%03d-%s", entry.ScheduleIndex, entry.ScheduledCallID))
+		requestBody, err := os.ReadFile(filepath.Join(callDirectory, "request.json"))
+		if err != nil {
+			return summary, err
+		}
+		storedReceipt, err := os.ReadFile(filepath.Join(callDirectory, "receipt.json"))
+		if err != nil {
+			return summary, err
+		}
+		var receiptDocument map[string]any
+		if err := json.Unmarshal(storedReceipt, &receiptDocument); err != nil {
+			return summary, err
+		}
+		measurement := receiptDocument["measurement"].(map[string]any)
+		result := callResult{RequestBody: requestBody}
+		ledgerEntry := ledgerEntries[entry.ScheduleIndex]
+		switch ledgerEntry.Status {
+		case "valid":
+			result.RawBody, err = os.ReadFile(filepath.Join(callDirectory, "raw-response.bin"))
+			if err != nil {
+				return summary, err
+			}
+			parsed, parseErr := parseAPIResponse(result.RawBody, requests[entry.RequestID])
+			if parseErr != nil {
+				return summary, parseErr
+			}
+			result.Response = &parsed
+			if err := loadAttemptMetadata(callDirectory, measurement, &result); err != nil {
+				return summary, err
+			}
+			if result.Metadata.HTTPStatus != http.StatusOK {
+				return summary, fmt.Errorf("valid ledger entry has HTTP status %d", result.Metadata.HTTPStatus)
+			}
+			if providerRequestIDs[result.Metadata.ProviderRequestID] {
+				return summary, fmt.Errorf("duplicate provider request ID")
+			}
+			providerRequestIDs[result.Metadata.ProviderRequestID] = true
+			summary.AttemptedCalls++
+			summary.CompletedCalls++
+			summary.InputTokens += result.Response.Usage.InputTokens
+			summary.OutputTokens += result.Response.Usage.OutputTokens
+			summary.InferredCostNanoUSD += int64(result.Response.Usage.InputTokens) * InputNanoUSD
+		case "failed":
+			result.RawBody, _ = os.ReadFile(filepath.Join(callDirectory, "raw-response.bin"))
+			if err := loadAttemptMetadata(callDirectory, measurement, &result); err != nil {
+				return summary, err
+			}
+			if err := loadPreservedError(callDirectory, &result); err != nil {
+				return summary, err
+			}
+			if result.Metadata.ProviderRequestID != "" {
+				if providerRequestIDs[result.Metadata.ProviderRequestID] {
+					return summary, fmt.Errorf("duplicate provider request ID")
+				}
+				providerRequestIDs[result.Metadata.ProviderRequestID] = true
+			}
+			summary.AttemptedCalls++
+			summary.FailedCalls++
+		case "not_attempted":
+			if err := loadPreservedError(callDirectory, &result); err != nil {
+				return summary, err
+			}
+			result.NotAttempted = true
+			summary.NotAttemptedCalls++
+		default:
+			return summary, fmt.Errorf("unknown ledger status")
+		}
+		baseSchedule, _ := scheduleForCase(pilot.Schedules, entry.CaseID)
+		material, err := buildReceipt(receiptInput{
+			Case: cases[entry.CaseID], Request: requests[entry.RequestID], BaseSchedule: baseSchedule,
+			ExecutionSchedule: entry, Authorization: authorization, AuthorizationBytes: authorizationBytes,
+			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes, Result: result,
+		})
+		if err != nil {
+			return summary, err
+		}
+		expectedLedger := makeLedgerEntry(entry, result, material.Receipt, summary.InferredCostNanoUSD)
+		expectedLedgerBytes, err := canonicalJSON(expectedLedger)
+		if err != nil {
+			return summary, err
+		}
+		actualLedgerBytes, err := canonicalJSON(ledgerEntry)
+		if err != nil || !strings.EqualFold(digest(expectedLedgerBytes), digest(actualLedgerBytes)) {
+			return summary, fmt.Errorf("ledger entry mismatch for %s", entry.ScheduledCallID)
+		}
+		if !strings.EqualFold(digest(storedReceipt), ledgerEntry.ReceiptSHA256) ||
+			!strings.EqualFold(digest(storedReceipt), digest(material.Receipt)) {
+			return summary, fmt.Errorf("stored receipt mismatch for %s", entry.ScheduledCallID)
+		}
+
+		receipts = append(receipts, storedReceipt)
+		registries[entry.ScheduledCallID] = material.Registry
+	}
+	if err := studypilot.ValidateReceiptStageCollection(receipts, registries, "runner"); err != nil {
+		return summary, err
+	}
+	collection := make([]any, 0, len(receipts))
+	for _, receipt := range receipts {
+		collection = append(collection, digest(receipt))
+	}
+	collectionBytes, _ := canonicalJSON(collection)
+	summary.ReceiptCollectionSHA256 = digest(collectionBytes)
+	if summary.AuthorizationSHA256 != digest(authorizationBytes) || authorization.ProviderRecordSHA256 != digest(providerBytes) {
+		return summary, fmt.Errorf("authorization digest mismatch")
+	}
+	return summary, nil
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func loadAttemptMetadata(callDirectory string, measurement map[string]any, result *callResult) error {
+	metadataBytes, err := os.ReadFile(filepath.Join(callDirectory, "response-metadata.json"))
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(metadataBytes, &result.Metadata); err != nil {
+		return err
+	}
+	started, err := time.Parse(time.RFC3339Nano, measurement["attempt_started_at"].(string))
+	if err != nil {
+		return err
+	}
+	finished, err := time.Parse(time.RFC3339Nano, measurement["attempt_finished_at"].(string))
+	if err != nil {
+		return err
+	}
+	result.StartedAt, result.FinishedAt = started, finished
+	return nil
+}
+
+func loadPreservedError(callDirectory string, result *callResult) error {
+	errorBytes, err := os.ReadFile(filepath.Join(callDirectory, "error.json"))
+	if err != nil {
+		return err
+	}
+	var preserved struct {
+		Stage   string `json:"stage"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(errorBytes, &preserved); err != nil {
+		return err
+	}
+	result.Err = fmt.Errorf("%s", preserved.Message)
+	result.ErrorStage = preserved.Stage
+	result.ErrorCode = preserved.Code
+	return nil
+}

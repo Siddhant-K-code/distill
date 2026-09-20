@@ -67,3 +67,43 @@ cannot validate merely by presenting internally consistent structured fields.
 
 This harness publishes no provider outcome, study result, selected threshold,
 qualification decision, or final-study metric.
+
+## Separately reviewed TypeSafe adapter
+
+The research-only `distill-typesafe-jev-pilot` command is the separately
+reviewed provider boundary. It is not linked into the public `distill` CLI.
+Its provider/API/model/pricing record is
+[`typesafe-jev-provider-v1.md`](../typesafe-jev-provider-v1.md).
+
+Authorization is an offline operation over an authenticated, previously saved
+`GET /v1/models` response and the deterministic pilot package:
+
+```bash
+go run ./cmd/distill-typesafe-jev-pilot authorize \
+  --pilot build/pilot \
+  --model-list build/typesafe-preflight/models-sdk.json \
+  --model-list-request-id build/typesafe-preflight/models-sdk-request-id.txt \
+  --output build/typesafe-jev-run
+```
+
+The resulting immutable authorization fixes `jev-1.13.0`, a USD 5.000000
+cap, the 18 base calls, and five representative cases with two additional
+replicates each. It reserves the documented 64,000-input-token worst case
+before every request, performs no retries, and permits no adaptive extension.
+
+Only the `run` subcommand reads `TYPESAFE_API_KEY`. Invoke it through the local
+Keychain wrapper; never pass a credential flag:
+
+```bash
+$HOME/.local/bin/typesafe-run go run ./cmd/distill-typesafe-jev-pilot run \
+  --pilot build/pilot \
+  --run-dir build/typesafe-jev-run
+
+go run ./cmd/distill-typesafe-jev-pilot validate \
+  --pilot build/pilot \
+  --run-dir build/typesafe-jev-run
+```
+
+Raw responses, parsed receipts, errors, and the append-only call ledger stay
+under ignored `build/` output with owner-only permissions. The runner does not
+persist request headers and refuses moving model aliases.
