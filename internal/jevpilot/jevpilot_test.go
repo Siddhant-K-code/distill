@@ -140,6 +140,12 @@ func TestPrepareRunAndValidateWithFakeTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Remove(filepath.Join(runDirectory, "calls", "000-pilot-call-001", "usage.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateRun(pilotDirectory, runDirectory); err == nil {
+		t.Fatal("validation accepted a missing persisted usage artifact")
+	}
 }
 
 func TestMappingRejectsAliasesAndAdversarialProbabilities(t *testing.T) {

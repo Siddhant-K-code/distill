@@ -49,6 +49,9 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 	if err := validateAuthorizationAgainstPilot(pilot, authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule); err != nil {
 		return RunSummary{}, err
 	}
+	if err := validateModelEvidence(options.RunDirectory, provider); err != nil {
+		return RunSummary{}, err
+	}
 	cases, requests, _, err := indexPilot(pilot)
 	if err != nil {
 		return RunSummary{}, err
@@ -330,11 +333,12 @@ func validateAuthorizationAgainstPilot(
 		!strings.EqualFold(authorization.ScheduleSHA256, digest(expectedScheduleBytes)) {
 		return fmt.Errorf("execution schedule differs from the fixed pilot schedule")
 	}
-	expectedProvider := newProviderRecord(provider.ModelListAliases, provider.ModelListResponseSHA256)
+	expectedProvider := newProviderRecord(provider.ModelListAliases, provider.ModelListResponseSHA256, provider.ModelListRequestIDSHA256)
 	expectedProviderBytes, err := canonicalJSON(expectedProvider)
 	if err != nil {
 		return err
 	}
+
 	if !strings.EqualFold(digest(providerBytes), digest(expectedProviderBytes)) {
 		return fmt.Errorf("provider record differs from the pinned contract")
 	}
@@ -365,6 +369,28 @@ func validateAuthorizationAgainstPilot(
 	if movingModelAlias(authorization.ModelID) || authorization.ModelID != provider.ModelID ||
 		int64(len(schedule))*WorstCallNanoUSD > authorization.AuthorizedBudgetNanoUSD {
 		return fmt.Errorf("authorization contains a moving model or unsafe budget")
+	}
+	return nil
+}
+
+func validateModelEvidence(directory string, provider ProviderRecord) error {
+	response, err := os.ReadFile(filepath.Join(directory, "model-list-response.json"))
+	if err != nil {
+		return fmt.Errorf("read stored model-list response: %w", err)
+	}
+	requestID, err := os.ReadFile(filepath.Join(directory, "model-list-request-id.txt"))
+	if err != nil {
+		return fmt.Errorf("read stored model-list request identity: %w", err)
+	}
+	aliases, err := validateModelList(response)
+	if err != nil {
+		return err
+	}
+	if !equalStrings(aliases, provider.ModelListAliases) ||
+		digest(response) != provider.ModelListResponseSHA256 ||
+		digest(requestID) != provider.ModelListRequestIDSHA256 ||
+		len(strings.TrimSpace(string(requestID))) == 0 {
+		return fmt.Errorf("stored model-list evidence does not match provider record")
 	}
 	return nil
 }
@@ -445,6 +471,9 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 	if err := validateAuthorizationAgainstPilot(pilot, authorizationBytes, providerBytes, scheduleBytes, authorization, provider, schedule); err != nil {
+		return RunSummary{}, err
+	}
+	if err := validateModelEvidence(runDirectory, provider); err != nil {
 		return RunSummary{}, err
 	}
 	cases, requests, _, err := indexPilot(pilot)
@@ -538,8 +567,8 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 			if err := loadPreservedError(callDirectory, &result); err != nil {
 				return summary, err
 			}
-			if parsed, parseErr := parseAPIResponse(result.RawBody, requests[entry.RequestID]); parseErr == nil {
-				result.ObservedUsage = &parsed.Usage
+			if usage, usageErr := parseUsageEnvelope(result.RawBody); usageErr == nil {
+				result.ObservedUsage = &usage
 			}
 			if result.Metadata.ProviderRequestID != "" {
 				if providerRequestIDs[result.Metadata.ProviderRequestID] {
@@ -574,6 +603,9 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 			ReservationBytes: reservationBytes, Result: result,
 		})
 		if err != nil {
+			return summary, err
+		}
+		if err := validateStoredCallArtifacts(callDirectory, result, reservationBytes, material); err != nil {
 			return summary, err
 		}
 		expectedLedger := makeLedgerEntry(entry, result, material.Receipt, summary.InferredCostNanoUSD)
@@ -687,6 +719,7 @@ func loadPreservedError(callDirectory string, result *callResult) error {
 	if err != nil {
 		return err
 	}
+
 	var preserved struct {
 		Stage   string `json:"stage"`
 		Code    string `json:"code"`
@@ -698,6 +731,51 @@ func loadPreservedError(callDirectory string, result *callResult) error {
 	result.Err = fmt.Errorf("%s", preserved.Message)
 	result.ErrorStage = preserved.Stage
 	result.ErrorCode = preserved.Code
+	return nil
+}
+
+func validateStoredCallArtifacts(callDirectory string, result callResult, reservation []byte, material receiptMaterial) error {
+	expected := map[string][]byte{
+		"request.json": result.RequestBody,
+		"receipt.json": material.Receipt,
+	}
+	if !result.NotAttempted {
+		metadata, err := canonicalJSON(result.Metadata)
+		if err != nil {
+			return err
+		}
+		expected["attempt-reservation.json"] = reservation
+		expected["response-metadata.json"] = metadata
+	}
+	if len(result.RawBody) > 0 {
+		expected["raw-response.bin"] = result.RawBody
+	}
+	if result.ObservedUsage != nil {
+		expected["usage.json"] = material.Artifacts[material.Registry.ScheduledCallID+"-usage"]
+	}
+	if result.Err != nil {
+		expected["error.json"] = material.Artifacts[material.Registry.ScheduledCallID+"-sanitized-error"]
+	}
+	entries, err := os.ReadDir(callDirectory)
+	if err != nil {
+		return err
+	}
+	if len(entries) != len(expected) {
+		return fmt.Errorf("call artifact set mismatch")
+	}
+	for _, entry := range entries {
+		want, ok := expected[entry.Name()]
+		if !ok || entry.IsDir() {
+			return fmt.Errorf("unexpected call artifact %q", entry.Name())
+		}
+		actual, err := os.ReadFile(filepath.Join(callDirectory, entry.Name()))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(actual, want) {
+			return fmt.Errorf("stored call artifact %q does not match receipt registry", entry.Name())
+		}
+	}
 	return nil
 }
 

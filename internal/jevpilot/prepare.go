@@ -69,7 +69,7 @@ func Prepare(options PrepareOptions) (Authorization, error) {
 	if err != nil {
 		return Authorization{}, err
 	}
-	provider := newProviderRecord(aliases, digest(modelList))
+	provider := newProviderRecord(aliases, digest(modelList), digest(requestID))
 	providerBytes, err := canonicalJSON(provider)
 	if err != nil {
 		return Authorization{}, err
@@ -114,9 +114,11 @@ func Prepare(options PrepareOptions) (Authorization, error) {
 		return Authorization{}, fmt.Errorf("scheduled worst-case cost %s exceeds cap", formatNanoUSD(maxCost))
 	}
 	if err := createAuthorizationDirectory(options.OutputDirectory, map[string][]byte{
-		"authorization.json":       authorizationBytes,
-		"execution-schedule.jsonl": scheduleBytes,
-		"provider-record.json":     providerBytes,
+		"authorization.json":        authorizationBytes,
+		"execution-schedule.jsonl":  scheduleBytes,
+		"model-list-request-id.txt": requestID,
+		"model-list-response.json":  modelList,
+		"provider-record.json":      providerBytes,
 	}); err != nil {
 		return Authorization{}, err
 	}
@@ -153,34 +155,34 @@ func validateModelList(data []byte) ([]string, error) {
 	return aliases, nil
 }
 
-func newProviderRecord(aliases []string, modelListDigest string) ProviderRecord {
+func newProviderRecord(aliases []string, modelListDigest, modelListRequestIDDigest string) ProviderRecord {
 	return ProviderRecord{
-		SchemaVersion:              ProviderSchema,
-		Provider:                   ProviderName,
-		ModelID:                    ModelID,
-		ModelVersion:               ModelVersion,
-		ModelListAliases:           aliases,
-		ModelListResponseSHA256:    modelListDigest,
-		ModelListRequestIDRecorded: true,
-		APIEndpoint:                APIEndpoint,
-		APIVersion:                 APIVersion,
-		HTTPClient:                 "Go standard library net/http",
-		SDKUsedForExecution:        false,
-		ReferenceSDK:               "typesafe-sdk",
-		ReferenceSDKVersion:        "0.7.0",
-		ReferenceSDKCommit:         "2ce5c65f13646cab6e6f782328194c9d85f3300a",
-		Authentication:             "Authorization: Bearer <key>; header never persisted",
-		RetryPolicy:                "zero automatic retries; one transport attempt per scheduled call",
-		TimeoutSeconds:             int(RequestTimeout / time.Second),
-		InputPriceUSDPerMillion:    "0.042000",
-		OutputPriceUSDPerMillion:   "0.000000",
-		MaxInputTokensPerCall:      MaxInputTokens,
-		WorstCaseCostUSDPerCall:    formatNanoUSD(WorstCallNanoUSD),
-		RateLimits:                 "250000 tokens/second and 1200 requests/minute; limits may change without notice",
-		UsageFields:                []string{"input_tokens", "output_tokens"},
-		ProviderCostField:          "not present in documented response; null in semantic receipt and separately inferred from input tokens",
-		RequestIDField:             "x-typesafe-request-id response header",
-		ConfidenceSemantics:        "provider-defined [0,1] statistic derived from Choice probabilities; not selected-label probability",
+		SchemaVersion:            ProviderSchema,
+		Provider:                 ProviderName,
+		ModelID:                  ModelID,
+		ModelVersion:             ModelVersion,
+		ModelListAliases:         aliases,
+		ModelListResponseSHA256:  modelListDigest,
+		ModelListRequestIDSHA256: modelListRequestIDDigest,
+		APIEndpoint:              APIEndpoint,
+		APIVersion:               APIVersion,
+		HTTPClient:               "Go standard library net/http",
+		SDKUsedForExecution:      false,
+		ReferenceSDK:             "typesafe-sdk",
+		ReferenceSDKVersion:      "0.7.0",
+		ReferenceSDKCommit:       "2ce5c65f13646cab6e6f782328194c9d85f3300a",
+		Authentication:           "Authorization: Bearer <key>; header never persisted",
+		RetryPolicy:              "zero automatic retries; one transport attempt per scheduled call",
+		TimeoutSeconds:           int(RequestTimeout / time.Second),
+		InputPriceUSDPerMillion:  "0.042000",
+		OutputPriceUSDPerMillion: "0.000000",
+		MaxInputTokensPerCall:    MaxInputTokens,
+		WorstCaseCostUSDPerCall:  formatNanoUSD(WorstCallNanoUSD),
+		RateLimits:               "250000 tokens/second and 1200 requests/minute; limits may change without notice",
+		UsageFields:              []string{"input_tokens", "output_tokens"},
+		ProviderCostField:        "not present in documented response; null in semantic receipt and separately inferred from input tokens",
+		RequestIDField:           "x-typesafe-request-id response header",
+		ConfidenceSemantics:      "provider-defined [0,1] statistic derived from Choice probabilities; not selected-label probability",
 		KnownJaggedEdges: []string{
 			"literal reading", "math and numeric precision", "date and time comparison", "indirection",
 			"large irrelevant state", "adversarial content", "contradictory instructions and criteria",

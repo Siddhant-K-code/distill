@@ -43,7 +43,8 @@ derives cost from `input_tokens` and the pinned public input-token price.
 The authenticated `GET /v1/models` account request returned only the moving
 aliases `jev-latest` and `jev-preview`. The immutable identifier
 `jev-1.13.0` is pinned from the official models document and must be echoed
-exactly by every paid response.
+exactly by every paid response. The local authorization directory preserves
+the model-list body and request ID with their digests; neither is committed.
 
 ## Known Jev 1.13 jagged edges
 
