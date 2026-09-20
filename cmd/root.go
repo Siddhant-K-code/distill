@@ -14,13 +14,14 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "distill",
-	Short: "Distill - Reliability layer for LLM context with semantic deduplication",
+	Short: "Distill - Reliable memory and deterministic context artifacts",
 	Long: `Distill is a reliability layer for LLM context that removes redundancy
 before it reaches your model, improving output quality and determinism.
 
 Features:
   - Agglomerative clustering for semantic deduplication
   - MMR re-ranking for diversity
+  - Offline deterministic context lock/build/verify
   - ~12ms latency, no LLM calls
   - Deterministic, auditable results
 

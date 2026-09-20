@@ -1,0 +1,17 @@
+{
+  "schema_version": "distill-lock/config/v0",
+  "source_root": "sources",
+  "sources": [
+    "code/example.go",
+    "docs/duplicate-a.md",
+    "docs/duplicate-b.md",
+    "line-endings/crlf.txt",
+    "line-endings/lf.txt"
+  ],
+  "exclude": [
+    "excluded/ignored.txt"
+  ],
+  "chunk_bytes": 4096,
+  "token_budget": 4096,
+  "metadata_removal": "none"
+}

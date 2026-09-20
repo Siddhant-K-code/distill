@@ -2,6 +2,14 @@
 
 All notable changes to Distill are documented here.
 
+## Unreleased
+
+### Added
+
+- **Distill Lock v0** — Offline `lock`, `build`, and `verify` commands for
+  deterministic, byte-identical context artifacts with exact deduplication,
+  canonical manifests, drift detection, and portable macOS/Linux goldens.
+
 ## [v0.9.0] - 2026-05-09
 
 ### Added
