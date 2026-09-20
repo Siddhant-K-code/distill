@@ -104,6 +104,9 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, ResponseLimitBytes+1))
 	closeErr := response.Body.Close()
 	result.RawBody = raw
+	if usage, usageErr := parseUsageEnvelope(raw); usageErr == nil {
+		result.ObservedUsage = &usage
+	}
 	if readErr != nil {
 		result.Err = fmt.Errorf("read provider response")
 		result.ErrorStage = "transport"
@@ -121,9 +124,6 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 		result.ErrorStage = "parse"
 		result.ErrorCode = "response_too_large"
 		return result
-	}
-	if usage, usageErr := parseUsageEnvelope(raw); usageErr == nil {
-		result.ObservedUsage = &usage
 	}
 	if response.StatusCode != http.StatusOK {
 		result.Err = fmt.Errorf("provider returned HTTP %d", response.StatusCode)

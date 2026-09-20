@@ -300,11 +300,12 @@ func TestTransportFailurePausesAndResumesWithoutRetry(t *testing.T) {
 	if _, err := ValidateRun(pilotDirectory, runDirectory); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Run(context.Background(), RunOptions{
+	finalized, err := Run(context.Background(), RunOptions{
 		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
 		APIKey: "test-secret-key", Transport: transport,
-	}); err == nil {
-		t.Fatal("duplicate execution unexpectedly accepted")
+	})
+	if err != nil || finalized.ReceiptCollectionSHA256 == "" || transport.calls != 1 {
+		t.Fatalf("completed run was not finalized without another call: %+v err=%v", finalized, err)
 	}
 }
 

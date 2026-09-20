@@ -93,7 +93,10 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		summary = partial
 		startIndex = len(ledgerEntries)
 		if startIndex == len(schedule) {
-			return RunSummary{}, fmt.Errorf("execution schedule is already complete")
+			if err := ensureIntegrationSummary(options.RunDirectory, summary); err != nil {
+				return RunSummary{}, err
+			}
+			return summary, nil
 		}
 		entries, readErr := os.ReadDir(callsDirectory)
 		if readErr != nil {
@@ -279,11 +282,7 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		return summary, fmt.Errorf("validate completed run: %w", err)
 	}
 	summary = validated
-	summaryBytes, err := canonicalJSON(summary)
-	if err != nil {
-		return summary, err
-	}
-	if err := writeExclusive(filepath.Join(options.RunDirectory, "integration-summary.json"), summaryBytes); err != nil {
+	if err := ensureIntegrationSummary(options.RunDirectory, summary); err != nil {
 		return summary, err
 	}
 	if duplicateProviderID {
@@ -460,7 +459,27 @@ func shouldPauseAfterFailure(result callResult) bool {
 		result.ErrorCode == "response_read_failed" ||
 		result.ErrorCode == "response_close_failed" ||
 		result.Metadata.HTTPStatus == http.StatusTooManyRequests ||
-		result.Metadata.HTTPStatus == 529
+		result.Metadata.HTTPStatus == 529 ||
+		result.Metadata.HTTPStatus >= 500
+}
+
+func ensureIntegrationSummary(runDirectory string, summary RunSummary) error {
+	summaryBytes, err := canonicalJSON(summary)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(runDirectory, "integration-summary.json")
+	existing, err := os.ReadFile(path)
+	if err == nil {
+		if !bytes.Equal(existing, summaryBytes) {
+			return fmt.Errorf("stored integration summary mismatch")
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+	return writeExclusive(path, summaryBytes)
 }
 
 func makeLedgerEntry(entry ExecutionScheduleEntry, result callResult, receipt []byte, cumulative int64) LedgerEntry {
@@ -550,6 +569,7 @@ func validateRunState(pilotDirectory, runDirectory string, requireComplete bool)
 	receipts := make([][]byte, 0, len(schedule))
 	registries := make(map[string]studypilot.ReceiptRegistry, len(schedule))
 	providerRequestIDs := make(map[string]bool, len(schedule))
+	terminalStop := false
 	for _, entry := range schedule[:len(ledgerEntries)] {
 		callDirectory := filepath.Join(runDirectory, "calls", fmt.Sprintf("%03d-%s", entry.ScheduleIndex, entry.ScheduledCallID))
 		requestBody, err := os.ReadFile(filepath.Join(callDirectory, "request.json"))
@@ -575,6 +595,9 @@ func validateRunState(pilotDirectory, runDirectory string, requireComplete bool)
 		}
 		result := callResult{RequestBody: requestBody}
 		ledgerEntry := ledgerEntries[entry.ScheduleIndex]
+		if terminalStop && ledgerEntry.Status != "not_attempted" {
+			return summary, fmt.Errorf("attempted call follows a terminal scheduler stop")
+		}
 		var reservationBytes []byte
 		if ledgerEntry.Status != "not_attempted" {
 			reservationBytes, err = os.ReadFile(filepath.Join(callDirectory, "attempt-reservation.json"))
@@ -630,12 +653,22 @@ func validateRunState(pilotDirectory, runDirectory string, requireComplete bool)
 			}
 			summary.AttemptedCalls++
 			summary.FailedCalls++
+			if shouldStopAfterFailure(result) {
+				terminalStop = true
+			}
 		case "not_attempted":
 			if err := loadPreservedError(callDirectory, &result); err != nil {
 				return summary, err
 			}
 			result.NotAttempted = true
 			summary.NotAttemptedCalls++
+			if !terminalStop {
+				if result.ErrorCode != "budget_reservation_failed" ||
+					reserveBudget(summary.InferredCostNanoUSD, authorization.AuthorizedBudgetNanoUSD) == nil {
+					return summary, fmt.Errorf("not-attempted call lacks a preceding terminal stop")
+				}
+				terminalStop = true
+			}
 		default:
 			return summary, fmt.Errorf("unknown ledger status")
 		}
