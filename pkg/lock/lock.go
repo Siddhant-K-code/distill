@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -306,10 +305,7 @@ func syncDirectory(directory string) error {
 	defer func() {
 		_ = handle.Close()
 	}()
-	if err := handle.Sync(); err != nil && !strings.Contains(strings.ToLower(err.Error()), "invalid argument") {
-		return err
-	}
-	return nil
+	return handle.Sync()
 }
 
 func equalLock(left, right LockFile) (bool, error) {
