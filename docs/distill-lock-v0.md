@@ -97,13 +97,15 @@ therefore also fails closed. Hard-linked regular files are treated as separate
 paths and exact-content deduplication handles them normally.
 
 The source, configuration, lockfile, output, and staging paths form a local
-trust boundary. Their ancestors and source directories must be owned by the
-current user or root and must not be group/world writable unless the directory
-has the sticky bit. Source/config/lock files must not be group/world writable.
-Extended ACLs are rejected, including inherited ACLs on staging outputs. These
-checks prevent another OS principal from swapping a validated path before it is
-read or published. Processes running as the same OS user are trusted; v0 is not
-a same-account sandbox.
+trust boundary. Every directory component is inspected without following links;
+any symlink component is rejected. Ancestors and source directories must be
+owned by the current user or root and must not be group/world writable unless
+the directory has the sticky bit. Source/config/lock files must not be
+group/world writable. Extended ACL entries granting mutation rights are
+rejected, including inherited ACLs on staging outputs. These checks prevent
+another OS principal from swapping a validated path before it is read or
+published. Processes running as the same OS user are trusted; v0 is not a
+same-account sandbox.
 
 Supported extensions are `.bash`, `.c`, `.cc`, `.cfg`, `.conf`, `.cpp`, `.cs`,
 `.css`, `.csv`, `.go`, `.graphql`, `.h`, `.hpp`, `.html`, `.ini`, `.java`,

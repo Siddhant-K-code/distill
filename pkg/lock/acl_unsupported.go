@@ -2,6 +2,6 @@
 
 package lock
 
-func hasExtendedACL(string) (bool, error) {
+func hasUnsafeACL(string) (bool, error) {
 	return false, nil
 }

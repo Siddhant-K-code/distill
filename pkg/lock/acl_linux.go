@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func hasExtendedACL(path string) (bool, error) {
+func hasUnsafeACL(path string) (bool, error) {
 	for _, name := range []string{"system.posix_acl_access", "system.posix_acl_default"} {
 		size, err := unix.Lgetxattr(path, name, nil)
 		if err == nil {

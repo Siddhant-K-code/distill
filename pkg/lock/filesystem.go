@@ -215,7 +215,7 @@ func validateLexicalDirectoryPath(absolute string) error {
 	relative := strings.TrimPrefix(absolute, root)
 	parts := strings.Split(relative, string(filepath.Separator))
 	current := root
-	for index, part := range parts {
+	for _, part := range parts {
 		if part == "" {
 			continue
 		}
@@ -225,13 +225,7 @@ func validateLexicalDirectoryPath(absolute string) error {
 			return fmt.Errorf("inspect directory component %q: %w", current, err)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			if index == len(parts)-1 {
-				return fmt.Errorf("directory %q is a symbolic link", current)
-			}
-			if err := validateTrustedSymlink(info, current); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("directory component %q is a symbolic link", current)
 		}
 		if !info.IsDir() {
 			return fmt.Errorf("directory component %q is not a directory", current)
@@ -264,30 +258,16 @@ func validateTrustedAncestors(directory string) error {
 	}
 }
 
-func validateTrustedSymlink(info fs.FileInfo, filePath string) error {
-	if !ownedByCurrentUserOrRoot(info) {
-		return fmt.Errorf("symbolic link %q is not owned by the current user or root", filePath)
-	}
-	hasACL, err := hasExtendedACL(filePath)
-	if err != nil {
-		return fmt.Errorf("inspect access controls for symbolic link %q: %w", filePath, err)
-	}
-	if hasACL {
-		return fmt.Errorf("symbolic link %q has an extended access-control list", filePath)
-	}
-	return nil
-}
-
 func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) error {
 	if !ownedByCurrentUserOrRoot(info) {
 		return fmt.Errorf("%q is not owned by the current user or root", filePath)
 	}
-	hasACL, err := hasExtendedACL(filePath)
+	hasACL, err := hasUnsafeACL(filePath)
 	if err != nil {
 		return fmt.Errorf("inspect access controls for %q: %w", filePath, err)
 	}
 	if hasACL {
-		return fmt.Errorf("%q has an extended access-control list", filePath)
+		return fmt.Errorf("%q has an access-control list granting mutation rights", filePath)
 	}
 	if info.Mode().Perm()&0o022 == 0 {
 		return nil

@@ -3,9 +3,20 @@
 package lock
 
 import (
+	"encoding/binary"
+	"fmt"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+)
+
+const (
+	darwinFileSecurityHeaderBytes = 44
+	darwinACEBytes                = 24
+	darwinACEPermit               = 1
+	darwinACEKindMask             = 0xf
+	darwinWriteRights             = (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6) |
+		(1 << 8) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 25)
 )
 
 type darwinAttributeList struct {
@@ -29,7 +40,7 @@ type darwinACLBuffer struct {
 	Data      [4096]byte
 }
 
-func hasExtendedACL(path string) (bool, error) {
+func hasUnsafeACL(path string) (bool, error) {
 	pathPointer, err := unix.BytePtrFromString(path)
 	if err != nil {
 		return false, err
@@ -52,5 +63,25 @@ func hasExtendedACL(path string) (bool, error) {
 	if errno != 0 {
 		return false, errno
 	}
-	return buffer.Reference.Length != 0, nil
+	if buffer.Reference.Length == 0 {
+		return false, nil
+	}
+	length := int(buffer.Reference.Length)
+	if length < darwinFileSecurityHeaderBytes || length > len(buffer.Data) {
+		return false, fmt.Errorf("invalid extended security data length %d", length)
+	}
+	data := buffer.Data[:length]
+	entryCount := int(binary.LittleEndian.Uint32(data[36:40]))
+	if expected := darwinFileSecurityHeaderBytes + entryCount*darwinACEBytes; expected != length {
+		return false, fmt.Errorf("invalid ACL entry count %d for length %d", entryCount, length)
+	}
+	for index := 0; index < entryCount; index++ {
+		offset := darwinFileSecurityHeaderBytes + index*darwinACEBytes
+		flags := binary.LittleEndian.Uint32(data[offset+16 : offset+20])
+		rights := binary.LittleEndian.Uint32(data[offset+20 : offset+24])
+		if flags&darwinACEKindMask == darwinACEPermit && rights&darwinWriteRights != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }

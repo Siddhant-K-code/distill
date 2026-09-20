@@ -12,6 +12,23 @@ import (
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	repositoryRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		panic(err)
+	}
+	temporaryRoot, err := os.MkdirTemp(repositoryRoot, ".distill-lock-tests-")
+	if err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("TMPDIR", temporaryRoot); err != nil {
+		panic(err)
+	}
+	code := m.Run()
+	_ = os.RemoveAll(temporaryRoot)
+	os.Exit(code)
+}
+
 func TestRandomizedEnumerationOrderIsDeterministic(t *testing.T) {
 	config := testConfig([]string{"a.txt", "b.txt", "c.txt"}, nil)
 	inputs := []sourceInput{
