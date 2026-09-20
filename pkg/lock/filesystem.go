@@ -220,6 +220,13 @@ func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) erro
 	if !ownedByCurrentUserOrRoot(info) {
 		return fmt.Errorf("%q is not owned by the current user or root", filePath)
 	}
+	hasACL, err := hasExtendedACL(filePath)
+	if err != nil {
+		return fmt.Errorf("inspect access controls for %q: %w", filePath, err)
+	}
+	if hasACL {
+		return fmt.Errorf("%q has an extended access-control list", filePath)
+	}
 	if info.Mode().Perm()&0o022 == 0 {
 		return nil
 	}

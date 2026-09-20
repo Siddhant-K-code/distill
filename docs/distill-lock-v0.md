@@ -100,9 +100,10 @@ The source, configuration, lockfile, output, and staging paths form a local
 trust boundary. Their ancestors and source directories must be owned by the
 current user or root and must not be group/world writable unless the directory
 has the sticky bit. Source/config/lock files must not be group/world writable.
-These checks prevent another OS principal from swapping a validated path before
-it is read or published. Processes running as the same OS user are trusted; v0
-is not a same-account sandbox.
+Extended ACLs are rejected, including inherited ACLs on staging outputs. These
+checks prevent another OS principal from swapping a validated path before it is
+read or published. Processes running as the same OS user are trusted; v0 is not
+a same-account sandbox.
 
 Supported extensions are `.bash`, `.c`, `.cc`, `.cfg`, `.conf`, `.cpp`, `.cs`,
 `.css`, `.csv`, `.go`, `.graphql`, `.h`, `.hpp`, `.html`, `.ini`, `.java`,
