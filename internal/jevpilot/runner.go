@@ -74,6 +74,7 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 	}
 	startIndex := 0
 	providerRequestIDs := make(map[string]bool, len(schedule))
+	resumeStopped := false
 	if err := os.Mkdir(callsDirectory, 0o700); err != nil {
 		if !os.IsExist(err) {
 			return RunSummary{}, fmt.Errorf("create calls directory: %w", err)
@@ -110,6 +111,10 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 				providerRequestIDs[*entry.ProviderRequestID] = true
 			}
 		}
+		resumeStopped, validateErr = terminalStopFromPrefix(options.RunDirectory, ledgerEntries)
+		if validateErr != nil {
+			return RunSummary{}, validateErr
+		}
 	}
 	ledgerPath := filepath.Join(options.RunDirectory, "call-ledger.jsonl")
 	ledgerFlags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
@@ -125,9 +130,13 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 	}()
 
 	duplicateProviderID := false
-	stopped := false
+	stopped := resumeStopped
 	stopCode := ""
 	stopMessage := ""
+	if stopped {
+		stopCode = "prior_call_failed"
+		stopMessage = "execution stopped after an integrity or authorization failure; no retry or replacement was attempted"
+	}
 	for _, entry := range schedule[startIndex:] {
 		caseRecord := cases[entry.CaseID]
 		requestRecord := requests[entry.RequestID]
@@ -461,6 +470,35 @@ func shouldPauseAfterFailure(result callResult) bool {
 		result.Metadata.HTTPStatus == http.StatusTooManyRequests ||
 		result.Metadata.HTTPStatus == 529 ||
 		result.Metadata.HTTPStatus >= 500
+}
+
+func terminalStopFromPrefix(runDirectory string, ledger []LedgerEntry) (bool, error) {
+	if len(ledger) == 0 {
+		return false, nil
+	}
+	last := ledger[len(ledger)-1]
+	switch last.Status {
+	case "valid":
+		return false, nil
+	case "not_attempted":
+		return true, nil
+	case "failed":
+		callDirectory := filepath.Join(runDirectory, "calls", fmt.Sprintf("%03d-%s", last.ScheduleIndex, last.ScheduledCallID))
+		var result callResult
+		if err := loadPreservedError(callDirectory, &result); err != nil {
+			return false, err
+		}
+		metadataBytes, err := os.ReadFile(filepath.Join(callDirectory, "response-metadata.json"))
+		if err != nil {
+			return false, err
+		}
+		if err := json.Unmarshal(metadataBytes, &result.Metadata); err != nil {
+			return false, err
+		}
+		return shouldStopAfterFailure(result), nil
+	default:
+		return false, fmt.Errorf("unknown terminal ledger status %q", last.Status)
+	}
 }
 
 func ensureIntegrationSummary(runDirectory string, summary RunSummary) error {

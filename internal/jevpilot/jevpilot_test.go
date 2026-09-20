@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -17,12 +18,13 @@ import (
 )
 
 type fakeTransport struct {
-	t          *testing.T
-	responses  map[string]APIResponse
-	calls      int
-	seenBodies [][]byte
-	err        error
-	fixedID    string
+	t             *testing.T
+	responses     map[string]APIResponse
+	calls         int
+	seenBodies    [][]byte
+	err           error
+	fixedID       string
+	modelOverride string
 }
 
 func (transport *fakeTransport) Do(request *http.Request) (*http.Response, error) {
@@ -45,6 +47,9 @@ func (transport *fakeTransport) Do(request *http.Request) (*http.Response, error
 	response, ok := transport.responses[input.State]
 	if !ok {
 		transport.t.Fatalf("unexpected state")
+	}
+	if transport.modelOverride != "" {
+		response.Model = transport.modelOverride
 	}
 	raw, err := canonicalJSON(response)
 	if err != nil {
@@ -365,6 +370,73 @@ func TestDuplicateProviderRequestIDInvalidatesRun(t *testing.T) {
 	}
 	if _, err := ValidateRun(pilotDirectory, runDirectory); err == nil {
 		t.Fatal("offline validation accepted duplicate provider request IDs")
+	}
+}
+
+func TestResumeAfterTerminalFailureMakesNoProviderCalls(t *testing.T) {
+	root := realTempDir(t)
+	pilotDirectory := filepath.Join(root, "pilot")
+	if _, err := studypilot.Prepare(pilotDirectory); err != nil {
+		t.Fatal(err)
+	}
+	pilot, _, err := loadPilot(pilotDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runDirectory := prepareTestAuthorization(t, root, pilotDirectory)
+	cases := make(map[string]studypilot.CaseRecord, len(pilot.Cases))
+	for _, record := range pilot.Cases {
+		cases[record.CaseID] = record
+	}
+	responses := make(map[string]APIResponse, len(pilot.Requests))
+	for _, request := range pilot.Requests {
+		responses[request.State.Content] = fakeResponse(request, cases[request.CaseID])
+	}
+	invalid := &fakeTransport{t: t, responses: responses, modelOverride: "jev-1.13.1"}
+	if _, err := Run(context.Background(), RunOptions{
+		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
+		APIKey: "test-secret-key", Transport: invalid,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ledgerPath := filepath.Join(runDirectory, "call-ledger.jsonl")
+	ledger, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstLineEnd := bytes.IndexByte(ledger, '\n')
+	if firstLineEnd < 0 {
+		t.Fatal("missing first ledger line")
+	}
+	if err := os.WriteFile(ledgerPath, ledger[:firstLineEnd+1], 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for index := 1; index < 28; index++ {
+		entries, err := os.ReadDir(filepath.Join(runDirectory, "calls"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), fmt.Sprintf("%03d-", index)) {
+				if err := os.RemoveAll(filepath.Join(runDirectory, "calls", entry.Name())); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	if err := os.Remove(filepath.Join(runDirectory, "integration-summary.json")); err != nil {
+		t.Fatal(err)
+	}
+	resumed := &fakeTransport{t: t, responses: responses}
+	summary, err := Run(context.Background(), RunOptions{
+		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
+		APIKey: "test-secret-key", Transport: resumed,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.calls != 0 || summary.FailedCalls != 1 || summary.NotAttemptedCalls != 27 {
+		t.Fatalf("terminal resume made provider calls: %+v calls=%d", summary, resumed.calls)
 	}
 }
 

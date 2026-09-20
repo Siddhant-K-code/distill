@@ -140,7 +140,7 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 	parsed, err := parseAPIResponse(raw, record)
 	if err != nil {
 		result.Err = err
-		result.ErrorStage = "response"
+		result.ErrorStage = "parse"
 		result.ErrorCode = "invalid_provider_response"
 		return result
 	}
