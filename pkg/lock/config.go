@@ -13,7 +13,17 @@ import (
 )
 
 func loadConfig(configPath string) (Config, []byte, error) {
-	data, err := os.ReadFile(configPath)
+	info, err := os.Lstat(configPath)
+	if err != nil {
+		return Config{}, nil, fmt.Errorf("inspect config: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return Config{}, nil, fmt.Errorf("config must be a regular file, not a symlink")
+	}
+	if err := validateTrustedInfo(info, configPath, false); err != nil {
+		return Config{}, nil, err
+	}
+	data, err := readRegularFile(configPath, info)
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("read config: %w", err)
 	}

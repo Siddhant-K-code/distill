@@ -41,6 +41,9 @@ func scanSourceRoot(root string) ([]sourceInput, error) {
 	if !rootInfo.IsDir() {
 		return nil, fmt.Errorf("source root %q is not a directory", root)
 	}
+	if err := validateTrustedInfo(rootInfo, root, true); err != nil {
+		return nil, err
+	}
 
 	var inputs []sourceInput
 	canonicalPaths := make(map[string]string)
@@ -70,10 +73,16 @@ func scanSourceRoot(root string) ([]sourceInput, error) {
 			return fmt.Errorf("source %q is a symbolic link; v0 rejects all symlinks", portable)
 		}
 		if info.IsDir() {
+			if err := validateTrustedInfo(info, filePath, true); err != nil {
+				return err
+			}
 			return nil
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("source %q is not a regular file", portable)
+		}
+		if err := validateTrustedInfo(info, filePath, false); err != nil {
+			return err
 		}
 		if previous, ok := canonicalPaths[canonical]; ok {
 			return fmt.Errorf("duplicate canonical source path %q from %q and %q", canonical, previous, portable)
@@ -180,7 +189,44 @@ func resolvedDirectory(dir string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf("%q is not a directory", dir)
 	}
+	if err := validateTrustedAncestors(resolved); err != nil {
+		return "", err
+	}
 	return filepath.Clean(resolved), nil
+}
+
+func validateTrustedAncestors(directory string) error {
+	current := filepath.Clean(directory)
+	for {
+		info, err := os.Lstat(current)
+		if err != nil {
+			return fmt.Errorf("inspect directory ancestor %q: %w", current, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return fmt.Errorf("directory ancestor %q is not a real directory", current)
+		}
+		if err := validateTrustedInfo(info, current, true); err != nil {
+			return err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return nil
+		}
+		current = parent
+	}
+}
+
+func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) error {
+	if !ownedByCurrentUserOrRoot(info) {
+		return fmt.Errorf("%q is not owned by the current user or root", filePath)
+	}
+	if info.Mode().Perm()&0o022 == 0 {
+		return nil
+	}
+	if directory && info.Mode()&os.ModeSticky != 0 {
+		return nil
+	}
+	return fmt.Errorf("%q is writable by group or other users", filePath)
 }
 
 func isWithin(parent, child string) (bool, error) {

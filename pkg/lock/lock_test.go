@@ -309,6 +309,30 @@ func TestUnsafeInputsFailClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("writable source directory", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.Chmod(root, 0o777); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := scanSourceRoot(root); err == nil {
+			t.Fatal("group/world-writable source directory was accepted")
+		}
+	})
+
+	t.Run("writable source file", func(t *testing.T) {
+		root := t.TempDir()
+		path := filepath.Join(root, "writable.txt")
+		if err := os.WriteFile(path, []byte("text"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, 0o666); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := scanSourceRoot(root); err == nil {
+			t.Fatal("group/world-writable source file was accepted")
+		}
+	})
+
 	t.Run("output inside source", func(t *testing.T) {
 		root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
 		lockPath := filepath.Join(root, LockFileName)
@@ -320,6 +344,24 @@ func TestUnsafeInputsFailClosed(t *testing.T) {
 			t.Fatal("output inside source root was accepted")
 		}
 	})
+}
+
+func TestBuildRejectsUntrustedOutputParent(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	lockPath := filepath.Join(root, LockFileName)
+	if _, err := Create(filepath.Join(root, "config.json"), lockPath); err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join(t.TempDir(), "untrusted")
+	if err := os.Mkdir(parent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(parent, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(lockPath, filepath.Join(parent, "output")); err == nil {
+		t.Fatal("build accepted a group/world-writable non-sticky output parent")
+	}
 }
 
 func TestVerifyRejectsTampering(t *testing.T) {

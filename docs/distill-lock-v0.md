@@ -96,6 +96,14 @@ than depending on platform-specific link resolution. An escaping symlink
 therefore also fails closed. Hard-linked regular files are treated as separate
 paths and exact-content deduplication handles them normally.
 
+The source, configuration, lockfile, output, and staging paths form a local
+trust boundary. Their ancestors and source directories must be owned by the
+current user or root and must not be group/world writable unless the directory
+has the sticky bit. Source/config/lock files must not be group/world writable.
+These checks prevent another OS principal from swapping a validated path before
+it is read or published. Processes running as the same OS user are trusted; v0
+is not a same-account sandbox.
+
 Supported extensions are `.bash`, `.c`, `.cc`, `.cfg`, `.conf`, `.cpp`, `.cs`,
 `.css`, `.csv`, `.go`, `.graphql`, `.h`, `.hpp`, `.html`, `.ini`, `.java`,
 `.js`, `.jsx`, `.json`, `.md`, `.php`, `.proto`, `.py`, `.rb`, `.rs`, `.scss`,
@@ -208,8 +216,9 @@ distill verify <directory> --expected-lock-sha256 <trusted-digest>
   sibling temporary directory, synchronized, and published with the native
   atomic no-replace rename (`renameat2(RENAME_NOREPLACE)` on Linux or
   `renamex_np(RENAME_EXCL)` on macOS) only after all hashes are complete.
-  Publication is the final commit point, so failure or interruption cannot
-  replace or leave a success-shaped destination.
+  The staging directory is verified against the intended lock digest before
+  publication. Publication is the final commit point, so failure or
+  interruption cannot replace or leave a success-shaped destination.
 - `verify` is standalone and offline. It reads only the output directory and
   validates the exact allowlisted file set, regular-file/no-symlink rules,
   schemas and identities, canonical JSON, every recorded hash and length,

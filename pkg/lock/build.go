@@ -14,14 +14,14 @@ func Build(lockPath, outputDirectory string) (Summary, error) {
 	if err := validateSupportedRuntime(); err != nil {
 		return Summary{}, err
 	}
-	lockBytes, lockFile, err := readLockFile(lockPath)
-	if err != nil {
-		return Summary{}, err
-	}
-
 	lockDirectory, err := resolvedDirectory(filepath.Dir(lockPath))
 	if err != nil {
 		return Summary{}, fmt.Errorf("resolve lockfile directory: %w", err)
+	}
+	lockPath = filepath.Join(lockDirectory, filepath.Base(lockPath))
+	lockBytes, lockFile, err := readLockFile(lockPath)
+	if err != nil {
+		return Summary{}, err
 	}
 	sourceRoot := filepath.Join(lockDirectory, filepath.FromSlash(lockFile.Configuration.SourceRoot))
 	sourceRoot, err = resolvedDirectory(sourceRoot)
@@ -84,6 +84,11 @@ func Build(lockPath, outputDirectory string) (Summary, error) {
 	if err != nil {
 		return Summary{}, fmt.Errorf("resolve output directory: %w", err)
 	}
+	outputParent, err := resolvedDirectory(filepath.Dir(outputAbsolute))
+	if err != nil {
+		return Summary{}, fmt.Errorf("resolve output parent: %w", err)
+	}
+	outputAbsolute = filepath.Join(outputParent, filepath.Base(outputAbsolute))
 	if err := validateBuildDestination(outputAbsolute, sourceRoot); err != nil {
 		return Summary{}, err
 	}
@@ -116,7 +121,7 @@ func Build(lockPath, outputDirectory string) (Summary, error) {
 	if err := syncDirectory(temporary); err != nil {
 		return Summary{}, fmt.Errorf("sync temporary output: %w", err)
 	}
-	if _, err := Verify(temporary); err != nil {
+	if _, err := VerifyWithExpectedLock(temporary, digestBytes(lockBytes)); err != nil {
 		return Summary{}, fmt.Errorf("verify temporary output: %w", err)
 	}
 	if err := syncDirectory(parent); err != nil {
@@ -145,6 +150,9 @@ func readLockFile(lockPath string) ([]byte, LockFile, error) {
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return nil, LockFile{}, fmt.Errorf("lockfile must be a regular file, not a symlink")
+	}
+	if err := validateTrustedInfo(info, lockPath, false); err != nil {
+		return nil, LockFile{}, err
 	}
 	data, err := readRegularFile(lockPath, info)
 	if err != nil {

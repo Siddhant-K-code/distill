@@ -15,14 +15,14 @@ func Create(configPath, outputPath string) (Summary, error) {
 	if err := validateSupportedRuntime(); err != nil {
 		return Summary{}, err
 	}
-	config, _, err := loadConfig(configPath)
-	if err != nil {
-		return Summary{}, err
-	}
-
 	configDirectory, err := resolvedDirectory(filepath.Dir(configPath))
 	if err != nil {
 		return Summary{}, fmt.Errorf("resolve config directory: %w", err)
+	}
+	configPath = filepath.Join(configDirectory, filepath.Base(configPath))
+	config, _, err := loadConfig(configPath)
+	if err != nil {
+		return Summary{}, err
 	}
 	sourceRoot := filepath.Join(configDirectory, filepath.FromSlash(config.SourceRoot))
 	sourceRoot, err = resolvedDirectory(sourceRoot)
@@ -38,6 +38,7 @@ func Create(configPath, outputPath string) (Summary, error) {
 	if err != nil {
 		return Summary{}, fmt.Errorf("resolve lockfile directory: %w", err)
 	}
+	outputAbsolute = filepath.Join(outputDirectory, filepath.Base(outputAbsolute))
 	inside, err := isWithin(outputDirectory, sourceRoot)
 	if err != nil {
 		return Summary{}, fmt.Errorf("compare lockfile and source paths: %w", err)

@@ -31,6 +31,11 @@ func VerifyWithExpectedLock(outputDirectory, expectedLockSHA256 string) (Summary
 	if directoryInfo.Mode()&os.ModeSymlink != 0 || !directoryInfo.IsDir() {
 		return Summary{}, fmt.Errorf("output must be a directory, not a symlink")
 	}
+	resolvedOutput, err := resolvedDirectory(outputDirectory)
+	if err != nil {
+		return Summary{}, fmt.Errorf("resolve output directory: %w", err)
+	}
+	outputDirectory = resolvedOutput
 
 	entries, err := os.ReadDir(outputDirectory)
 	if err != nil {
@@ -53,6 +58,9 @@ func VerifyWithExpectedLock(outputDirectory, expectedLockSHA256 string) (Summary
 		}
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return Summary{}, fmt.Errorf("output %q must be a regular file, not a symlink", entry.Name())
+		}
+		if err := validateTrustedInfo(info, path, false); err != nil {
+			return Summary{}, err
 		}
 		data, err := readRegularFile(path, info)
 		if err != nil {
