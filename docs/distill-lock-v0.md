@@ -192,6 +192,7 @@ reproduces its bytes exactly.
 distill lock <config> --output <lockfile>
 distill build <lockfile> --output <directory>
 distill verify <directory>
+distill verify <directory> --expected-lock-sha256 <trusted-digest>
 ```
 
 - `lock` resolves the configuration, validates and freezes the complete source
@@ -210,7 +211,11 @@ distill verify <directory>
   validates the exact allowlisted file set, regular-file/no-symlink rules,
   schemas and identities, canonical JSON, every recorded hash and length,
   configuration/lock/manifest/source/chunk/bundle relationships, exact bundle
-  regeneration, and `SHA256SUMS`. Unexpected files or any mismatch fail.
+  regeneration, and `SHA256SUMS`. Unexpected files or any mismatch fail. By
+  itself this proves consistency, not authenticity: when the directory may be
+  attacker-replaceable, `--expected-lock-sha256` must supply a lowercase
+  SHA-256 obtained through a trusted out-of-band channel. That trusted lock
+  anchors selected chunk identities and therefore the regenerated bundle.
 
 All failures return nonzero with a specific error. There are no warnings that
 substitute for required validation, silent skips, automatic relocking,

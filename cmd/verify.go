@@ -5,12 +5,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var verifyExpectedLockSHA256 string
+
 var verifyCmd = &cobra.Command{
 	Use:   "verify <directory>",
 	Short: "Verify a Distill Lock artifact offline",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		summary, err := distilllock.Verify(args[0])
+		summary, err := distilllock.VerifyWithExpectedLock(args[0], verifyExpectedLockSHA256)
 		if err != nil {
 			return err
 		}
@@ -19,5 +21,11 @@ var verifyCmd = &cobra.Command{
 }
 
 func init() {
+	verifyCmd.Flags().StringVar(
+		&verifyExpectedLockSHA256,
+		"expected-lock-sha256",
+		"",
+		"trusted out-of-band context.lock.json SHA-256",
+	)
 	rootCmd.AddCommand(verifyCmd)
 }

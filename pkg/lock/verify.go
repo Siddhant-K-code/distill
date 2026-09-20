@@ -11,6 +11,16 @@ import (
 
 // Verify checks a built directory without reading source files or using a network.
 func Verify(outputDirectory string) (Summary, error) {
+	return VerifyWithExpectedLock(outputDirectory, "")
+}
+
+// VerifyWithExpectedLock checks a built directory and, when non-empty, anchors
+// its contents to an out-of-band trusted lockfile SHA-256.
+func VerifyWithExpectedLock(outputDirectory, expectedLockSHA256 string) (Summary, error) {
+	if expectedLockSHA256 != "" && !validDigest(expectedLockSHA256) {
+		return Summary{}, fmt.Errorf("expected lock SHA-256 is not a lowercase SHA-256 digest")
+	}
+
 	directoryInfo, err := os.Lstat(outputDirectory)
 	if err != nil {
 		return Summary{}, fmt.Errorf("inspect output directory: %w", err)
@@ -47,6 +57,10 @@ func Verify(outputDirectory string) (Summary, error) {
 		}
 		files[entry.Name()] = data
 	}
+	actualLockSHA256 := digestBytes(files[LockFileName])
+	if expectedLockSHA256 != "" && actualLockSHA256 != expectedLockSHA256 {
+		return Summary{}, fmt.Errorf("trusted lock digest mismatch: got %s, want %s", actualLockSHA256, expectedLockSHA256)
+	}
 
 	var lockFile LockFile
 	if err := decodeCanonicalJSON(files[LockFileName], &lockFile); err != nil {
@@ -82,7 +96,7 @@ func Verify(outputDirectory string) (Summary, error) {
 		SelectedCount:  manifest.Stats.SelectedCount,
 		SelectedTokens: manifest.Stats.SelectedTokens,
 		BundleSHA256:   manifest.Bundle.SHA256,
-		LockSHA256:     manifest.LockSHA256,
+		LockSHA256:     actualLockSHA256,
 		ManifestSHA256: digestBytes(files[ManifestFileName]),
 	}, nil
 }

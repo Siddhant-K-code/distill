@@ -130,6 +130,7 @@ without a model, provider, or network call:
 distill lock path/to/config.json --output path/to/context.lock.json
 distill build path/to/context.lock.json --output path/to/context-output
 distill verify path/to/context-output
+distill verify path/to/context-output --expected-lock-sha256 <trusted-digest>
 
 # Synthetic fixture: build, offline verify, repeatability, and mutation proof.
 make distill-lock-demo
@@ -142,6 +143,9 @@ inclusion/exclusion reason. `build` refuses any missing, changed, newly
 unexpected, unsafe, or unsupported input; it never relocks automatically.
 `verify` checks the complete allowlisted file set, canonical JSON, schemas,
 lengths, hashes, relationships, and exact bundle regeneration offline.
+Without the optional out-of-band lock digest it proves internal consistency,
+not authenticity; use `--expected-lock-sha256` when the artifact directory may
+be attacker-replaceable.
 
 The fresh output directory contains:
 

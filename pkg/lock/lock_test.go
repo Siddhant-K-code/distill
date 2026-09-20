@@ -395,6 +395,40 @@ func TestFailedBuildPreservesPriorVerifiedOutput(t *testing.T) {
 	}
 }
 
+func TestTrustedLockDigestRejectsConsistentReplacement(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	lockPath := filepath.Join(root, LockFileName)
+	original, err := Create(filepath.Join(root, "config.json"), lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalOutput := filepath.Join(root, "original-output")
+	if _, err := Build(lockPath, originalOutput); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VerifyWithExpectedLock(originalOutput, original.LockSHA256); err != nil {
+		t.Fatalf("trusted original failed verification: %v", err)
+	}
+
+	codePath := filepath.Join(root, "sources", "code", "example.go")
+	code := bytes.Replace(mustRead(t, codePath), []byte("42"), []byte("43"), 1)
+	mustWrite(t, codePath, code)
+	replacementLock := filepath.Join(root, "replacement.lock.json")
+	if _, err := Create(filepath.Join(root, "config.json"), replacementLock); err != nil {
+		t.Fatal(err)
+	}
+	replacementOutput := filepath.Join(root, "replacement-output")
+	if _, err := Build(replacementLock, replacementOutput); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Verify(replacementOutput); err != nil {
+		t.Fatalf("internally consistent replacement should pass unanchored verification: %v", err)
+	}
+	if _, err := VerifyWithExpectedLock(replacementOutput, original.LockSHA256); err == nil {
+		t.Fatal("trusted digest accepted a consistently regenerated replacement")
+	}
+}
+
 func TestLockPackageHasNoNetworkOrProviderImports(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {
