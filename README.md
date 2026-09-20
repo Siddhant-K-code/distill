@@ -143,6 +143,9 @@ inclusion/exclusion reason. `build` refuses any missing, changed, newly
 unexpected, unsafe, or unsupported input; it never relocks automatically.
 `verify` checks the complete allowlisted file set, canonical JSON, schemas,
 lengths, hashes, relationships, and exact bundle regeneration offline.
+Lock output cannot overwrite its configuration. A post-publication directory
+sync failure is reported explicitly as `published but durability unconfirmed`;
+verify the named output instead of retrying blindly.
 Without the optional out-of-band lock digest it proves internal consistency,
 not authenticity; use `--expected-lock-sha256` when the artifact directory may
 be attacker-replaceable.

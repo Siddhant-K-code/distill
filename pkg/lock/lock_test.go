@@ -2,6 +2,7 @@ package lock
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 	"math/rand"
 	"os"
@@ -261,6 +262,12 @@ func TestUnsafeInputsFailClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid UTF-8 path", func(t *testing.T) {
+		if err := validatePortablePath(string([]byte{'a', 0xff, 'b'})); err == nil {
+			t.Fatal("invalid UTF-8 path was accepted")
+		}
+	})
+
 	t.Run("duplicate normalized source path", func(t *testing.T) {
 		config := testConfig([]string{"same.txt"}, nil)
 		inputs := []sourceInput{testInput(t, "same.txt", "a"), testInput(t, "same.txt", "b")}
@@ -378,6 +385,18 @@ func TestUnsafeInputsFailClosed(t *testing.T) {
 	})
 }
 
+func TestLockCannotOverwriteConfiguration(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	configPath := filepath.Join(root, "config.json")
+	before := append([]byte(nil), mustRead(t, configPath)...)
+	if _, err := Create(configPath, configPath); err == nil {
+		t.Fatal("lock creation overwrote its configuration")
+	}
+	if after := mustRead(t, configPath); !bytes.Equal(before, after) {
+		t.Fatal("failed lock creation changed its configuration")
+	}
+}
+
 func TestBuildRejectsUntrustedOutputParent(t *testing.T) {
 	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
 	lockPath := filepath.Join(root, LockFileName)
@@ -479,6 +498,34 @@ func TestFailedBuildPreservesPriorVerifiedOutput(t *testing.T) {
 	after := readOutputFiles(t, output)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("failed build altered prior output")
+	}
+}
+
+func TestPostPublishSyncFailureIsClassified(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	lockPath := filepath.Join(root, LockFileName)
+	if _, err := Create(filepath.Join(root, "config.json"), lockPath); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "output")
+	syncCalls := 0
+	syncFailure := errors.New("injected parent sync failure")
+	_, err := buildWithSync(lockPath, output, func(directory string) error {
+		syncCalls++
+		if syncCalls == 3 {
+			return syncFailure
+		}
+		return syncDirectory(directory)
+	})
+	var publishedError *PublishedDurabilityError
+	if !errors.As(err, &publishedError) {
+		t.Fatalf("got %v, want PublishedDurabilityError", err)
+	}
+	if publishedError.Path != output || !errors.Is(publishedError, syncFailure) {
+		t.Fatalf("unexpected publication error: %+v", publishedError)
+	}
+	if _, err := Verify(output); err != nil {
+		t.Fatalf("committed output did not verify: %v", err)
 	}
 }
 

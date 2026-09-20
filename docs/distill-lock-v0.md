@@ -209,8 +209,8 @@ distill verify <directory> --expected-lock-sha256 <trusted-digest>
 
 - `lock` resolves the configuration, validates and freezes the complete source
   inventory, canonicalizes and chunks candidates, performs exact deduplication
-  and budget selection, then atomically writes a new lockfile. It performs no
-  network or model call.
+  and budget selection, then atomically writes a new lockfile. The output may
+  not overwrite the configuration. It performs no network or model call.
 - `build` strictly re-reads every source under the recorded root and refuses
   missing, changed, unsupported, duplicate, unsafe, or newly unexpected input;
   configuration, tool, runtime, and algorithm identities must still match. It
@@ -221,7 +221,11 @@ distill verify <directory> --expected-lock-sha256 <trusted-digest>
   `renamex_np(RENAME_EXCL)` on macOS) only after all hashes are complete.
   The staging directory is verified against the intended lock digest before
   publication. Publication is the final commit point, so failure or
-  interruption cannot replace or leave a success-shaped destination.
+  interruption before that point cannot replace or leave a success-shaped
+  destination. The parent directory is synchronized after publication. A rare
+  post-publication sync failure returns a distinct `published but durability
+  unconfirmed` error naming the committed path; callers must verify that path
+  rather than retrying blindly.
 - `verify` is standalone and offline. It reads only the output directory and
   validates the exact allowlisted file set, regular-file/no-symlink rules,
   schemas and identities, canonical JSON, every recorded hash and length,

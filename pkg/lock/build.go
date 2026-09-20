@@ -11,6 +11,10 @@ import (
 
 // Build validates all locked inputs and atomically publishes a fresh output directory.
 func Build(lockPath, outputDirectory string) (Summary, error) {
+	return buildWithSync(lockPath, outputDirectory, syncDirectory)
+}
+
+func buildWithSync(lockPath, outputDirectory string, syncDirectoryFn func(string) error) (Summary, error) {
 	if err := validateSupportedRuntime(); err != nil {
 		return Summary{}, err
 	}
@@ -118,19 +122,22 @@ func Build(lockPath, outputDirectory string) (Summary, error) {
 			return Summary{}, fmt.Errorf("write output %q: %w", name, err)
 		}
 	}
-	if err := syncDirectory(temporary); err != nil {
+	if err := syncDirectoryFn(temporary); err != nil {
 		return Summary{}, fmt.Errorf("sync temporary output: %w", err)
 	}
 	if _, err := VerifyWithExpectedLock(temporary, digestBytes(lockBytes)); err != nil {
 		return Summary{}, fmt.Errorf("verify temporary output: %w", err)
 	}
-	if err := syncDirectory(parent); err != nil {
+	if err := syncDirectoryFn(parent); err != nil {
 		return Summary{}, fmt.Errorf("sync output parent before publication: %w", err)
 	}
 	if err := renameNoReplace(temporary, outputAbsolute); err != nil {
 		return Summary{}, fmt.Errorf("publish output directory: %w", err)
 	}
 	published = true
+	if err := syncDirectoryFn(parent); err != nil {
+		return Summary{}, &PublishedDurabilityError{Path: outputAbsolute, Err: err}
+	}
 
 	return Summary{
 		SourceCount:    lockFile.Stats.SourceCount,

@@ -1,6 +1,8 @@
 // Package lock builds and verifies deterministic, offline context artifacts.
 package lock
 
+import "fmt"
+
 const (
 	ConfigSchemaVersion   = "distill-lock/config/v0"
 	LockSchemaVersion     = "distill-lock/v0"
@@ -131,6 +133,21 @@ type Summary struct {
 	BundleSHA256   string
 	LockSHA256     string
 	ManifestSHA256 string
+}
+
+// PublishedDurabilityError means the atomic publication committed, but syncing
+// its parent directory failed. Callers must inspect or verify Path, not retry.
+type PublishedDurabilityError struct {
+	Path string
+	Err  error
+}
+
+func (err *PublishedDurabilityError) Error() string {
+	return fmt.Sprintf("output published at %q, but parent-directory durability is unconfirmed: %v; verify it before any retry", err.Path, err.Err)
+}
+
+func (err *PublishedDurabilityError) Unwrap() error {
+	return err.Err
 }
 
 func currentIdentities() IdentitySet {

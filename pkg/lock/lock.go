@@ -39,6 +39,9 @@ func Create(configPath, outputPath string) (Summary, error) {
 		return Summary{}, fmt.Errorf("resolve lockfile directory: %w", err)
 	}
 	outputAbsolute = filepath.Join(outputDirectory, filepath.Base(outputAbsolute))
+	if outputAbsolute == configPath {
+		return Summary{}, fmt.Errorf("lockfile output must not overwrite its configuration")
+	}
 	inside, err := isWithin(outputDirectory, sourceRoot)
 	if err != nil {
 		return Summary{}, fmt.Errorf("compare lockfile and source paths: %w", err)
@@ -63,6 +66,9 @@ func Create(configPath, outputPath string) (Summary, error) {
 	lockFile, _, err := buildLock(config, inputs)
 	if err != nil {
 		return Summary{}, err
+	}
+	if err := validateLock(lockFile); err != nil {
+		return Summary{}, fmt.Errorf("validate generated lockfile: %w", err)
 	}
 	lockBytes, err := canonicalJSON(lockFile)
 	if err != nil {

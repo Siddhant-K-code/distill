@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -111,6 +112,9 @@ func canonicalPortablePath(value string) (string, error) {
 func validatePortablePath(value string) error {
 	if value == "" {
 		return fmt.Errorf("path is empty")
+	}
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("path is not valid UTF-8")
 	}
 	if filepath.IsAbs(value) || path.IsAbs(value) {
 		return fmt.Errorf("absolute paths are not allowed")
