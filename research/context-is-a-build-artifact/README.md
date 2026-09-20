@@ -48,7 +48,7 @@ and `make distill-lock-demo`. Distill Lock stabilizes context bytes and
 provenance. It does not make a model or provider deterministic.
 
 The frozen `pilot-schema.json` SHA-256 is
-`63f96c8eb1cacee9a072d43ae508f8628acc6ccd86bcf5926ca6954975c06238`.
+`1a63ab0a3f3e377e09b54c8993bc0d2bc8fb3fe3512fc401c10bc0f188ee2e41`.
 
 ## Independent review
 

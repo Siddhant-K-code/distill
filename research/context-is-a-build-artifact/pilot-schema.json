@@ -434,14 +434,14 @@
                       ]
                     }
                   }
-                },
-                "policy": {
-                  "properties": {
-                    "acceptance_score": {
-                      "type": "number"
-                    }
-                  }
                 }
+              }
+            }
+          },
+          "policy": {
+            "properties": {
+              "acceptance_score": {
+                "type": "number"
               }
             }
           }

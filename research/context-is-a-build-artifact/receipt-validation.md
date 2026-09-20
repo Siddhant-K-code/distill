@@ -151,7 +151,7 @@ It never repairs, coerces, reorders, retries, or silently drops data.
 
 1. The exact schema bytes hash to `/receipt_schema_digest` and to the published
    constant
-   `63f96c8eb1cacee9a072d43ae508f8628acc6ccd86bcf5926ca6954975c06238`.
+   `1a63ab0a3f3e377e09b54c8993bc0d2bc8fb3fe3512fc401c10bc0f188ee2e41`.
 2. The JSON Schema engine and version equal `/validator` and run with Draft
    2020-12 format assertion enabled. URI and RFC 3339 date-time negative
    fixtures must fail.
