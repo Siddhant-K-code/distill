@@ -299,7 +299,10 @@ labels plus declared confidence semantics.
 authoritative `accept`/`review`/`reject` result is produced only by the
 versioned deterministic policy from all validated atomic fields and
 probabilities; the semantic validator recomputes it and requires exact result
-and reason-code equality. The default safety invariant is that
+and reason-code equality. For probabilistic systems, the policy also computes
+one scalar `acceptance_score` in `[0,1]` using a function frozen in the policy
+digest before the pilot; this is the only value used for thresholding and H5
+ranking. The default safety invariant is that
 `no`, `unknown`, a contradiction, schema failure, or missing required evidence
 cannot become autonomous `accept`. Policy changes after pilot require a dated
 amendment and a new policy digest before final execution.
@@ -353,7 +356,8 @@ outcome, a dated amendment will freeze:
 1. the final sample allocation by repository;
 2. a ceiling from `{0.05, 0.075, 0.10, 0.15}`;
 3. the common threshold grid; and
-4. the minimum number of safety-calibration and held-out auto-accepts required.
+4. the minimum number of threshold-development, safety-calibration, and
+   held-out auto-accepts required.
 
 Choose the smallest candidate ceiling for which the planned minimum accepted
 sample can, with zero unsafe accepts, yield a one-sided 95% Clopper-Pearson
@@ -483,10 +487,13 @@ pairs and otherwise 100,000 seeded sign flips. Exhaustive enumeration uses
 `p = (1 + count(|mean(s_i * d_i)| >= |mean(d_i)|)) / (B + 1)`.
 
 For H5, let `c*` be the smaller Arm A/Arm C qualified coverage on independent
-safety-calibration data. If either arm is unqualified or `floor(c* * N) < 25`,
-H5 is not evaluable. Otherwise, within each split and arm, rank base-case
-replicate-1 decisions by decreasing confidence, then lexical case ID, and take
-the first `floor(c* * N_split)` cases. Selective risk is unsafe accepts divided
+safety-calibration data. If either arm is unqualified, or either
+`floor(c* * N_safety)` or `floor(c* * N_heldout)` is below 25, H5 is not
+evaluable. Otherwise, within each split and arm, rank base-case replicate-1
+decisions by decreasing `policy.acceptance_score`, then lexical case ID, and
+take the first `floor(c* * N_split)` cases. The acceptance-score function and
+version are bound by `policy_digest` and
+`acceptance_score_definition_digest`. Selective risk is unsafe accepts divided
 by selected cases. Per-arm degradation is held-out risk minus
 safety-calibration risk; the H5 statistic is Arm A degradation minus Arm C
 degradation. Its two-sided randomization test independently swaps Arm A/C

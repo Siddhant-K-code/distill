@@ -92,6 +92,7 @@ members in this logical projection:
 /policy/policy_version
 /policy/policy_digest
 /policy/threshold_set_digest
+/policy/acceptance_score_definition_digest
 /validator
 /evidence_hashes
 ```
@@ -104,6 +105,7 @@ Condition identity intentionally excludes:
 - `/custody/access_log_digest` and `/custody/unsealed_at`;
 - `/decision`;
 - `/policy/result` and `/policy/reason_codes`;
+- `/policy/acceptance_score`;
 - `/run_validity`;
 - `/receipt_artifact_hashes`;
 - `/measurement`; and
@@ -148,7 +150,7 @@ It never repairs, coerces, reorders, retries, or silently drops data.
 
 1. The exact schema bytes hash to `/receipt_schema_digest` and to the published
    constant
-   `f8c1ae74f2ee1523f57858bc8ff1f44ddfef5b9d79179fc73f9972a7b0c82f11`.
+   `adfe846637344f202e5b73f3c082c6d485663120cefc40ca4d9c65a6a2a4c9a3`.
 2. The JSON Schema engine and version equal `/validator` and run with Draft
    2020-12 format assertion enabled. URI and RFC 3339 date-time negative
    fixtures must fail.
@@ -228,12 +230,15 @@ unless its separately preregistered version emits genuine probabilities.
    never authorizes action. For every valid decision, execute the exact pinned
    deterministic policy over
    the validated atomic outputs and frozen threshold set. The recomputed result
-   and complete ordered reason-code set must exactly equal `/policy/result` and
-   `/policy/reason_codes`; an unsafe or unknown required field cannot be paired
-   with `accept`.
+   complete ordered reason-code set, and scalar acceptance score must exactly
+   equal `/policy/result`, `/policy/reason_codes`, and
+   `/policy/acceptance_score`; an unsafe or unknown required field cannot be
+   paired with `accept`. The score function/version is bound by
+   `policy_digest` and `acceptance_score_definition_digest`.
 2. A failed or not-attempted decision has no outputs, has a sanitized error
-   artifact, and produces policy result `review` with reason
-   `decision_failed`.
+   artifact, and produces policy result `review`. Failed attempts use reason
+   `decision_failed`; calls stopped before execution use `not_attempted` and
+   error stage `scheduler`.
 3. Every error's `sanitized_error_artifact_id` resolves to exactly one
    `receipt_artifact_hashes` entry whose digest equals
    `error_detail_digest`.
@@ -251,10 +256,11 @@ unless its separately preregistered version emits genuine probabilities.
 6. `excluded_provider_pilot` authorization is valid only for pilot data.
    `final` authorization is valid only after a successful excluded provider
    pilot and for final data.
-7. An attempted measurement has `attempt_count = 1`; an explicit
-   `not_attempted` terminal record has `attempt_count = 0`. Every measurement
-   has `retry_count = 0`. Documented rate-limit waits may delay an attempt but
-   cannot trigger resubmission.
+7. An attempted measurement has `attempt_count = 1`, non-null start/finish
+   timestamps and latency; an explicit `not_attempted` terminal record has
+   `attempt_count = 0`, null start/finish/latency/usage/cost/request ID, and no
+   wait events. Every measurement has `retry_count = 0`. Documented rate-limit
+   waits may delay an attempt but cannot trigger resubmission.
 
 ### 4.5 Custody, artifacts, and time
 
@@ -285,7 +291,8 @@ unless its separately preregistered version emits genuine probabilities.
 ## 5. Collection and schedule validation
 
 `run_schedule_digest` is the raw SHA-256 of the prepublished canonical schedule
-artifact. Each schedule entry contains exactly the scheduled call ID, case ID,
+artifact. Each schedule entry contains exactly the scheduled call ID,
+zero-based `schedule_index`, case ID,
 source-set and perturbation digests, context arm/compiler digest, question and
 decision-system digests, policy and threshold-set digests, repository role,
 recorded execution order, and replicate index.
@@ -296,7 +303,8 @@ schedule entries and receipts:
 1. exactly one terminal record exists for every scheduled call ID;
 2. stopped calls have an explicit `not_attempted` record rather than no record;
 3. no duplicate or extra scheduled call ID exists;
-4. every scheduled field equals the corresponding receipt field;
+4. every scheduled field, including `schedule_index`, equals the corresponding
+   receipt field;
 5. runner and analysis records pair one-to-one by scheduled call ID and
    `identity_digest`; and
 6. the collection manifest records and verifies every receipt and artifact

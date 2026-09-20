@@ -256,10 +256,7 @@
           "decision": {
             "properties": {
               "status": {
-                "enum": [
-                  "failed",
-                  "not_attempted"
-                ]
+                "const": "failed"
               }
             }
           }
@@ -300,6 +297,39 @@
             "properties": {
               "attempt_count": {
                 "const": 0
+              },
+              "attempt_started_at": {
+                "type": "null"
+              },
+              "attempt_finished_at": {
+                "type": "null"
+              },
+              "latency_ms": {
+                "type": "null"
+              },
+              "rate_limit_waits": {
+                "maxItems": 0
+              },
+              "usage": {
+                "type": "null"
+              },
+              "provider_reported_cost": {
+                "type": "null"
+              },
+              "provider_request_id": {
+                "type": "null"
+              }
+            }
+          },
+          "policy": {
+            "properties": {
+              "result": {
+                "const": "review"
+              },
+              "reason_codes": {
+                "contains": {
+                  "const": "not_attempted"
+                }
               }
             }
           }
@@ -311,6 +341,18 @@
             "properties": {
               "attempt_count": {
                 "const": 1
+              },
+              "attempt_started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "attempt_finished_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "latency_ms": {
+                "type": "number",
+                "minimum": 0
               }
             }
           }
@@ -361,6 +403,13 @@
             "properties": {
               "status": {
                 "const": "valid"
+              }
+            }
+          },
+          "policy": {
+            "properties": {
+              "acceptance_score": {
+                "type": "number"
               }
             }
           }
@@ -1261,6 +1310,8 @@
         "policy_version",
         "policy_digest",
         "threshold_set_digest",
+        "acceptance_score",
+        "acceptance_score_definition_digest",
         "result",
         "reason_codes"
       ],
@@ -1275,6 +1326,21 @@
           "$ref": "#/$defs/sha256"
         },
         "threshold_set_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "acceptance_score": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acceptance_score_definition_digest": {
           "$ref": "#/$defs/sha256"
         },
         "result": {
@@ -1347,6 +1413,7 @@
       "additionalProperties": false,
       "required": [
         "scheduled_call_id",
+        "schedule_index",
         "replicate_index",
         "attempt_count",
         "retry_count",
@@ -1361,6 +1428,10 @@
       "properties": {
         "scheduled_call_id": {
           "$ref": "#/$defs/nonEmptyString"
+        },
+        "schedule_index": {
+          "type": "integer",
+          "minimum": 0
         },
         "replicate_index": {
           "type": "integer",
@@ -1383,16 +1454,37 @@
           }
         },
         "attempt_started_at": {
-          "type": "string",
-          "format": "date-time"
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "attempt_finished_at": {
-          "type": "string",
-          "format": "date-time"
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "latency_ms": {
-          "type": "number",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "usage": {
           "oneOf": [
@@ -1512,6 +1604,7 @@
         "stage": {
           "enum": [
             "preflight",
+            "scheduler",
             "compile",
             "transport",
             "provider",
