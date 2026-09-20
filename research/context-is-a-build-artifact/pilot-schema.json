@@ -10,6 +10,7 @@
     "receipt_schema_digest",
     "study_phase",
     "record_stage",
+    "run_schedule_digest",
     "case",
     "source_set",
     "perturbation",
@@ -26,6 +27,7 @@
     "validator",
     "measurement",
     "evidence_hashes",
+    "receipt_artifact_hashes",
     "identity_digest",
     "outcome_digest",
     "receipt_digest"
@@ -49,6 +51,9 @@
         "runner",
         "analysis"
       ]
+    },
+    "run_schedule_digest": {
+      "$ref": "#/$defs/sha256"
     },
     "case": {
       "$ref": "#/$defs/case"
@@ -112,6 +117,14 @@
     "evidence_hashes": {
       "type": "array",
       "minItems": 1,
+      "description": "Pre-execution evidence artifacts only. This collection is bound into identity_digest.",
+      "items": {
+        "$ref": "#/$defs/evidenceHash"
+      }
+    },
+    "receipt_artifact_hashes": {
+      "type": "array",
+      "description": "Outcome-dependent sanitized response, error, usage, and audit artifacts. This collection is excluded from identity_digest and included in receipt_digest.",
       "items": {
         "$ref": "#/$defs/evidenceHash"
       }
@@ -200,6 +213,9 @@
             "properties": {
               "unsealed_at": {
                 "type": "null"
+              },
+              "reveal_nonce": {
+                "type": "null"
               }
             }
           }
@@ -224,6 +240,10 @@
               "unsealed_at": {
                 "type": "string",
                 "format": "date-time"
+              },
+              "reveal_nonce": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
               }
             }
           }
@@ -236,7 +256,10 @@
           "decision": {
             "properties": {
               "status": {
-                "const": "failed"
+                "enum": [
+                  "failed",
+                  "not_attempted"
+                ]
               }
             }
           }
@@ -253,6 +276,41 @@
                 "contains": {
                   "const": "decision_failed"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "status": {
+                "const": "not_attempted"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "measurement": {
+            "properties": {
+              "attempt_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "measurement": {
+            "properties": {
+              "attempt_count": {
+                "const": 1
               }
             }
           }
@@ -542,6 +600,7 @@
         "expected_equivalence",
         "base_source_set_digest",
         "result_source_set_digest",
+        "transformation_receipt_artifact_id",
         "transformation_receipt_digest"
       ],
       "properties": {
@@ -581,6 +640,9 @@
         },
         "result_source_set_digest": {
           "$ref": "#/$defs/sha256"
+        },
+        "transformation_receipt_artifact_id": {
+          "$ref": "#/$defs/nonEmptyString"
         },
         "transformation_receipt_digest": {
           "$ref": "#/$defs/sha256"
@@ -710,7 +772,8 @@
         "labels_available_to_runner",
         "commitment_published_digest",
         "access_log_digest",
-        "unsealed_at"
+        "unsealed_at",
+        "reveal_nonce"
       ],
       "properties": {
         "labels_available_to_runner": {
@@ -732,6 +795,18 @@
               "type": "null"
             }
           ]
+        },
+        "reveal_nonce": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Custodian-generated 256-bit random nonce, withheld in runner records and revealed only in analysis records."
         }
       }
     },
@@ -922,14 +997,14 @@
           "type": "string",
           "minLength": 1,
           "not": {
-            "pattern": "(^|[-_/:@.])[Ll][Aa][Tt][Ee][Ss][Tt]$"
+            "pattern": "(^|[-_/:@.])([Ll][Aa][Tt][Ee][Ss][Tt]|[Ss][Tt][Aa][Bb][Ll][Ee]|[Pp][Rr][Ee][Vv][Ii][Ee][Ww]|[Nn][Ee][Ww][Ee][Ss][Tt])($|[-_/:@.])"
           }
         },
         "model_version": {
           "type": "string",
           "minLength": 1,
           "not": {
-            "pattern": "(^|[-_/:@.])[Ll][Aa][Tt][Ee][Ss][Tt]$"
+            "pattern": "(^|[-_/:@.])([Ll][Aa][Tt][Ee][Ss][Tt]|[Ss][Tt][Aa][Bb][Ll][Ee]|[Pp][Rr][Ee][Vv][Ii][Ee][Ww]|[Nn][Ee][Ww][Ee][Ss][Tt])($|[-_/:@.])"
           }
         },
         "model_snapshot_digest": {
@@ -1042,7 +1117,8 @@
         "status": {
           "enum": [
             "valid",
-            "failed"
+            "failed",
+            "not_attempted"
           ]
         },
         "outputs": {
@@ -1099,7 +1175,10 @@
           "if": {
             "properties": {
               "status": {
-                "const": "failed"
+                "enum": [
+                  "failed",
+                  "not_attempted"
+                ]
               }
             }
           },
@@ -1289,7 +1368,10 @@
           "maximum": 3
         },
         "attempt_count": {
-          "const": 1
+          "enum": [
+            0,
+            1
+          ]
         },
         "retry_count": {
           "const": 0
@@ -1447,7 +1529,7 @@
         },
         "sanitized_error_artifact_id": {
           "$ref": "#/$defs/nonEmptyString",
-          "description": "Must identify an evidence_hashes entry with the same SHA-256 as error_detail_digest; enforced by the pinned semantic validator."
+          "description": "Must identify a receipt_artifact_hashes entry with the same SHA-256 as error_detail_digest; enforced by the pinned semantic validator."
         },
         "error_detail_digest": {
           "$ref": "#/$defs/sha256"

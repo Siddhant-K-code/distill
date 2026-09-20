@@ -136,11 +136,13 @@ resolution is possible, the field is `indeterminate` and handled under Section
 the final label.
 
 Held-out labels are encrypted or kept by an independent custodian. Runners
-receive label-free case packages and only a commitment to the adjudication
-artifact. Access is logged. Labels are unsealed only after the compiler,
-question schema, decision system, policy, threshold, run schedule, analysis
-commit, and receipt-manifest commitment have been published. Any earlier
-access invalidates confirmatory analysis.
+receive label-free case packages and only a hiding commitment to the
+adjudication artifact, constructed with the custodian's unreused random 256-bit
+nonce under [the receipt-validation contract](receipt-validation.md). Access is
+logged. The nonce and labels are unsealed only after the compiler, question
+schema, decision system, policy, threshold, run schedule, analysis commit, and
+receipt-manifest commitment have been published. Any earlier access invalidates
+confirmatory analysis.
 
 ## 3. Perturbations
 
@@ -291,10 +293,13 @@ labels plus declared confidence semantics.
 | `cleanup_complete` | Are all registered cleanup obligations complete? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when no cleanup obligation exists |
 | `external_effects_resolved` | Are all registered external effects resolved or explicitly accepted? | `yes`, `no`, `unknown`, `not_applicable` | `no`, `unknown`; `not_applicable` only when no external effect exists |
 | `patch_risk` | What is the evidence-supported patch-risk class? | `low`, `medium`, `high`, `unknown` | `high`, `unknown` |
-| `disposition` | What action should the policy take now? | `accept`, `review`, `reject` | `review`, `reject` |
+| `recommended_disposition` | What disposition does the evidence support? | `accept`, `review`, `reject` | `review`, `reject` |
 
-`disposition` is produced by the versioned decision policy from the atomic
-fields, not by free-form model prose. The default safety invariant is that
+`recommended_disposition` is a measured atomic answer, not an action. The
+authoritative `accept`/`review`/`reject` result is produced only by the
+versioned deterministic policy from all validated atomic fields and
+probabilities; the semantic validator recomputes it and requires exact result
+and reason-code equality. The default safety invariant is that
 `no`, `unknown`, a contradiction, schema failure, or missing required evidence
 cannot become autonomous `accept`. Policy changes after pilot require a dated
 amendment and a new policy digest before final execution.
@@ -318,7 +323,8 @@ concatenation for the same decision system.
   (H4a) and field-level log loss (H4b) than raw concatenation.
   **Null:** the corresponding proper score is no lower.
 - **H5 (directional):** Distill Lock reduces held-out degradation in selective
-  risk at matched coverage.
+  risk at the safety-calibration-frozen matched coverage defined in Section
+  11.2.
   **Null:** degradation is not reduced.
 
 All other arm, field, cost, latency, repeatability, and meaning-changing
@@ -353,16 +359,23 @@ Choose the smallest candidate ceiling for which the planned minimum accepted
 sample can, with zero unsafe accepts, yield a one-sided 95% Clopper-Pearson
 upper bound at or below that ceiling. The minimum accepted sample must be at
 least 25 in both safety-calibration and held-out data and cannot be reduced
-after final outcomes exist. This rule avoids an unsupported 1% target.
+after final outcomes exist. With zero unsafe accepts, the minimum accepted
+counts needed for the candidate ceilings are 59 for `0.05`, 39 for `0.075`, 29
+for `0.10`, and 25 for `0.15`; the sample-allocation amendment must choose a
+feasible pair. This rule avoids an unsupported 1% target.
 
 For each arm, evaluate the frozen threshold grid only on
-threshold-development repositories and select greatest coverage, breaking ties
-toward the higher confidence threshold and then lexical threshold encoding.
-Lock that single candidate threshold. Evaluate it once on the independent
-safety-calibration repository or repositories. It qualifies only if the
-minimum accepted count is met and the one-sided exact 95% Clopper-Pearson upper
-bound on unsafe accepts is at or below the frozen ceiling. There is no fallback
-threshold search on safety-calibration data.
+threshold-development repositories. Retain thresholds with at least the frozen
+development accepted-count minimum and a one-sided exact 95%
+Clopper-Pearson unsafe upper bound at or below the frozen ceiling; select the
+one with greatest coverage, breaking ties toward the higher confidence
+threshold and then lexical threshold encoding. If none qualifies, the arm has
+no candidate and qualified coverage is zero. Otherwise lock that single
+candidate threshold and evaluate it once on the independent safety-calibration
+repository or repositories. It qualifies only if the safety-calibration
+minimum accepted count is met and the one-sided exact 95%
+Clopper-Pearson unsafe upper bound is at or below the frozen ceiling. There is
+no fallback threshold search on safety-calibration data.
 
 Apply a qualified threshold unchanged to the held-out repository. For the H1
 confirmatory comparison, an arm's held-out qualified coverage is its raw
@@ -389,9 +402,10 @@ reported descriptively, not substituted into the confirmatory analysis.
    and right-open except the last bin; report bin counts, mean confidence, and
    accuracy. Adaptive-bin and classwise ECE are sensitivity analyses.
 6. Mean negative log likelihood (log loss) for every valid full distribution.
-   A zero probability on the observed label contributes positive infinity and
-   is never dropped. A finite version clipped at `1e-15` is a sensitivity
-   analysis.
+   The confirmatory statistic clips the observed-label probability at
+   `1e-15`; the extended-real value, where zero contributes positive infinity,
+   and the count of infinite contributions are reported descriptively. No
+   observation is dropped.
 7. Selective risk/coverage curves over the frozen threshold grid and area under
    that empirical curve, with interpolation rules published in analysis code.
 8. Human-review routing rate, defined as `review` plus failures routed to
@@ -460,10 +474,28 @@ cases.
 
 H1 is the sole primary hypothesis at two-sided alpha `0.05` (the direction is
 preregistered but the interval remains two-sided). H2, H3, H4a, H4b, and H5
-form a secondary confirmatory family. Their paired case-level two-sided
+form a secondary confirmatory family. H2 and H3 first average within each case
+equally across applicable perturbation families; H4a and H4b first average
+equally across determinate atomic fields. Their paired case-level two-sided
 randomization p-values use all sign flips when there are at most 20 nonzero
-pairs and otherwise 100,000 seeded sign flips, with
+pairs and otherwise 100,000 seeded sign flips. Exhaustive enumeration uses
+`p = count(|mean(s_i * d_i)| >= |mean(d_i)|) / B`; sampled permutations use
 `p = (1 + count(|mean(s_i * d_i)| >= |mean(d_i)|)) / (B + 1)`.
+
+For H5, let `c*` be the smaller Arm A/Arm C qualified coverage on independent
+safety-calibration data. If either arm is unqualified or `floor(c* * N) < 25`,
+H5 is not evaluable. Otherwise, within each split and arm, rank base-case
+replicate-1 decisions by decreasing confidence, then lexical case ID, and take
+the first `floor(c* * N_split)` cases. Selective risk is unsafe accepts divided
+by selected cases. Per-arm degradation is held-out risk minus
+safety-calibration risk; the H5 statistic is Arm A degradation minus Arm C
+degradation. Its two-sided randomization test independently swaps Arm A/C
+labels within each case, stratified by split, and recomputes the complete
+difference-in-differences. Use all swaps for at most 20 total cases and 100,000
+seeded swaps otherwise, with the same exhaustive and sampled p-value formulas
+above. A 10,000-resample interval independently resamples cases within
+safety-calibration and held-out strata and recomputes the statistic.
+
 Apply Holm correction across these five tests at familywise alpha `0.05`.
 All remaining comparisons report effect sizes and intervals and are labelled
 exploratory.
@@ -489,7 +521,8 @@ other repositories requires independent replication.
 Prospectively report:
 
 - alternate ECE with equal-frequency bins and classwise calibration;
-- finite log-loss clipping at `1e-15` versus the extended-real primary value;
+- alternative log-loss floors versus the `1e-15` confirmatory value, with the
+  extended-real result and infinite-contribution count shown descriptively;
 - all-invalid-as-unsafe versus all-invalid-as-review routing;
 - adjudication analysis excluding and conservatively resolving
   `indeterminate` labels;
@@ -512,6 +545,13 @@ policy, threshold grid, model/version, provider parameters, and analysis commit
 must be frozen before final execution. Conditions are randomized in seeded
 case-level blocks and interleaved across repository, arm, and condition. The
 runner processes the published schedule sequentially.
+
+The published schedule is content-addressed. Collection validation requires
+exactly one terminal runner record and one derived analysis record for every
+scheduled call ID, including an explicit `not_attempted` record when execution
+stops before a call. Duplicate, missing, extra, or condition-mismatched records
+invalidate confirmatory analysis; no omitted call can disappear from a
+denominator.
 
 There are **zero retries** for a failed scheduled call. The repeatability subset
 contains exactly three predeclared calls regardless of agreement; a failed

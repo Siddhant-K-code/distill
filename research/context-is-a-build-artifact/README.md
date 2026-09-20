@@ -47,6 +47,9 @@ The relevant commands are `distill lock`, `distill build`, `distill verify`,
 and `make distill-lock-demo`. Distill Lock stabilizes context bytes and
 provenance. It does not make a model or provider deterministic.
 
+The frozen `pilot-schema.json` SHA-256 is
+`f8c1ae74f2ee1523f57858bc8ff1f44ddfef5b9d79179fc73f9972a7b0c82f11`.
+
 ## Independent review
 
 External reviewers can review this directory without provider access.
@@ -55,7 +58,7 @@ Recommended review order:
 1. Check the frozen claims, hypotheses, split, outcomes, and analysis in the
    preregistration.
 2. Validate `pilot-schema.json` with a JSON Schema Draft 2020-12 validator and
-   inspect its deterministic identity exclusions.
+   confirm its SHA-256 above before inspecting its identity exclusions.
 3. Verify every related-work URL and the distinction between first-party
    claims and independent evidence.
 4. Recompute all four Distill Lock artifact hashes with
