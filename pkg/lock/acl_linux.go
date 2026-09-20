@@ -10,7 +10,7 @@ import (
 
 func hasExtendedACL(path string) (bool, error) {
 	for _, name := range []string{"system.posix_acl_access", "system.posix_acl_default"} {
-		size, err := unix.Getxattr(path, name, nil)
+		size, err := unix.Lgetxattr(path, name, nil)
 		if err == nil {
 			if size > 0 {
 				return true, nil

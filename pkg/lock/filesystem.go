@@ -178,6 +178,9 @@ func resolvedDirectory(dir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err := validateLexicalDirectoryPath(absolute); err != nil {
+		return "", err
+	}
 	resolved, err := filepath.EvalSymlinks(absolute)
 	if err != nil {
 		return "", err
@@ -193,6 +196,51 @@ func resolvedDirectory(dir string) (string, error) {
 		return "", err
 	}
 	return filepath.Clean(resolved), nil
+}
+
+func validateLexicalDirectoryPath(absolute string) error {
+	volume := filepath.VolumeName(absolute)
+	root := volume + string(filepath.Separator)
+	if volume == "" {
+		root = string(filepath.Separator)
+	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil {
+		return fmt.Errorf("inspect directory root %q: %w", root, err)
+	}
+	if err := validateTrustedInfo(rootInfo, root, true); err != nil {
+		return err
+	}
+
+	relative := strings.TrimPrefix(absolute, root)
+	parts := strings.Split(relative, string(filepath.Separator))
+	current := root
+	for index, part := range parts {
+		if part == "" {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return fmt.Errorf("inspect directory component %q: %w", current, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			if index == len(parts)-1 {
+				return fmt.Errorf("directory %q is a symbolic link", current)
+			}
+			if err := validateTrustedSymlink(info, current); err != nil {
+				return err
+			}
+			continue
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("directory component %q is not a directory", current)
+		}
+		if err := validateTrustedInfo(info, current, true); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validateTrustedAncestors(directory string) error {
@@ -214,6 +262,20 @@ func validateTrustedAncestors(directory string) error {
 		}
 		current = parent
 	}
+}
+
+func validateTrustedSymlink(info fs.FileInfo, filePath string) error {
+	if !ownedByCurrentUserOrRoot(info) {
+		return fmt.Errorf("symbolic link %q is not owned by the current user or root", filePath)
+	}
+	hasACL, err := hasExtendedACL(filePath)
+	if err != nil {
+		return fmt.Errorf("inspect access controls for symbolic link %q: %w", filePath, err)
+	}
+	if hasACL {
+		return fmt.Errorf("symbolic link %q has an extended access-control list", filePath)
+	}
+	return nil
 }
 
 func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) error {

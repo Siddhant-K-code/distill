@@ -279,6 +279,21 @@ func TestUnsafeInputsFailClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("source root symlink", func(t *testing.T) {
+		parent := t.TempDir()
+		actual := filepath.Join(parent, "actual")
+		if err := os.Mkdir(actual, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(parent, "sources")
+		if err := os.Symlink(actual, link); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := resolvedDirectory(link); err == nil {
+			t.Fatal("source-root symlink was accepted")
+		}
+	})
+
 	t.Run("invalid UTF-8", func(t *testing.T) {
 		root := t.TempDir()
 		if err := os.WriteFile(filepath.Join(root, "bad.txt"), []byte{0xff, 0xfe}, 0o644); err != nil {
