@@ -176,6 +176,11 @@ See [the frozen Distill Lock v0 specification](docs/distill-lock-v0.md) for the
 canonical JSON rules, algorithms, failure behavior, and a complete
 configuration example.
 
+The separate research-only
+[offline excluded-pilot harness](research/context-is-a-build-artifact/pilot/README.md)
+generates synthetic, zero-provider-call protocol fixtures and is not wired into
+the public `distill` CLI.
+
 ## Quick Start
 
 ### 1. Standalone API (No Vector DB Required)
