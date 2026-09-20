@@ -16,7 +16,8 @@ const (
 	darwinACEPermit               = 1
 	darwinACEKindMask             = 0xf
 	darwinWriteRights             = (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6) |
-		(1 << 8) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 25)
+		(1 << 8) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 21) | (1 << 23) |
+		(1 << 25)
 )
 
 type darwinAttributeList struct {
@@ -66,11 +67,14 @@ func hasUnsafeACL(path string) (bool, error) {
 	if buffer.Reference.Length == 0 {
 		return false, nil
 	}
-	length := int(buffer.Reference.Length)
-	if length < darwinFileSecurityHeaderBytes || length > len(buffer.Data) {
+	return darwinACLGrantsMutation(buffer.Data[:], int(buffer.Reference.Length))
+}
+
+func darwinACLGrantsMutation(data []byte, length int) (bool, error) {
+	if length < darwinFileSecurityHeaderBytes || length > len(data) {
 		return false, fmt.Errorf("invalid extended security data length %d", length)
 	}
-	data := buffer.Data[:length]
+	data = data[:length]
 	entryCount := int(binary.LittleEndian.Uint32(data[36:40]))
 	if expected := darwinFileSecurityHeaderBytes + entryCount*darwinACEBytes; expected != length {
 		return false, fmt.Errorf("invalid ACL entry count %d for length %d", entryCount, length)
