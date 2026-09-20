@@ -142,6 +142,7 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 		return result
 	}
 	result.Response = &parsed
+	result.ObservedUsage = &parsed.Usage
 	return result
 }
 
@@ -189,7 +190,7 @@ func parseAPIResponse(raw []byte, request studypilot.RequestRecord) (APIResponse
 		if math.Abs(answer.Probabilities[answer.Choice]-maximum) > 1e-12 {
 			return APIResponse{}, fmt.Errorf("provider answer %q selection is not maximal", question.Field)
 		}
-		if !finiteProbability(answer.Confidence) {
+		if !answer.confidencePresent || !finiteProbability(answer.Confidence) {
 			return APIResponse{}, fmt.Errorf("provider answer %q has invalid confidence", question.Field)
 		}
 	}

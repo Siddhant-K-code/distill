@@ -104,6 +104,8 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		}
 
 		var result callResult
+		var reservationBytes []byte
+		var encodeErr error
 		if stopped {
 			result = callResult{
 				RequestBody: requestBody, Err: fmt.Errorf("%s", stopMessage),
@@ -118,7 +120,7 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 			}
 			summary.NotAttemptedCalls++
 		} else {
-			reservationBytes, encodeErr := canonicalJSON(map[string]any{
+			reservationBytes, encodeErr = canonicalJSON(map[string]any{
 				"scheduled_call_id": entry.ScheduledCallID,
 				"request_sha256":    digest(requestBody),
 				"reserved_nano_usd": WorstCallNanoUSD,
@@ -148,23 +150,26 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 			if result.Metadata.ProviderRequestID != "" {
 				providerRequestIDs[result.Metadata.ProviderRequestID] = true
 			}
-			if result.Response != nil {
-				inferredCost := int64(result.Response.Usage.InputTokens) * InputNanoUSD
+			if result.ObservedUsage != nil {
+				inferredCost := int64(result.ObservedUsage.InputTokens) * InputNanoUSD
 				if inferredCost > authorization.AuthorizedBudgetNanoUSD-summary.InferredCostNanoUSD {
 					result.Response = nil
 					result.Err = fmt.Errorf("provider usage exceeded the reserved budget")
 					result.ErrorStage = "receipt"
 					result.ErrorCode = "provider_usage_exceeded_budget"
+				} else {
+					summary.InputTokens += result.ObservedUsage.InputTokens
+					summary.OutputTokens += result.ObservedUsage.OutputTokens
+					summary.InferredCostNanoUSD += inferredCost
 				}
 			}
 			if result.Response != nil {
 				summary.CompletedCalls++
-				summary.InputTokens += result.Response.Usage.InputTokens
-				summary.OutputTokens += result.Response.Usage.OutputTokens
-				summary.InferredCostNanoUSD += int64(result.Response.Usage.InputTokens) * InputNanoUSD
 			} else {
 				summary.FailedCalls++
-				stopped, stopCode, stopMessage = true, "prior_call_failed", "execution stopped after a failed scheduled call; no retry or replacement was attempted"
+				if shouldStopAfterFailure(result) {
+					stopped, stopCode, stopMessage = true, "prior_call_failed", "execution stopped after an integrity or authorization failure; no retry or replacement was attempted"
+				}
 			}
 		}
 		if len(result.RawBody) > 0 {
@@ -184,12 +189,13 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 		material, err := buildReceipt(receiptInput{
 			Case: caseRecord, Request: requestRecord, BaseSchedule: baseSchedule,
 			ExecutionSchedule: entry, Authorization: authorization, AuthorizationBytes: authorizationBytes,
-			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes, Result: result,
+			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes,
+			ReservationBytes: reservationBytes, Result: result,
 		})
 		if err != nil {
 			return summary, fmt.Errorf("%s: %w", entry.ScheduledCallID, err)
 		}
-		if result.Response != nil {
+		if result.ObservedUsage != nil {
 			if data := material.Artifacts[entry.ScheduledCallID+"-usage"]; len(data) > 0 {
 				if err := writeExclusive(filepath.Join(callDirectory, "usage.json"), data); err != nil {
 					return summary, err
@@ -367,7 +373,19 @@ func reserveBudget(spentNanoUSD, capNanoUSD int64) error {
 		return fmt.Errorf("worst-case reservation %s would exceed remaining cap %s",
 			formatNanoUSD(WorstCallNanoUSD), formatNanoUSD(capNanoUSD-spentNanoUSD))
 	}
+
 	return nil
+}
+
+func shouldStopAfterFailure(result callResult) bool {
+	if result.ErrorCode == "duplicate_provider_request_id" ||
+		result.ErrorCode == "provider_usage_exceeded_budget" ||
+		result.ErrorCode == "missing_provider_request_id" ||
+		result.ErrorCode == "invalid_provider_response" ||
+		result.ErrorCode == "response_too_large" {
+		return true
+	}
+	return result.Metadata.HTTPStatus == http.StatusUnauthorized || result.Metadata.HTTPStatus == http.StatusForbidden
 }
 
 func makeLedgerEntry(entry ExecutionScheduleEntry, result callResult, receipt []byte, cumulative int64) LedgerEntry {
@@ -390,12 +408,14 @@ func makeLedgerEntry(entry ExecutionScheduleEntry, result callResult, receipt []
 		requestID := result.Metadata.ProviderRequestID
 		ledger.ProviderRequestID = &requestID
 	}
-	if result.Response != nil {
-		ledger.Status = "valid"
-		inputTokens, outputTokens := result.Response.Usage.InputTokens, result.Response.Usage.OutputTokens
+	if result.ObservedUsage != nil {
+		inputTokens, outputTokens := result.ObservedUsage.InputTokens, result.ObservedUsage.OutputTokens
 		ledger.InputTokens, ledger.OutputTokens = &inputTokens, &outputTokens
 		cost := formatNanoUSD(int64(inputTokens) * InputNanoUSD)
 		ledger.InferredCostUSD = &cost
+	}
+	if result.Response != nil {
+		ledger.Status = "valid"
 	}
 	return ledger
 }
@@ -473,6 +493,18 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		}
 		result := callResult{RequestBody: requestBody}
 		ledgerEntry := ledgerEntries[entry.ScheduleIndex]
+		var reservationBytes []byte
+		if ledgerEntry.Status != "not_attempted" {
+			reservationBytes, err = os.ReadFile(filepath.Join(callDirectory, "attempt-reservation.json"))
+			if err != nil {
+				return summary, err
+			}
+			if err := validateReservation(reservationBytes, entry, requestBody, measurement); err != nil {
+				return summary, err
+			}
+		} else if _, err := os.Lstat(filepath.Join(callDirectory, "attempt-reservation.json")); !os.IsNotExist(err) {
+			return summary, fmt.Errorf("not-attempted call has an attempt reservation")
+		}
 		switch ledgerEntry.Status {
 		case "valid":
 			result.RawBody, err = os.ReadFile(filepath.Join(callDirectory, "raw-response.bin"))
@@ -484,6 +516,7 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 				return summary, parseErr
 			}
 			result.Response = &parsed
+			result.ObservedUsage = &parsed.Usage
 			if err := loadAttemptMetadata(callDirectory, measurement, &result); err != nil {
 				return summary, err
 			}
@@ -496,9 +529,6 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 			providerRequestIDs[result.Metadata.ProviderRequestID] = true
 			summary.AttemptedCalls++
 			summary.CompletedCalls++
-			summary.InputTokens += result.Response.Usage.InputTokens
-			summary.OutputTokens += result.Response.Usage.OutputTokens
-			summary.InferredCostNanoUSD += int64(result.Response.Usage.InputTokens) * InputNanoUSD
 		case "failed":
 			result.RawBody, _ = os.ReadFile(filepath.Join(callDirectory, "raw-response.bin"))
 			if err := loadAttemptMetadata(callDirectory, measurement, &result); err != nil {
@@ -506,6 +536,9 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 			}
 			if err := loadPreservedError(callDirectory, &result); err != nil {
 				return summary, err
+			}
+			if parsed, parseErr := parseAPIResponse(result.RawBody, requests[entry.RequestID]); parseErr == nil {
+				result.ObservedUsage = &parsed.Usage
 			}
 			if result.Metadata.ProviderRequestID != "" {
 				if providerRequestIDs[result.Metadata.ProviderRequestID] {
@@ -524,11 +557,20 @@ func ValidateRun(pilotDirectory, runDirectory string) (RunSummary, error) {
 		default:
 			return summary, fmt.Errorf("unknown ledger status")
 		}
+		if result.ObservedUsage != nil {
+			summary.InputTokens += result.ObservedUsage.InputTokens
+			summary.OutputTokens += result.ObservedUsage.OutputTokens
+			summary.InferredCostNanoUSD += int64(result.ObservedUsage.InputTokens) * InputNanoUSD
+			if summary.InferredCostNanoUSD > authorization.AuthorizedBudgetNanoUSD {
+				return summary, fmt.Errorf("cumulative inferred cost exceeds authorization")
+			}
+		}
 		baseSchedule, _ := scheduleForCase(pilot.Schedules, entry.CaseID)
 		material, err := buildReceipt(receiptInput{
 			Case: cases[entry.CaseID], Request: requests[entry.RequestID], BaseSchedule: baseSchedule,
 			ExecutionSchedule: entry, Authorization: authorization, AuthorizationBytes: authorizationBytes,
-			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes, Result: result,
+			ProviderRecord: provider, ProviderBytes: providerBytes, ScheduleBytes: scheduleBytes,
+			ReservationBytes: reservationBytes, Result: result,
 		})
 		if err != nil {
 			return summary, err
@@ -582,6 +624,7 @@ func loadAttemptMetadata(callDirectory string, measurement map[string]any, resul
 	if err != nil {
 		return err
 	}
+
 	if err := json.Unmarshal(metadataBytes, &result.Metadata); err != nil {
 		return err
 	}
@@ -599,6 +642,42 @@ func loadAttemptMetadata(callDirectory string, measurement map[string]any, resul
 		return err
 	}
 	result.StartedAt, result.FinishedAt = started, finished
+	return nil
+}
+
+func validateReservation(data []byte, entry ExecutionScheduleEntry, requestBody []byte, measurement map[string]any) error {
+	canonical, err := canonicalJSON(json.RawMessage(data))
+	if err != nil || !bytes.Equal(canonical, data) {
+		return fmt.Errorf("attempt reservation is not canonical JSON")
+	}
+	var reservation struct {
+		ScheduledCallID string `json:"scheduled_call_id"`
+		RequestSHA256   string `json:"request_sha256"`
+		ReservedNanoUSD int64  `json:"reserved_nano_usd"`
+		ReservedAt      string `json:"reserved_at"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&reservation); err != nil {
+		return fmt.Errorf("decode attempt reservation: %w", err)
+	}
+	reservedAt, err := time.Parse(time.RFC3339Nano, reservation.ReservedAt)
+	if err != nil {
+		return fmt.Errorf("invalid reservation timestamp")
+	}
+	startedText, ok := measurement["attempt_started_at"].(string)
+	if !ok {
+		return fmt.Errorf("attempt reservation lacks matching attempt timestamp")
+	}
+	startedAt, err := time.Parse(time.RFC3339Nano, startedText)
+	if err != nil || reservedAt.After(startedAt) {
+		return fmt.Errorf("attempt reservation was not durable before the call")
+	}
+	if reservation.ScheduledCallID != entry.ScheduledCallID ||
+		reservation.RequestSHA256 != digest(requestBody) ||
+		reservation.ReservedNanoUSD != WorstCallNanoUSD {
+		return fmt.Errorf("attempt reservation identity mismatch")
+	}
 	return nil
 }
 

@@ -21,6 +21,7 @@ type receiptInput struct {
 	ProviderRecord     ProviderRecord
 	ProviderBytes      []byte
 	ScheduleBytes      []byte
+	ReservationBytes   []byte
 	Result             callResult
 }
 
@@ -54,6 +55,9 @@ func buildReceipt(input receiptInput) (receiptMaterial, error) {
 	addEvidence("execution-authorization", "application/json", input.AuthorizationBytes)
 	addEvidence("provider-record", "application/json", input.ProviderBytes)
 	addEvidence("execution-schedule", "application/x-ndjson", input.ScheduleBytes)
+	if len(input.ReservationBytes) > 0 {
+		addEvidence(input.ExecutionSchedule.ScheduledCallID+"-attempt-reservation", "application/json", input.ReservationBytes)
+	}
 
 	receiptArtifacts := make([]any, 0, 4)
 	addReceiptArtifact := func(id, media string, data []byte) {
@@ -78,6 +82,20 @@ func buildReceipt(input receiptInput) (receiptMaterial, error) {
 	var errorValue any
 	status := "valid"
 	runValidity := map[string]any{"status": "valid", "reason_codes": []any{}}
+	if input.Result.ObservedUsage != nil {
+		usage = map[string]any{
+			"input_tokens":  input.Result.ObservedUsage.InputTokens,
+			"output_tokens": input.Result.ObservedUsage.OutputTokens,
+			"total_tokens":  input.Result.ObservedUsage.InputTokens + input.Result.ObservedUsage.OutputTokens,
+		}
+		usageBytes, encodeErr := canonicalJSON(usage)
+		if encodeErr != nil {
+			return receiptMaterial{}, encodeErr
+		}
+		usageID := input.ExecutionSchedule.ScheduledCallID + "-usage"
+		addReceiptArtifact(usageID, "application/json", usageBytes)
+		usage["provider_usage_json_digest"] = digest(usageBytes)
+	}
 	if input.Result.NotAttempted {
 		status = "not_attempted"
 		runValidity = map[string]any{"status": "invalid", "reason_codes": []any{"not_attempted"}}
@@ -97,18 +115,6 @@ func buildReceipt(input receiptInput) (receiptMaterial, error) {
 		}
 	} else if input.Result.Err == nil {
 		outputs = providerOutputs(*input.Result.Response, input.Request)
-		usage = map[string]any{
-			"input_tokens":  input.Result.Response.Usage.InputTokens,
-			"output_tokens": input.Result.Response.Usage.OutputTokens,
-			"total_tokens":  input.Result.Response.Usage.InputTokens + input.Result.Response.Usage.OutputTokens,
-		}
-		usageBytes, encodeErr := canonicalJSON(usage)
-		if encodeErr != nil {
-			return receiptMaterial{}, encodeErr
-		}
-		usageID := input.ExecutionSchedule.ScheduledCallID + "-usage"
-		addReceiptArtifact(usageID, "application/json", usageBytes)
-		usage["provider_usage_json_digest"] = digest(usageBytes)
 		rawOutputDigest = digest(input.Result.RawBody)
 		providerRequestID = input.Result.Metadata.ProviderRequestID
 	} else {

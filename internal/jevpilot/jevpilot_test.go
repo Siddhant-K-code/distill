@@ -184,6 +184,22 @@ func TestMappingRejectsAliasesAndAdversarialProbabilities(t *testing.T) {
 	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
 		t.Fatal("missing output usage unexpectedly accepted")
 	}
+	response = fakeResponse(pilot.Requests[0], pilot.Cases[0])
+	answer := response.Answers[pilot.Requests[0].Questions[0].Field]
+	answerValue := map[string]any{
+		"type": answer.Type, "choice": answer.Choice, "probabilities": answer.Probabilities,
+	}
+	responseValue := map[string]any{
+		"model": response.Model, "answers": map[string]any{}, "usage": response.Usage,
+	}
+	for id, existing := range response.Answers {
+		responseValue["answers"].(map[string]any)[id] = existing
+	}
+	responseValue["answers"].(map[string]any)[pilot.Requests[0].Questions[0].Field] = answerValue
+	raw, _ = json.Marshal(responseValue)
+	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
+		t.Fatal("missing confidence unexpectedly accepted")
+	}
 }
 
 func TestZeroRetryTransportFailureAndBudgetGuard(t *testing.T) {
@@ -230,8 +246,8 @@ func TestFailedCallStopsWithoutRetriesAndRecordsRemainder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if transport.calls != 1 || summary.FailedCalls != 1 || summary.NotAttemptedCalls != 27 {
-		t.Fatalf("failed call was retried or remainder was not preserved: %+v calls=%d", summary, transport.calls)
+	if transport.calls != 28 || summary.FailedCalls != 28 || summary.NotAttemptedCalls != 0 {
+		t.Fatalf("failed calls were retried or omitted: %+v calls=%d", summary, transport.calls)
 	}
 	if _, err := Run(context.Background(), RunOptions{
 		PilotDirectory: pilotDirectory, RunDirectory: runDirectory,
@@ -291,6 +307,9 @@ func TestDuplicateProviderRequestIDInvalidatesRun(t *testing.T) {
 	if err == nil || summary.CompletedCalls != 1 || summary.FailedCalls != 1 ||
 		summary.NotAttemptedCalls != 26 || transport.calls != 2 {
 		t.Fatalf("duplicate request ID did not fail closed: summary=%+v calls=%d err=%v", summary, transport.calls, err)
+	}
+	if summary.InputTokens != 200 || summary.InferredCostNanoUSD != 200*InputNanoUSD {
+		t.Fatalf("duplicate response usage was not retained: %+v", summary)
 	}
 	if _, err := ValidateRun(pilotDirectory, runDirectory); err == nil {
 		t.Fatal("offline validation accepted duplicate provider request IDs")

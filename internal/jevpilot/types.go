@@ -127,10 +127,32 @@ type APIRequest struct {
 }
 
 type ChoiceAnswer struct {
-	Type          string             `json:"type"`
-	Choice        string             `json:"choice"`
-	Probabilities map[string]float64 `json:"probabilities"`
-	Confidence    float64            `json:"confidence"`
+	Type              string             `json:"type"`
+	Choice            string             `json:"choice"`
+	Probabilities     map[string]float64 `json:"probabilities"`
+	Confidence        float64            `json:"confidence"`
+	confidencePresent bool
+}
+
+func (answer *ChoiceAnswer) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Type          string             `json:"type"`
+		Choice        string             `json:"choice"`
+		Probabilities map[string]float64 `json:"probabilities"`
+		Confidence    *float64           `json:"confidence"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Confidence == nil {
+		return fmt.Errorf("choice answer must contain confidence")
+	}
+	answer.Type = wire.Type
+	answer.Choice = wire.Choice
+	answer.Probabilities = wire.Probabilities
+	answer.Confidence = *wire.Confidence
+	answer.confidencePresent = true
+	return nil
 }
 
 type Usage struct {
@@ -196,16 +218,17 @@ type pilotData struct {
 }
 
 type callResult struct {
-	RequestBody  []byte
-	Response     *APIResponse
-	RawBody      []byte
-	Metadata     ResponseMetadata
-	StartedAt    time.Time
-	FinishedAt   time.Time
-	Err          error
-	ErrorStage   string
-	ErrorCode    string
-	NotAttempted bool
+	RequestBody   []byte
+	Response      *APIResponse
+	ObservedUsage *Usage
+	RawBody       []byte
+	Metadata      ResponseMetadata
+	StartedAt     time.Time
+	FinishedAt    time.Time
+	Err           error
+	ErrorStage    string
+	ErrorCode     string
+	NotAttempted  bool
 }
 
 type receiptMaterial struct {
