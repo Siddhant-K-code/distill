@@ -158,10 +158,11 @@ SHA256SUMS
 
 **Guarantee:** the same locked sources, configuration, and supported
 runtime/tool identities produce byte-identical bundle, manifest, lockfile, and
-digests on supported macOS/Linux systems with Go 1.24. Original CRLF/CR hashes
-remain distinct while normalized LF content can deduplicate exactly. Builds
-publish atomically into a nonexistent directory, so failures cannot replace a
-previous valid artifact.
+digests on supported macOS/Linux systems with Go 1.24 through Go 1.26. Other
+Go runtime versions fail closed. Original CRLF/CR hashes remain distinct while
+normalized LF content can deduplicate exactly. Builds use native atomic
+no-replace publication into a nonexistent directory, so failures cannot
+replace a previous valid artifact.
 
 **Non-guarantees and non-goals:** v0 does not provide semantic or
 near-duplicate matching, a vector database, agent framework, model adapter,

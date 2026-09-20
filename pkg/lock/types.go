@@ -8,7 +8,7 @@ const (
 
 	ToolName        = "distill"
 	ToolIdentity    = "github.com/Siddhant-K-code/distill/distill-lock-v0"
-	RuntimeIdentity = "go1.24"
+	RuntimeIdentity = "go1.24-go1.26"
 
 	CanonicalizationIdentity = "utf8-nfc-lf-v1"
 	ChunkingIdentity         = "utf8-fixed-bytes-v1"

@@ -11,6 +11,9 @@ import (
 
 // Build validates all locked inputs and atomically publishes a fresh output directory.
 func Build(lockPath, outputDirectory string) (Summary, error) {
+	if err := validateSupportedRuntime(); err != nil {
+		return Summary{}, err
+	}
 	lockBytes, lockFile, err := readLockFile(lockPath)
 	if err != nil {
 		return Summary{}, err
@@ -116,13 +119,13 @@ func Build(lockPath, outputDirectory string) (Summary, error) {
 	if _, err := Verify(temporary); err != nil {
 		return Summary{}, fmt.Errorf("verify temporary output: %w", err)
 	}
-	if err := os.Rename(temporary, outputAbsolute); err != nil {
+	if err := syncDirectory(parent); err != nil {
+		return Summary{}, fmt.Errorf("sync output parent before publication: %w", err)
+	}
+	if err := renameNoReplace(temporary, outputAbsolute); err != nil {
 		return Summary{}, fmt.Errorf("publish output directory: %w", err)
 	}
 	published = true
-	if err := syncDirectory(parent); err != nil {
-		return Summary{}, fmt.Errorf("sync output parent: %w", err)
-	}
 
 	return Summary{
 		SourceCount:    lockFile.Stats.SourceCount,

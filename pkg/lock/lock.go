@@ -12,6 +12,9 @@ import (
 
 // Create reads a canonical configuration and atomically writes its lockfile.
 func Create(configPath, outputPath string) (Summary, error) {
+	if err := validateSupportedRuntime(); err != nil {
+		return Summary{}, err
+	}
 	config, _, err := loadConfig(configPath)
 	if err != nil {
 		return Summary{}, err

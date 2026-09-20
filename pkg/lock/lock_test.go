@@ -112,6 +112,19 @@ func TestUnicodeNormalizesToNFC(t *testing.T) {
 	}
 }
 
+func TestSupportedRuntimeIdentity(t *testing.T) {
+	for _, version := range []string{"go1.24", "go1.24.12", "go1.25.7", "go1.26.4"} {
+		if err := validateRuntimeVersion(version); err != nil {
+			t.Errorf("expected %s to be supported: %v", version, err)
+		}
+	}
+	for _, version := range []string{"go1.23.9", "go1.27", "devel go1.27-abcdef", "gccgo"} {
+		if err := validateRuntimeVersion(version); err == nil {
+			t.Errorf("expected %s to be rejected", version)
+		}
+	}
+}
+
 func TestRelevantMutationChangesSourceChunkAndBundle(t *testing.T) {
 	config := testConfig([]string{"code.go"}, nil)
 	beforeInput := testInput(t, "code.go", "package p\nconst answer = 42\n")
@@ -395,6 +408,34 @@ func TestFailedBuildPreservesPriorVerifiedOutput(t *testing.T) {
 	}
 }
 
+func TestAtomicPublishDoesNotReplaceConcurrentDestination(t *testing.T) {
+	parent := t.TempDir()
+	staged := filepath.Join(parent, "staged")
+	destination := filepath.Join(parent, "destination")
+	if err := os.Mkdir(staged, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staged, "new.txt"), []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(destination, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := renameNoReplace(staged, destination); err == nil {
+		t.Fatal("no-replace publication replaced a concurrently created destination")
+	}
+	if _, err := os.Stat(filepath.Join(staged, "new.txt")); err != nil {
+		t.Fatalf("staged output was lost: %v", err)
+	}
+	entries, err := os.ReadDir(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatal("concurrent destination was modified")
+	}
+}
+
 func TestTrustedLockDigestRejectsConsistentReplacement(t *testing.T) {
 	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
 	lockPath := filepath.Join(root, LockFileName)
@@ -456,9 +497,9 @@ func TestGoldenFixture(t *testing.T) {
 	}
 	expected := map[string]string{
 		BundleFileName:    "3096d7b4492124df4e893d27b15a9d59ffe8a9fad80d24cd8265262c2251866a",
-		LockFileName:      "c27f70c858b10b02efd94727339f003311ef0e62feb6550a1f2481fed6eb00eb",
-		ManifestFileName:  "e95b24ed00659d3eb13fb84ef8027fd425f1fa8ea16f991c3b1d60325f3d9eb7",
-		ChecksumsFileName: "d1411a6046d01299dcf46fc3e46050bf5e64a685aea5f041965ba96aaa57a439",
+		LockFileName:      "a4d44357e284f359c970af70aea744346703ecd37e8058bf7b8d3bd30f11842b",
+		ManifestFileName:  "7f6849eb7f22a1de00e851bfd42ccef32dea1d82751bca9d7c592286ec6929fd",
+		ChecksumsFileName: "ad4d593b7ded2a53023a24e767351b21570839f0b4fea9348d8e600252b8b0ee",
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("golden hashes differ\nactual: %#v", actual)

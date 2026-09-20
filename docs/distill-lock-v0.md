@@ -14,8 +14,9 @@ Distill Lock performs no model or network calls.
 ## Scope and identities
 
 The v0 tool identity is `github.com/Siddhant-K-code/distill/distill-lock-v0`
-and the supported runtime identity is `go1.24`. Portable artifacts bind those
-identities plus these independently versioned algorithms:
+and the supported runtime identity is `go1.24-go1.26`. Lock, build, and verify
+reject binaries built with other Go runtime versions. Portable artifacts bind
+those identities plus these independently versioned algorithms:
 
 | Concern | Identity |
 |---|---|
@@ -204,9 +205,11 @@ distill verify <directory> --expected-lock-sha256 <trusted-digest>
   configuration, tool, runtime, and algorithm identities must still match. It
   never relocks. Output must be a safe, nonexistent directory outside the
   source root. Files are written with ordinary portable permissions to a
-  sibling temporary directory, synchronized, and renamed into place only after
-  all hashes are complete. Failure or interruption cannot replace or leave a
-  success-shaped destination.
+  sibling temporary directory, synchronized, and published with the native
+  atomic no-replace rename (`renameat2(RENAME_NOREPLACE)` on Linux or
+  `renamex_np(RENAME_EXCL)` on macOS) only after all hashes are complete.
+  Publication is the final commit point, so failure or interruption cannot
+  replace or leave a success-shaped destination.
 - `verify` is standalone and offline. It reads only the output directory and
   validates the exact allowlisted file set, regular-file/no-symlink rules,
   schemas and identities, canonical JSON, every recorded hash and length,

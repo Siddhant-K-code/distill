@@ -17,6 +17,9 @@ func Verify(outputDirectory string) (Summary, error) {
 // VerifyWithExpectedLock checks a built directory and, when non-empty, anchors
 // its contents to an out-of-band trusted lockfile SHA-256.
 func VerifyWithExpectedLock(outputDirectory, expectedLockSHA256 string) (Summary, error) {
+	if err := validateSupportedRuntime(); err != nil {
+		return Summary{}, err
+	}
 	if expectedLockSHA256 != "" && !validDigest(expectedLockSHA256) {
 		return Summary{}, fmt.Errorf("expected lock SHA-256 is not a lowercase SHA-256 digest")
 	}
