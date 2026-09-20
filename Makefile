@@ -40,6 +40,10 @@ test-cover: ## Run tests and show coverage
 	$(GO) tool cover -func=coverage.out
 	rm -f coverage.out
 
+.PHONY: distill-lock-demo
+distill-lock-demo: ## Build, verify, repeat, and mutate the Distill Lock v0 fixture
+	$(GO) test ./pkg/lock -run '^TestDistillLockDemo$$' -count=1 -v
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...

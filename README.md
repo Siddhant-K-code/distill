@@ -114,10 +114,67 @@ make test         # go test ./...
 make check        # fmt + vet + test
 make test-cover   # test with coverage report
 make bench        # run benchmarks
+make distill-lock-demo # deterministic lock/build/verify demo
 make lint         # golangci-lint (requires golangci-lint in PATH)
 make docker-build # build Docker image
 make help         # list all targets
 ```
+
+## Distill Lock v0: context is a build artifact
+
+Runtime prompt assembly hides source drift. Distill Lock freezes a reviewed
+source inventory and configuration, then builds a portable context artifact
+without a model, provider, or network call:
+
+```bash
+distill lock path/to/config.json --output path/to/context.lock.json
+distill build path/to/context.lock.json --output path/to/context-output
+distill verify path/to/context-output
+distill verify path/to/context-output --expected-lock-sha256 <trusted-digest>
+
+# Synthetic fixture: build, offline verify, repeatability, and mutation proof.
+make distill-lock-demo
+```
+
+A configuration explicitly lists selected and excluded UTF-8 text/code files.
+`lock` records original and normalized SHA-256 identities, NFC/LF-normalized
+chunks, exact-duplicate decisions, the deterministic token budget, and every
+inclusion/exclusion reason. `build` refuses any missing, changed, newly
+unexpected, unsafe, or unsupported input; it never relocks automatically.
+`verify` checks the complete allowlisted file set, canonical JSON, schemas,
+lengths, hashes, relationships, and exact bundle regeneration offline.
+Lock output cannot overwrite its configuration. A post-publication directory
+sync failure is reported explicitly as `published but durability unconfirmed`;
+verify the named output instead of retrying blindly.
+Without the optional out-of-band lock digest it proves internal consistency,
+not authenticity; use `--expected-lock-sha256` when the artifact directory may
+be attacker-replaceable.
+
+The fresh output directory contains:
+
+```text
+context.bundle.md
+context.lock.json
+context.manifest.json
+SHA256SUMS
+```
+
+**Guarantee:** the same locked sources, configuration, and supported
+runtime/tool identities produce byte-identical bundle, manifest, lockfile, and
+digests on supported macOS/Linux systems with Go 1.24 through Go 1.26. Other
+Go runtime versions fail closed. Original CRLF/CR hashes remain distinct while
+normalized LF content can deduplicate exactly. Builds use native atomic
+no-replace publication into a nonexistent directory, so failures cannot
+replace a previous valid artifact.
+
+**Non-guarantees and non-goals:** v0 does not provide semantic or
+near-duplicate matching, a vector database, agent framework, model adapter,
+decision replay, dashboard, Jev integration, or deterministic model output.
+The existing semantic Distill pipeline remains available and unchanged.
+
+See [the frozen Distill Lock v0 specification](docs/distill-lock-v0.md) for the
+canonical JSON rules, algorithms, failure behavior, and a complete
+configuration example.
 
 ## Quick Start
 
@@ -1229,4 +1286,3 @@ For commercial licensing, contact: siddhantkhare2694@gmail.com
 - [Blog Post](https://dev.to/siddhantkcode/the-engineering-guide-to-context-window-efficiency-202b)
 - [MCP Configuration](mcp/README.md)
 - [Book a Demo](https://meet.siddhantkhare.com)
-

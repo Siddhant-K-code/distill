@@ -12,6 +12,7 @@
 
 - [API Reference](reference/api.md) — All REST endpoints
 - [Configuration](reference/configuration.md) — Config file, environment variables, CLI flags
+- [Distill Lock v0](distill-lock-v0.md) — Deterministic context lock/build/verify contract
 - [OpenAPI Spec](../openapi.yaml) — Machine-readable API specification
 
 ## Examples
