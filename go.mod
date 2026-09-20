@@ -3,11 +3,14 @@ module github.com/Siddhant-K-code/distill
 go 1.24.0
 
 require (
+	github.com/dlclark/regexp2 v1.11.5
+	github.com/gowebpki/jcs v1.0.1
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/pinecone-io/go-pinecone/v3 v3.1.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/qdrant/go-client v1.15.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/schollz/progressbar/v3 v3.14.6
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0

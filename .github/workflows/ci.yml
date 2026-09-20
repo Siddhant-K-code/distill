@@ -56,3 +56,22 @@ jobs:
 
       - name: Verify Distill Lock golden artifacts
         run: go test ./pkg/lock -run '^(TestGoldenFixture|TestDistillLockDemo)$' -count=1 -v
+
+  distill-jev-pilot-portability:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: '1.24'
+
+      - name: Test offline excluded-pilot harness
+        run: go test ./internal/studypilot ./cmd/distill-jev-pilot -count=1
+
+      - name: Generate and validate offline excluded-pilot package
+        run: make distill-jev-pilot

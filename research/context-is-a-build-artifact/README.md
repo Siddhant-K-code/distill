@@ -27,6 +27,10 @@ credential, outcome, or claim that an experiment has run.
   executes nothing.
 - [Receipt validation](receipt-validation.md): canonical digest projections
   and cross-record checks required in addition to JSON Schema validation.
+- [Offline pilot clarification](pilot-protocol-v1.md): prospective frozen
+  seven-question and untuned routing details for synthetic excluded fixtures.
+- [Offline pilot harness](pilot/README.md): zero-call generation, validation,
+  and future-adapter gates.
 
 ## Distill Lock v0 anchors
 

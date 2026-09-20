@@ -44,6 +44,13 @@ test-cover: ## Run tests and show coverage
 distill-lock-demo: ## Build, verify, repeat, and mutate the Distill Lock v0 fixture
 	$(GO) test ./pkg/lock -run '^TestDistillLockDemo$$' -count=1 -v
 
+.PHONY: distill-jev-pilot
+distill-jev-pilot: ## Generate and validate the excluded offline research pilot
+	$(GO) run ./cmd/distill-jev-pilot prepare --output build/pilot
+	$(GO) run ./cmd/distill-jev-pilot validate build/pilot
+	$(GO) run ./cmd/distill-jev-pilot summarize build/pilot
+	@printf '%s\n' 'provider_calls=0 final_study_eligible=false'
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...
