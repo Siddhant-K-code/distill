@@ -128,6 +128,9 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 		result.ErrorCode = fmt.Sprintf("http_%d", response.StatusCode)
 		return result
 	}
+	if usage, usageErr := parseUsageEnvelope(raw); usageErr == nil {
+		result.ObservedUsage = &usage
+	}
 	if result.Metadata.ProviderRequestID == "" {
 		result.Err = fmt.Errorf("provider response lacks request identity")
 		result.ErrorStage = "parse"
@@ -144,6 +147,28 @@ func (client *Client) call(ctx context.Context, record studypilot.RequestRecord)
 	result.Response = &parsed
 	result.ObservedUsage = &parsed.Usage
 	return result
+}
+
+func parseUsageEnvelope(raw []byte) (Usage, error) {
+	var envelope struct {
+		Usage json.RawMessage `json:"usage"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return Usage{}, err
+	}
+	if len(envelope.Usage) == 0 || bytes.Equal(bytes.TrimSpace(envelope.Usage), []byte("null")) {
+		return Usage{}, fmt.Errorf("provider response omits usage")
+	}
+	var usage Usage
+	if err := json.Unmarshal(envelope.Usage, &usage); err != nil {
+		return Usage{}, err
+	}
+	if !usage.inputPresent || !usage.outputPresent ||
+		usage.InputTokens < 0 || int64(usage.InputTokens) > MaxInputTokens ||
+		usage.OutputTokens < 0 || int64(usage.OutputTokens) > MaxOutputTokens {
+		return Usage{}, fmt.Errorf("provider response has invalid usage")
+	}
+	return usage, nil
 }
 
 func parseAPIResponse(raw []byte, request studypilot.RequestRecord) (APIResponse, error) {
@@ -194,9 +219,7 @@ func parseAPIResponse(raw []byte, request studypilot.RequestRecord) (APIResponse
 			return APIResponse{}, fmt.Errorf("provider answer %q has invalid confidence", question.Field)
 		}
 	}
-	if !response.Usage.inputPresent || !response.Usage.outputPresent ||
-		response.Usage.InputTokens < 0 || int64(response.Usage.InputTokens) > MaxInputTokens ||
-		response.Usage.OutputTokens < 0 || int64(response.Usage.OutputTokens) > MaxOutputTokens {
+	if _, err := parseUsageEnvelope(raw); err != nil {
 		return APIResponse{}, fmt.Errorf("provider response has invalid usage")
 	}
 	return response, nil

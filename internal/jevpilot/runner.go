@@ -201,7 +201,8 @@ func Run(ctx context.Context, options RunOptions) (RunSummary, error) {
 					return summary, err
 				}
 			}
-		} else {
+		}
+		if result.Err != nil {
 			if data := material.Artifacts[entry.ScheduledCallID+"-sanitized-error"]; len(data) > 0 {
 				if err := writeExclusive(filepath.Join(callDirectory, "error.json"), data); err != nil {
 					return summary, err

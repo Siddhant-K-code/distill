@@ -1,8 +1,10 @@
 package jevpilot
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/Siddhant-K-code/distill/internal/studypilot"
@@ -141,7 +143,7 @@ func (answer *ChoiceAnswer) UnmarshalJSON(data []byte) error {
 		Probabilities map[string]float64 `json:"probabilities"`
 		Confidence    *float64           `json:"confidence"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := decodeStrictJSON(data, &wire); err != nil {
 		return err
 	}
 	if wire.Confidence == nil {
@@ -167,7 +169,7 @@ func (usage *Usage) UnmarshalJSON(data []byte) error {
 		InputTokens  *int `json:"input_tokens"`
 		OutputTokens *int `json:"output_tokens"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := decodeStrictJSON(data, &wire); err != nil {
 		return err
 	}
 	if wire.InputTokens == nil || wire.OutputTokens == nil {
@@ -177,6 +179,19 @@ func (usage *Usage) UnmarshalJSON(data []byte) error {
 	usage.OutputTokens = *wire.OutputTokens
 	usage.inputPresent = true
 	usage.outputPresent = true
+	return nil
+}
+
+func decodeStrictJSON(data []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return fmt.Errorf("trailing JSON value")
+	}
 	return nil
 }
 

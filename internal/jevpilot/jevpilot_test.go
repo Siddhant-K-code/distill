@@ -200,6 +200,28 @@ func TestMappingRejectsAliasesAndAdversarialProbabilities(t *testing.T) {
 	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
 		t.Fatal("missing confidence unexpectedly accepted")
 	}
+	response = fakeResponse(pilot.Requests[0], pilot.Cases[0])
+	raw, _ = json.Marshal(response)
+	var responseMap map[string]any
+	if err := json.Unmarshal(raw, &responseMap); err != nil {
+		t.Fatal(err)
+	}
+	first := responseMap["answers"].(map[string]any)[pilot.Requests[0].Questions[0].Field].(map[string]any)
+	first["unexpected"] = true
+	raw, _ = json.Marshal(responseMap)
+	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
+		t.Fatal("unknown nested answer field unexpectedly accepted")
+	}
+	response = fakeResponse(pilot.Requests[0], pilot.Cases[0])
+	raw, _ = json.Marshal(response)
+	if err := json.Unmarshal(raw, &responseMap); err != nil {
+		t.Fatal(err)
+	}
+	responseMap["usage"].(map[string]any)["unexpected"] = true
+	raw, _ = json.Marshal(responseMap)
+	if _, err := parseAPIResponse(raw, pilot.Requests[0]); err == nil {
+		t.Fatal("unknown nested usage field unexpectedly accepted")
+	}
 }
 
 func TestZeroRetryTransportFailureAndBudgetGuard(t *testing.T) {
