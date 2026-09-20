@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strings"
 
 	"github.com/gowebpki/jcs"
 	"golang.org/x/text/unicode/norm"
@@ -163,9 +162,10 @@ func validateJSONStructuralLimits(data []byte) error {
 				escaped = false
 				continue
 			}
-			if value == '\\' {
+			switch value {
+			case '\\':
 				escaped = true
-			} else if value == '"' {
+			case '"':
 				inString = false
 			}
 			continue
@@ -223,12 +223,4 @@ func parseJSONL[T any](data []byte) ([]T, error) {
 		result = append(result, record)
 	}
 	return result, nil
-}
-
-func validDigest(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
-		return false
-	}
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == sha256.Size
 }

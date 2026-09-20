@@ -35,8 +35,8 @@ func run(args []string, output io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(output, "prepared=%s cases=%d provider_calls=0 final_study_eligible=false\n", *outputDirectory, summary.CaseCount)
-		return nil
+		_, err = fmt.Fprintf(output, "prepared=%s cases=%d provider_calls=0 final_study_eligible=false\n", *outputDirectory, summary.CaseCount)
+		return err
 	case "validate":
 		if len(args) != 2 {
 			return fmt.Errorf("usage: distill-jev-pilot validate <artifact-directory>")
@@ -45,8 +45,8 @@ func run(args []string, output io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(output, "valid=true cases=%d provider_calls=0 final_study_eligible=false\n", summary.CaseCount)
-		return nil
+		_, err = fmt.Fprintf(output, "valid=true cases=%d provider_calls=0 final_study_eligible=false\n", summary.CaseCount)
+		return err
 	case "summarize":
 		if len(args) != 2 {
 			return fmt.Errorf("usage: distill-jev-pilot summarize <artifact-directory>")

@@ -335,7 +335,9 @@ func readValidatedArtifact(path string, before os.FileInfo) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 	opened, err := file.Stat()
 	if err != nil {
 		return nil, err

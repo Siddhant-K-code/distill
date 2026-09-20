@@ -372,7 +372,7 @@ func validateReceiptIdentities(receipt map[string]any, registry ReceiptRegistry)
 	}
 	if stringAt(receipt, "validator", "json_schema_validator") != "github.com/santhosh-tekuri/jsonschema/v6" ||
 		stringAt(receipt, "validator", "json_schema_validator_version") != "v6.0.3" ||
-		boolAt(receipt, "validator", "format_assertion_enabled") != true ||
+		!boolAt(receipt, "validator", "format_assertion_enabled") ||
 		stringAt(receipt, "validator", "semantic_validator_version") != "context-build-artifact/semantic-validator/v1" {
 		return fmt.Errorf("validator identity mismatch")
 	}
