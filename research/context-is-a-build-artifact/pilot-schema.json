@@ -1,0 +1,946 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Siddhant-K-code/distill/blob/main/research/context-is-a-build-artifact/pilot-schema.json",
+  "title": "Context Is a Build Artifact Pilot Record",
+  "description": "Data and receipt structures for an excluded pilot or later final run. This schema makes no provider call. Fields named *_digest contain lowercase SHA-256 of separately specified canonical bytes. Deterministic identities MUST exclude timestamps, latency, usage, cost, provider request IDs, and other execution metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_phase",
+    "case",
+    "source_set",
+    "perturbation",
+    "ground_truth",
+    "compiled_context",
+    "question_schema",
+    "decision_system",
+    "decision",
+    "policy",
+    "measurement",
+    "evidence_hashes",
+    "identity_digest",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-build-artifact/receipt/v1"
+    },
+    "study_phase": {
+      "enum": [
+        "pilot",
+        "final"
+      ]
+    },
+    "case": {
+      "$ref": "#/$defs/case"
+    },
+    "source_set": {
+      "$ref": "#/$defs/sourceSet"
+    },
+    "perturbation": {
+      "$ref": "#/$defs/perturbation"
+    },
+    "ground_truth": {
+      "$ref": "#/$defs/groundTruth"
+    },
+    "compiled_context": {
+      "$ref": "#/$defs/compiledContext"
+    },
+    "question_schema": {
+      "$ref": "#/$defs/questionSchema"
+    },
+    "decision_system": {
+      "$ref": "#/$defs/decisionSystem"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "measurement": {
+      "$ref": "#/$defs/measurement"
+    },
+    "evidence_hashes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidenceHash"
+      }
+    },
+    "identity_digest": {
+      "$ref": "#/$defs/sha256",
+      "description": "Digest of canonical identity material only: schema version, phase, case, source identities, perturbation, ground truth, compiled-context identity, question-schema identity, decision-system identity, decision output, policy identity/result, and evidence hashes. Excludes all measurement fields, timestamps, latency, usage, cost, provider request IDs, identity_digest, and receipt_digest."
+    },
+    "receipt_digest": {
+      "$ref": "#/$defs/sha256",
+      "description": "Integrity digest of the canonical complete receipt, including measurement metadata but excluding receipt_digest itself. This is not a deterministic experiment identity because timestamps and provider execution metadata are included."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "study_phase": {
+            "const": "pilot"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "case": {
+            "properties": {
+              "split": {
+                "const": "pilot"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "study_phase": {
+            "const": "final"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "case": {
+            "properties": {
+              "split": {
+                "enum": [
+                  "calibration",
+                  "held_out_repository"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "repository_url",
+        "repository_commit",
+        "split",
+        "task_kind",
+        "case_manifest_digest"
+      ],
+      "properties": {
+        "case_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "repository_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "split": {
+          "enum": [
+            "pilot",
+            "calibration",
+            "held_out_repository"
+          ]
+        },
+        "task_kind": {
+          "enum": [
+            "evidence_handoff",
+            "patch_verification",
+            "cleanup_verification",
+            "external_effect_verification"
+          ]
+        },
+        "case_manifest_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sourceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_set_id",
+        "manifest_order",
+        "sources",
+        "source_set_digest"
+      ],
+      "properties": {
+        "source_set_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "manifest_order": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "source_set_digest": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of canonical source identities and manifest order; excludes collection timestamps and filesystem metadata."
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "relative_path",
+        "media_type",
+        "byte_length",
+        "content_digest",
+        "evidence_role"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*\\\\)[^\\u0000-\\u001f]+$"
+        },
+        "media_type": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "normalized_content_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_role": {
+          "enum": [
+            "required",
+            "supporting",
+            "contradictory",
+            "metadata",
+            "irrelevant_control"
+          ]
+        }
+      }
+    },
+    "perturbation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "perturbation_id",
+        "type",
+        "transform_version",
+        "seed",
+        "expected_equivalence",
+        "base_source_set_digest",
+        "result_source_set_digest",
+        "transformation_receipt_digest"
+      ],
+      "properties": {
+        "perturbation_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "type": {
+          "enum": [
+            "none",
+            "source_reorder",
+            "exact_duplicate_insertion",
+            "line_ending_change",
+            "metadata_noise",
+            "path_rename_identical_content",
+            "irrelevant_appended_text",
+            "one_relevant_fact_change",
+            "missing_required_evidence",
+            "contradictory_evidence",
+            "stale_baseline_or_evidence"
+          ]
+        },
+        "transform_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_equivalence": {
+          "enum": [
+            "equivalent",
+            "meaning_changing"
+          ]
+        },
+        "base_source_set_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result_source_set_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "transformation_receipt_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "groundTruth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubric_version",
+        "rubric_digest",
+        "adjudication_status",
+        "answers",
+        "adjudication_receipt_digest"
+      ],
+      "properties": {
+        "rubric_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "rubric_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "adjudication_status": {
+          "enum": [
+            "agreed",
+            "resolved_by_third_adjudicator",
+            "contains_indeterminate"
+          ]
+        },
+        "answers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/groundTruthAnswer"
+          }
+        },
+        "adjudication_receipt_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "groundTruthAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "label",
+        "supporting_evidence_digests"
+      ],
+      "properties": {
+        "question_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "label": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown",
+            "not_applicable",
+            "low",
+            "medium",
+            "high",
+            "accept",
+            "review",
+            "reject",
+            "indeterminate"
+          ]
+        },
+        "supporting_evidence_digests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "disagreement_code": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "compiledContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "compiler_version",
+        "compiler_digest",
+        "input_source_set_digest",
+        "context_byte_length",
+        "compiled_context_digest",
+        "artifact_hashes"
+      ],
+      "properties": {
+        "arm": {
+          "enum": [
+            "raw_deterministic_concatenation",
+            "deterministic_lexical_chunk_rank",
+            "distill_lock_v0",
+            "distill_lock_content_addressed_replay"
+          ]
+        },
+        "compiler_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "compiler_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_source_set_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "context_byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compiled_context_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_hashes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidenceHash"
+          }
+        }
+      }
+    },
+    "questionSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "question_schema_digest",
+        "question_ids"
+      ],
+      "properties": {
+        "schema_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "question_schema_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "question_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "decisionSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "system_version",
+        "system_digest",
+        "model",
+        "api_version",
+        "sdk"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "deterministic_policy",
+            "jev_pinned",
+            "frontier_llm_pinned"
+          ]
+        },
+        "system_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "system_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/modelIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "api_version": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sdk": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sdkIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "modelIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model_id",
+        "model_version",
+        "parameters_digest",
+        "confidence_semantics_version"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "(^|[-_/])[Ll][Aa][Tt][Ee][Ss][Tt]$"
+          }
+        },
+        "model_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "confidence_semantics_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "sdkIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "package_digest"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "package_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "outputs",
+        "raw_output_digest"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "valid",
+            "failed"
+          ]
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/questionOutput"
+          }
+        },
+        "raw_output_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "valid"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "minItems": 1
+              },
+              "raw_output_digest": {
+                "$ref": "#/$defs/sha256"
+              },
+              "error": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "maxItems": 0
+              },
+              "error": {
+                "$ref": "#/$defs/error"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "questionOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "selected_label",
+        "probabilities",
+        "confidence",
+        "confidence_semantics"
+      ],
+      "properties": {
+        "question_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "selected_label": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "probabilities": {
+          "oneOf": [
+            {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "description": "Complete label distribution. The runner additionally validates finite values and sum within 1e-9 of 1."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence_semantics": {
+          "enum": [
+            "selected_label_probability",
+            "provider_defined_versioned",
+            "not_available"
+          ]
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_version",
+        "policy_digest",
+        "threshold_set_digest",
+        "result",
+        "reason_codes"
+      ],
+      "properties": {
+        "policy_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "policy_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threshold_set_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result": {
+          "enum": [
+            "accept",
+            "review",
+            "reject"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduled_call_id",
+        "replicate_index",
+        "attempt_started_at",
+        "attempt_finished_at",
+        "latency_ms",
+        "usage",
+        "provider_reported_cost",
+        "provider_request_id"
+      ],
+      "properties": {
+        "scheduled_call_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "replicate_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "attempt_started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attempt_finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usage": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/usage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_reported_cost": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cost"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_request_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "Execution metadata for audit and secondary outcomes. This entire object is excluded from identity_digest but included in receipt_digest."
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "provider_usage_json_digest"
+      ],
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_usage_json_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "currency",
+        "pricing_version"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "pricing_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "code",
+        "retry_count",
+        "error_detail_digest"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "preflight",
+            "compile",
+            "transport",
+            "provider",
+            "parse",
+            "schema",
+            "policy",
+            "receipt"
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "retry_count": {
+          "const": 0
+        },
+        "error_detail_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evidenceHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "media_type",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "media_type": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

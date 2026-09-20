@@ -19,3 +19,8 @@
 
 - [LangChain Integration](examples/langchain.md)
 - [RAG Pipeline](examples/rag-pipeline.md)
+
+## Research
+
+- [Context Is a Build Artifact](../research/context-is-a-build-artifact/) —
+  preregistered decision-reliability study design; no model runs
