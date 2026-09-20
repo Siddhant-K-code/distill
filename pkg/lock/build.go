@@ -32,11 +32,15 @@ func buildWithSync(lockPath, outputDirectory string, syncDirectoryFn func(string
 	if err != nil {
 		return Summary{}, fmt.Errorf("resolve locked source root: %w", err)
 	}
-	inside, err := isWithin(lockDirectory, sourceRoot)
+	inside, err := existingPathWithin(lockDirectory, sourceRoot)
 	if err != nil {
 		return Summary{}, fmt.Errorf("validate locked source root: %w", err)
 	}
-	if !inside || lockDirectory == sourceRoot {
+	sameDirectory, err := sameExistingFile(lockDirectory, sourceRoot)
+	if err != nil {
+		return Summary{}, fmt.Errorf("compare lockfile and source directory identities: %w", err)
+	}
+	if !inside || sameDirectory {
 		return Summary{}, fmt.Errorf("locked source root must be a strict descendant of lockfile directory")
 	}
 
@@ -245,8 +249,7 @@ func validateBuildDestination(destination, sourceRoot string) error {
 	if err != nil {
 		return fmt.Errorf("resolve source root: %w", err)
 	}
-	outputResolved := filepath.Join(parent, filepath.Base(destination))
-	inside, err := isWithin(sourceResolved, outputResolved)
+	inside, err := existingPathWithin(sourceResolved, parent)
 	if err != nil {
 		return fmt.Errorf("compare output and source paths: %w", err)
 	}

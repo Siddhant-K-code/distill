@@ -278,10 +278,24 @@ func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) erro
 	return fmt.Errorf("%q is writable by group or other users", filePath)
 }
 
-func isWithin(parent, child string) (bool, error) {
-	relative, err := filepath.Rel(parent, child)
+func existingPathWithin(parent, child string) (bool, error) {
+	parentInfo, err := os.Stat(parent)
 	if err != nil {
 		return false, err
 	}
-	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))), nil
+	current := filepath.Clean(child)
+	for {
+		info, err := os.Stat(current)
+		if err != nil {
+			return false, err
+		}
+		if os.SameFile(parentInfo, info) {
+			return true, nil
+		}
+		next := filepath.Dir(current)
+		if next == current {
+			return false, nil
+		}
+		current = next
+	}
 }

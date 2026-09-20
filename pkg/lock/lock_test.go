@@ -397,6 +397,40 @@ func TestLockCannotOverwriteConfiguration(t *testing.T) {
 	}
 }
 
+func TestLockCannotOverwriteConfigurationAlias(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	configPath := filepath.Join(root, "config.json")
+	aliasPath := filepath.Join(root, "config-alias.json")
+	if err := os.Link(configPath, aliasPath); err != nil {
+		t.Fatal(err)
+	}
+	before := append([]byte(nil), mustRead(t, configPath)...)
+	if _, err := Create(configPath, aliasPath); err == nil {
+		t.Fatal("lock creation accepted a configuration hard-link alias")
+	}
+	if after := mustRead(t, configPath); !bytes.Equal(before, after) {
+		t.Fatal("alias refusal changed the configuration")
+	}
+}
+
+func TestLockCannotOverwriteCaseAlias(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	configPath := filepath.Join(root, "config.json")
+	aliasPath := filepath.Join(root, "CONFIG.JSON")
+	if _, err := os.Stat(aliasPath); os.IsNotExist(err) {
+		t.Skip("filesystem is case-sensitive")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	before := append([]byte(nil), mustRead(t, configPath)...)
+	if _, err := Create(configPath, aliasPath); err == nil {
+		t.Fatal("lock creation accepted a case-insensitive configuration alias")
+	}
+	if after := mustRead(t, configPath); !bytes.Equal(before, after) {
+		t.Fatal("case-alias refusal changed the configuration")
+	}
+}
+
 func TestBuildRejectsUntrustedOutputParent(t *testing.T) {
 	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
 	lockPath := filepath.Join(root, LockFileName)
@@ -412,6 +446,23 @@ func TestBuildRejectsUntrustedOutputParent(t *testing.T) {
 	}
 	if _, err := Build(lockPath, filepath.Join(parent, "output")); err == nil {
 		t.Fatal("build accepted a group/world-writable non-sticky output parent")
+	}
+}
+
+func TestBuildRejectsCaseAliasInsideSource(t *testing.T) {
+	root := copyFixture(t, filepath.Join(t.TempDir(), "fixture"))
+	sourceAlias := filepath.Join(root, "SOURCES")
+	if _, err := os.Stat(sourceAlias); os.IsNotExist(err) {
+		t.Skip("filesystem is case-sensitive")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(root, LockFileName)
+	if _, err := Create(filepath.Join(root, "config.json"), lockPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(lockPath, filepath.Join(sourceAlias, "artifact")); err == nil {
+		t.Fatal("build accepted a case-insensitive output path inside the source root")
 	}
 }
 
@@ -526,6 +577,25 @@ func TestPostPublishSyncFailureIsClassified(t *testing.T) {
 	}
 	if _, err := Verify(output); err != nil {
 		t.Fatalf("committed output did not verify: %v", err)
+	}
+}
+
+func TestLockPostPublishSyncFailureIsClassified(t *testing.T) {
+	directory := t.TempDir()
+	destination := filepath.Join(directory, LockFileName)
+	syncFailure := errors.New("injected lock parent sync failure")
+	err := atomicWriteFileWithSync(destination, []byte("committed"), func(string) error {
+		return syncFailure
+	})
+	var publishedError *PublishedDurabilityError
+	if !errors.As(err, &publishedError) {
+		t.Fatalf("got %v, want PublishedDurabilityError", err)
+	}
+	if publishedError.Path != destination || !errors.Is(publishedError, syncFailure) {
+		t.Fatalf("unexpected publication error: %+v", publishedError)
+	}
+	if got := string(mustRead(t, destination)); got != "committed" {
+		t.Fatalf("committed lockfile = %q", got)
 	}
 }
 

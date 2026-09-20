@@ -42,11 +42,22 @@ func Create(configPath, outputPath string) (Summary, error) {
 	if outputAbsolute == configPath {
 		return Summary{}, fmt.Errorf("lockfile output must not overwrite its configuration")
 	}
-	inside, err := isWithin(outputDirectory, sourceRoot)
+	sameAsConfig, err := sameExistingFile(outputAbsolute, configPath)
+	if err != nil {
+		return Summary{}, fmt.Errorf("compare lockfile output and configuration: %w", err)
+	}
+	if sameAsConfig {
+		return Summary{}, fmt.Errorf("lockfile output must not alias its configuration")
+	}
+	inside, err := existingPathWithin(outputDirectory, sourceRoot)
 	if err != nil {
 		return Summary{}, fmt.Errorf("compare lockfile and source paths: %w", err)
 	}
-	if !inside || outputDirectory == sourceRoot {
+	sameDirectory, err := sameExistingFile(outputDirectory, sourceRoot)
+	if err != nil {
+		return Summary{}, fmt.Errorf("compare lockfile and source directory identities: %w", err)
+	}
+	if !inside || sameDirectory {
 		return Summary{}, fmt.Errorf("lockfile directory must be a strict ancestor of source root")
 	}
 
@@ -243,6 +254,10 @@ func summaryFromLock(lockFile LockFile, lockDigest string) Summary {
 }
 
 func atomicWriteFile(destination string, data []byte) error {
+	return atomicWriteFileWithSync(destination, data, syncDirectory)
+}
+
+func atomicWriteFileWithSync(destination string, data []byte, syncDirectoryFn func(string) error) error {
 	if info, err := os.Lstat(destination); err == nil && info.IsDir() {
 		return fmt.Errorf("destination %q is a directory", destination)
 	} else if err != nil && !os.IsNotExist(err) {
@@ -277,7 +292,10 @@ func atomicWriteFile(destination string, data []byte) error {
 	if err := os.Rename(temporaryPath, destination); err != nil {
 		return err
 	}
-	return syncDirectory(directory)
+	if err := syncDirectoryFn(directory); err != nil {
+		return &PublishedDurabilityError{Path: destination, Err: err}
+	}
+	return nil
 }
 
 func syncDirectory(directory string) error {
@@ -304,4 +322,19 @@ func equalLock(left, right LockFile) (bool, error) {
 		return false, err
 	}
 	return bytes.Equal(leftBytes, rightBytes), nil
+}
+
+func sameExistingFile(left, right string) (bool, error) {
+	leftInfo, err := os.Stat(left)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	rightInfo, err := os.Stat(right)
+	if err != nil {
+		return false, err
+	}
+	return os.SameFile(leftInfo, rightInfo), nil
 }
