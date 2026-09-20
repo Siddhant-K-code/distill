@@ -21,6 +21,11 @@ type sourceInput struct {
 	normalized []byte
 }
 
+type aclEvaluation struct {
+	unsafe           bool
+	groupModeCovered bool
+}
+
 var supportedExtensions = map[string]struct{}{
 	".bash": {}, ".c": {}, ".cc": {}, ".cfg": {}, ".conf": {}, ".cpp": {},
 	".cs": {}, ".css": {}, ".csv": {}, ".go": {}, ".graphql": {}, ".h": {},
@@ -262,14 +267,18 @@ func validateTrustedInfo(info fs.FileInfo, filePath string, directory bool) erro
 	if !ownedByCurrentUserOrRoot(info) {
 		return fmt.Errorf("%q is not owned by the current user or root", filePath)
 	}
-	hasACL, err := hasUnsafeACL(filePath)
+	acl, err := evaluateACL(filePath)
 	if err != nil {
 		return fmt.Errorf("inspect access controls for %q: %w", filePath, err)
 	}
-	if hasACL {
+	if acl.unsafe {
 		return fmt.Errorf("%q has an access-control list granting mutation rights", filePath)
 	}
-	if info.Mode().Perm()&0o022 == 0 {
+	permissions := info.Mode().Perm()
+	if acl.groupModeCovered {
+		permissions &^= 0o020
+	}
+	if permissions&0o022 == 0 {
 		return nil
 	}
 	if directory && info.Mode()&os.ModeSticky != 0 {

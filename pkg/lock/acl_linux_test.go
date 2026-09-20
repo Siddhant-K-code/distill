@@ -4,7 +4,11 @@ package lock
 
 import (
 	"encoding/binary"
+	"errors"
+	"os"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestLinuxACLEffectiveMutationRights(t *testing.T) {
@@ -79,6 +83,36 @@ func TestLinuxACLEffectiveMutationRights(t *testing.T) {
 				t.Fatalf("unsafe = %t, want %t", unsafe, test.unsafe)
 			}
 		})
+	}
+}
+
+func TestLinuxAccessACLControlsGroupModeBits(t *testing.T) {
+	path := t.TempDir() + "/acl.txt"
+	if err := os.WriteFile(path, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entries := []linuxACLEntry{
+		{tag: linuxACLUserObj, permissions: 6, id: ^uint32(0)},
+		{tag: linuxACLUser, permissions: 6, id: uint32(os.Geteuid())},
+		{tag: linuxACLGroupObj, permissions: 4, id: ^uint32(0)},
+		{tag: linuxACLMask, permissions: 6, id: ^uint32(0)},
+		{tag: linuxACLOther, permissions: 4, id: ^uint32(0)},
+	}
+	if err := unix.Setxattr(path, "system.posix_acl_access", encodeLinuxACL(entries), 0); err != nil {
+		if errors.Is(err, unix.ENOTSUP) || errors.Is(err, unix.EPERM) {
+			t.Skipf("filesystem does not support POSIX ACLs: %v", err)
+		}
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o020 == 0 {
+		t.Fatal("test ACL did not populate group mask mode bit")
+	}
+	if err := validateTrustedInfo(info, path, false); err != nil {
+		t.Fatalf("safe current-user ACL was rejected: %v", err)
 	}
 }
 

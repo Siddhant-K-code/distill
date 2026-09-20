@@ -41,10 +41,10 @@ type darwinACLBuffer struct {
 	Data      [4096]byte
 }
 
-func hasUnsafeACL(path string) (bool, error) {
+func evaluateACL(path string) (aclEvaluation, error) {
 	pathPointer, err := unix.BytePtrFromString(path)
 	if err != nil {
-		return false, err
+		return aclEvaluation{}, err
 	}
 	attributes := darwinAttributeList{
 		BitmapCount: 5,
@@ -62,12 +62,13 @@ func hasUnsafeACL(path string) (bool, error) {
 		0,
 	)
 	if errno != 0 {
-		return false, errno
+		return aclEvaluation{}, errno
 	}
 	if buffer.Reference.Length == 0 {
-		return false, nil
+		return aclEvaluation{}, nil
 	}
-	return darwinACLGrantsMutation(buffer.Data[:], int(buffer.Reference.Length))
+	unsafe, err := darwinACLGrantsMutation(buffer.Data[:], int(buffer.Reference.Length))
+	return aclEvaluation{unsafe: unsafe}, err
 }
 
 func darwinACLGrantsMutation(data []byte, length int) (bool, error) {

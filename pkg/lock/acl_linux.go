@@ -28,32 +28,37 @@ type linuxACLEntry struct {
 	id          uint32
 }
 
-func hasUnsafeACL(path string) (bool, error) {
+func evaluateACL(path string) (aclEvaluation, error) {
+	var result aclEvaluation
 	for _, name := range []string{"system.posix_acl_access", "system.posix_acl_default"} {
 		size, err := unix.Lgetxattr(path, name, nil)
 		if errors.Is(err, unix.ENODATA) || errors.Is(err, unix.ENOTSUP) {
 			continue
 		}
 		if err != nil {
-			return false, err
+			return aclEvaluation{}, err
 		}
 		if size == 0 {
 			continue
 		}
+		if name == "system.posix_acl_access" {
+			result.groupModeCovered = true
+		}
 		data := make([]byte, size)
 		read, err := unix.Lgetxattr(path, name, data)
 		if err != nil {
-			return false, err
+			return aclEvaluation{}, err
 		}
 		unsafe, err := linuxACLGrantsMutation(data[:read], uint32(os.Geteuid()))
 		if err != nil {
-			return false, fmt.Errorf("%s: %w", name, err)
+			return aclEvaluation{}, fmt.Errorf("%s: %w", name, err)
 		}
 		if unsafe {
-			return true, nil
+			result.unsafe = true
+			return result, nil
 		}
 	}
-	return false, nil
+	return result, nil
 }
 
 func linuxACLGrantsMutation(data []byte, currentUID uint32) (bool, error) {
