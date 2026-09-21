@@ -53,6 +53,8 @@ distill-jev-pilot: ## Generate and validate the excluded offline research pilot
 
 .PHONY: distill-jev-final
 distill-jev-final: ## Generate and validate the offline final-study package
+	mkdir -p build
+	chmod 700 build
 	$(GO) run ./cmd/distill-jev-final prepare \
 		--output build/final-study \
 		--agenttrace-contamination-artifact research/context-is-a-build-artifact/final-contamination-ledger-v1.md \

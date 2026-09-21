@@ -861,7 +861,8 @@ func ValidateReceipt(r Receipt, d Dataset, schedule ScheduleEntry, authorization
 	} else if r.ParsedResponseSHA256 != nil {
 		return fmt.Errorf("parsed response digest without raw response")
 	}
-	if r.Status == "succeeded" {
+	switch r.Status {
+	case "succeeded":
 		if r.Decision == nil || r.ErrorCode != nil || r.ErrorMessageSHA256 != nil ||
 			r.ErrorArtifactSHA256 != nil || len(r.RawError) != 0 ||
 			r.InferredCostNanoUSD == nil || r.CostBasis != "authoritative_usage" ||
@@ -893,7 +894,7 @@ func ValidateReceipt(r Receipt, d Dataset, schedule ScheduleEntry, authorization
 			r.Usage.InputTokens == nil || *r.InferredCostNanoUSD != *r.Usage.InputTokens*InputPriceNanoUSD {
 			return fmt.Errorf("provider response fields do not match receipt")
 		}
-	} else if r.Status == "failed" || r.Status == "partial" || r.Status == "not_attempted" {
+	case "failed", "partial", "not_attempted":
 		if r.ErrorCode == nil || len(r.RawError) == 0 || r.Decision != nil ||
 			r.ProviderPolicyFacts != (PolicyFacts{}) || r.IndependentPolicyFacts != (PolicyFacts{}) ||
 			r.FactsAgreement || r.IndependentDisposition != "" || len(r.IndependentReasonCodes) != 0 {
@@ -936,7 +937,7 @@ func ValidateReceipt(r Receipt, d Dataset, schedule ScheduleEntry, authorization
 		} else if len(r.RawResponse) > 0 {
 			return fmt.Errorf("unknown response artifact kind")
 		}
-	} else {
+	default:
 		return fmt.Errorf("invalid receipt status")
 	}
 	receiptHash, err := receiptDigest(r)

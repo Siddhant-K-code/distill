@@ -154,8 +154,8 @@ func run(args []string) error {
 		if !*fake {
 			return fmt.Errorf("real transport is intentionally unavailable; use the in-memory studyfinal.Transport interface")
 		}
-		fmt.Fprintln(os.Stdout, "fake transport scaffold ready; no network call made")
-		return nil
+		_, err := fmt.Fprintln(os.Stdout, "fake transport scaffold ready; no network call made")
+		return err
 	default:
 		return usageError()
 	}
@@ -166,7 +166,7 @@ func readStrictJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {

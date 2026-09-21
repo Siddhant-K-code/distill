@@ -16,7 +16,11 @@ func TestOfflineCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(root)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(root); err != nil {
+			t.Error(err)
+		}
+	})
 	destination := filepath.Join(root, "package")
 	if err := run([]string{"prepare", "--output", destination}); err != nil {
 		t.Fatal(err)
@@ -58,7 +62,11 @@ func TestSummarize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(root)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(root); err != nil {
+			t.Error(err)
+		}
+	})
 	destination := filepath.Join(root, "package")
 	if err := run([]string{"prepare", "--output", destination}); err != nil {
 		t.Fatal(err)

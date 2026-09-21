@@ -164,8 +164,11 @@ func createExecutionLedger(path string, d Dataset, schedule []ScheduleEntry, ana
 	if err != nil {
 		return LedgerBinding{}, err
 	}
-	defer parent.Close()
 	if err := parent.Sync(); err != nil {
+		_ = parent.Close()
+		return LedgerBinding{}, err
+	}
+	if err := parent.Close(); err != nil {
 		return LedgerBinding{}, err
 	}
 	return binding, nil
@@ -204,7 +207,7 @@ func validateFreshLedgerBinding(binding LedgerBinding, d Dataset, schedule []Sch
 	if err != nil {
 		return fmt.Errorf("bound ledger missing: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {
 		return fmt.Errorf("ledger genesis missing")

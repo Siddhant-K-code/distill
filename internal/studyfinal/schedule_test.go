@@ -127,9 +127,10 @@ func TestPhaseOrderingAndHeldOutOnce(t *testing.T) {
 	development := []ScoredDecision{}
 	calibration := []ScoredDecision{}
 	for _, base := range d.Bases {
-		if base.Split == "threshold-development" {
+		switch base.Split {
+		case "threshold-development":
 			development = append(development, ScoredDecision{ID: base.ID, Score: &score})
-		} else if base.Split == "safety-calibration" {
+		case "safety-calibration":
 			calibration = append(calibration, ScoredDecision{ID: base.ID, Score: &score})
 		}
 	}

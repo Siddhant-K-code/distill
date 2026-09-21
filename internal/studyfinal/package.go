@@ -349,7 +349,7 @@ func readChecksums(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	out := map[string]string{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -405,7 +405,7 @@ func WriteAuthorization(path string, authorization Authorization) error {
 	if err := writeExclusive(stage, append(data, '\n'), 0o600); err != nil {
 		return err
 	}
-	defer os.Remove(stage)
+	defer func() { _ = os.Remove(stage) }()
 	if err := os.Link(stage, path); err != nil {
 		return err
 	}
@@ -413,8 +413,11 @@ func WriteAuthorization(path string, authorization Authorization) error {
 	if err != nil {
 		return err
 	}
-	defer dir.Close()
-	return dir.Sync()
+	if err := dir.Sync(); err != nil {
+		_ = dir.Close()
+		return err
+	}
+	return dir.Close()
 }
 
 func syncTree(dir string) error {
@@ -439,8 +442,11 @@ func syncTree(dir string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
-	return root.Sync()
+	if err := root.Sync(); err != nil {
+		_ = root.Close()
+		return err
+	}
+	return root.Close()
 }
 
 func safeDestination(p string) bool {

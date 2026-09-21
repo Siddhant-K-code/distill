@@ -45,7 +45,8 @@ func DigestDomain(domain string, v any) (string, error) {
 		return "", fmt.Errorf("digest domain is required")
 	}
 	for _, r := range domain {
-		if r > 0x7f || !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+		valid := r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-'
+		if r > 0x7f || !valid {
 			return "", fmt.Errorf("invalid digest domain %q", domain)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -228,8 +229,10 @@ func buildCorpus(cfg Config, env authorizationEnvironment) (Dataset, error) {
 					Path: anchor.Path, ContentSHA256: anchor.SHA256, Resolution: resolution,
 				})
 			}
-			count := 0
-			fmt.Sscan(spec.counts[i], &count)
+			count, err := strconv.Atoi(spec.counts[i])
+			if err != nil {
+				return Dataset{}, fmt.Errorf("invalid allocation count for %s: %w", id, err)
+			}
 			families := distillFamilies
 			if spec.repo != "Distill" {
 				families = specializedFamilies[id]
@@ -459,7 +462,7 @@ func validateCorpus(d Dataset, env authorizationEnvironment) error {
 		return fmt.Errorf("unexpected AgentTrace contamination artifact path")
 	}
 	if d.DistillLock != (DistillLockConfig{MergeCommit: DistillCommit, ChunkBytes: 1024, TokenBudget: 8192, Algorithm: "distill-lock/v0"}) {
-		return fmt.Errorf("Distill Lock configuration drift")
+		return fmt.Errorf("distill Lock configuration drift")
 	}
 	if len(d.Bases) != 21 || len(d.Conditions) != 150 {
 		return fmt.Errorf("expected 21 bases and 150 conditions, got %d and %d", len(d.Bases), len(d.Conditions))

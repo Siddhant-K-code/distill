@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -409,9 +410,14 @@ func TestRandomLabelCommitmentCustody(t *testing.T) {
 		bytes.Contains(publicBytes, []byte(`"disposition"`)) {
 		t.Fatal("public custody package leaks labels or nonce")
 	}
-	vaultBytes, _ := json.Marshal(vault)
-	if string(vaultBytes) != "{}" {
-		t.Fatal("custodian vault serialized secret material")
+	vaultType := reflect.TypeOf(vault)
+	if vaultType.Kind() == reflect.Pointer {
+		vaultType = vaultType.Elem()
+	}
+	for i := 0; i < vaultType.NumField(); i++ {
+		if vaultType.Field(i).IsExported() {
+			t.Fatal("custodian vault exposes secret material")
+		}
 	}
 }
 
@@ -452,7 +458,11 @@ func TestAtomicOwnerOnlyPackageAndBijection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(root)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(root); err != nil {
+			t.Error(err)
+		}
+	})
 	if err := os.Chmod(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +632,11 @@ func TestPackageRejectsSymlink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(root)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(root); err != nil {
+			t.Error(err)
+		}
+	})
 	real := filepath.Join(root, "real")
 	if err := os.Mkdir(real, 0o700); err != nil {
 		t.Fatal(err)
