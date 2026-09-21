@@ -1,0 +1,149 @@
+{
+  "protocol": "context-build-artifact/final-amendment/v1",
+  "date": "2026-09-20",
+  "status": "prospective_no_final_outcome_access",
+  "provider_execution_authorized": false,
+  "independent_unit": "base_case",
+  "condition_records_are_clustered": true,
+  "allocation": [
+    {
+      "repository": "distill",
+      "role": "threshold_development",
+      "split": "calibration",
+      "base_cases": 7,
+      "condition_records": 77
+    },
+    {
+      "repository": "llmtracefx",
+      "role": "safety_calibration",
+      "split": "calibration",
+      "base_cases": 7,
+      "condition_records": 41
+    },
+    {
+      "repository": "agenttrace",
+      "role": "held_out",
+      "split": "held_out_repository",
+      "base_cases": 7,
+      "condition_records": 32
+    }
+  ],
+  "totals": {
+    "base_cases": 21,
+    "condition_records": 150,
+    "approved_context_arms": 2,
+    "condition_arm_pairs": 300,
+    "repeatability_pairs": 60,
+    "extra_replicates": 120,
+    "scheduled_observations_per_decision_system": 420,
+    "maximum_jev_provider_calls": 420
+  },
+  "context_arms": {
+    "included": [
+      "raw_deterministic_concatenation_v1",
+      "distill_lock_v0"
+    ],
+    "prospectively_omitted": [
+      "deterministic_lexical_chunk_rank"
+    ],
+    "excluded": [
+      "distill_lock_content_addressed_replay"
+    ]
+  },
+  "decision_systems": [
+    "deterministic_policy_baseline_v1",
+    "typesafe_jev_1_13_0"
+  ],
+  "risk": {
+    "ceiling": 0.15,
+    "threshold_grid": [
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.95
+    ],
+    "minimum_accepted": {
+      "threshold_development": 25,
+      "safety_calibration": 25,
+      "held_out": 25
+    },
+    "confirmatory_h1_h5_evaluable": false,
+    "reason": "Each repository role has seven independent base cases, fewer than the frozen minimum of 25."
+  },
+  "budget_usd": {
+    "cumulative_cap": "5.000000",
+    "prior_inferred_pilot": "0.000760242",
+    "remaining_cap": "4.999239758",
+    "input_per_million": "0.042000",
+    "output_per_million": "0.000000",
+    "provider_reported_cost": "separate_nullable"
+  },
+  "seeds": {
+    "transform": "final-transform-v1:2026-09-20",
+    "condition_order": "final-condition-order-v1:2026-09-20",
+    "repeatability": "final-repeatability-v1:2026-09-20",
+    "arm_order": "final-arm-order-v1:2026-09-20",
+    "bootstrap": 2026092001,
+    "randomization": 2026092002
+  },
+  "analysis": {
+    "bootstrap_resamples": 10000,
+    "randomization_samples": 100000,
+    "ece_bins": 10,
+    "log_loss_floor": 1e-15,
+    "secondary_family": [
+      "H2",
+      "H3",
+      "H4a",
+      "H4b",
+      "H5"
+    ],
+    "multiplicity": "holm_0.05"
+  },
+  "execution_order": [
+    "threshold_development",
+    "automatic_threshold_selection",
+    "safety_calibration",
+    "frozen_qualification",
+    "held_out_once_or_confirmatory_secondary",
+    "collector_signed_receipt_manifest_seal",
+    "label_unseal",
+    "analysis"
+  ],
+  "required_reviews": [
+    "methodology",
+    "operations",
+    "privacy",
+    "reproducibility",
+    "security",
+    "statistics"
+  ],
+  "execution_authorization": {
+    "gate_attestation": "content_addressed_ed25519_multi_review",
+    "trust_root": "compiled_versioned_role_key_map",
+    "build_identity": "exact_vcs_revision_clean_required",
+    "ledger": "single_canonical_owner_only_hash_chain_with_external_witness",
+    "receipt_manifest": "collector_signed_schedule_bijection",
+    "credential_storage": "macos_keychain_ai.typesafe.api_only"
+  },
+  "final_schedule_contract": {
+    "digest": "sha256(context-build-artifact/run-schedule/v1\\n || RFC8785_JCS(NFC(schedule)))",
+    "schedule_index_origin": 1,
+    "overrides": [
+      "receipt-validation-v1 raw schedule artifact digest for final-study records",
+      "receipt-validation-v1 zero-based schedule index for final-study records"
+    ]
+  },
+  "required_external_gates": [
+    "publication_independence",
+    "immutable_exact_model",
+    "no_disallowed_post_submission_tuning_or_approved_temporal_interpretation",
+    "retention_requirement_as_preregistered",
+    "provider_side_numeric_spend_cap",
+    "current_pricing",
+    "current_terms_and_privacy",
+    "exact_model_list"
+  ]
+}

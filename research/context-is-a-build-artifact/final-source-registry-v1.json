@@ -1,0 +1,278 @@
+{
+  "registry": "context-build-artifact/final-source-registry/v1",
+  "frozen_at": "2026-09-20",
+  "moving_refs_permitted": false,
+  "repositories": [
+    {
+      "id": "distill",
+      "repository": "Siddhant-K-code/distill",
+      "commit": "a9b14667024c27c32c9c9dfb9c8dc35865990979",
+      "role": "threshold_development",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "a669ee1a7ee2fd4e1a4024d6a2579da845ad577e14b7c177778270df210b02ca"
+      },
+      "anchors": [
+        {
+          "base_id": "distill-lock-golden-v0",
+          "paths": [
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            },
+            {
+              "path": "testdata/distill-lock-v0/config.json",
+              "sha256": "690fd254e697c5b4a0c542690bce1c733376b16b1f3da7b94d8c2ee3ab7ea713"
+            },
+            {
+              "path": "testdata/distill-lock-v0/sources/code/example.go",
+              "sha256": "32f7f5d8a8a1b269bd8e1d2b05f26150d3841850bed7734f132e6745110066bb"
+            },
+            {
+              "path": "testdata/distill-lock-v0/sources/docs/duplicate-a.md",
+              "sha256": "aa370ad05485fe5774b5915e78256eaeaed218fca2c74c1fb3df60dedbfa73a9"
+            },
+            {
+              "path": "testdata/distill-lock-v0/sources/docs/duplicate-b.md",
+              "sha256": "aa370ad05485fe5774b5915e78256eaeaed218fca2c74c1fb3df60dedbfa73a9"
+            },
+            {
+              "path": "testdata/distill-lock-v0/sources/line-endings/crlf.txt",
+              "sha256": "c8dba68945249de9b4faed72b89e041e3df77ffff885122599e6c2f7c65a68b2"
+            },
+            {
+              "path": "testdata/distill-lock-v0/sources/line-endings/lf.txt",
+              "sha256": "4fdbc441ea7b546100e086ac1e4fc5ae6749b7314311c99db05be450eca12996"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-budget-whole-chunk",
+          "paths": [
+            {
+              "path": "pkg/lock/lock.go",
+              "sha256": "76eb54f79a3853cf83d327de491d9a526006c87665cd55a2e020ccd34eac7159"
+            },
+            {
+              "path": "pkg/lock/build.go",
+              "sha256": "b2b9d61d0fc3f7764aa0b39ccd66bbf26d97981dd542db4b5cbe9cda1aac4716"
+            },
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-source-drift",
+          "paths": [
+            {
+              "path": "pkg/lock/build.go",
+              "sha256": "b2b9d61d0fc3f7764aa0b39ccd66bbf26d97981dd542db4b5cbe9cda1aac4716"
+            },
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-fs-trust-boundary",
+          "paths": [
+            {
+              "path": "pkg/lock/filesystem.go",
+              "sha256": "304043a4f030f54f147822533fedf5307505824f10cfa38eaa01b852542b8a95"
+            },
+            {
+              "path": "pkg/lock/acl_linux_test.go",
+              "sha256": "1bef0a760550ada530060829216205d8bf14659fc2ca8bb972d33bc835601ed8"
+            },
+            {
+              "path": "pkg/lock/acl_darwin_test.go",
+              "sha256": "e8b1ff5ae298864d53acbc19847388df72665947ae810b88ba26a37924a1d05a"
+            },
+            {
+              "path": "pkg/lock/invalid_path_linux_test.go",
+              "sha256": "50fd05b9e0b917f344550cbf73b05a8a53e3d810c1eae14777ef6d06561a5d51"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-config-path-safety",
+          "paths": [
+            {
+              "path": "pkg/lock/config.go",
+              "sha256": "32d9373e09f8c1fb3e021abe48a90eaed7369b10be1bb95031aa7c942dde5762"
+            },
+            {
+              "path": "pkg/lock/validate.go",
+              "sha256": "e20b82db7bf6d7a60628c7c843dd2fa7258063008ba6ad16f1f74ba3fb2392e5"
+            },
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-atomic-publication",
+          "paths": [
+            {
+              "path": "pkg/lock/lock.go",
+              "sha256": "76eb54f79a3853cf83d327de491d9a526006c87665cd55a2e020ccd34eac7159"
+            },
+            {
+              "path": "pkg/lock/filesystem.go",
+              "sha256": "304043a4f030f54f147822533fedf5307505824f10cfa38eaa01b852542b8a95"
+            },
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            }
+          ]
+        },
+        {
+          "base_id": "distill-lock-trusted-verification",
+          "paths": [
+            {
+              "path": "pkg/lock/verify.go",
+              "sha256": "6262432245ffd63b078006a5b82152bf9187c7637aaeb5ddd34f48ae3e0f09f8"
+            },
+            {
+              "path": "pkg/lock/lock_test.go",
+              "sha256": "8025a7f25aa1411c4a1a60e8fd3f615dd7bb1248dd6dddabbaa8f4d9e8d48d60"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "llmtracefx",
+      "repository": "Siddhant-K-code/LLMTraceFX",
+      "commit": "f9385e1d9ebf862ba46272fb8a45d7881b0b2a9c",
+      "commit_tree": "f71c1ca5a0a2dbd37c08c84176c2c25bad9026b1",
+      "role": "safety_calibration",
+      "license": {
+        "spdx": "Apache-2.0",
+        "path": "LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      "anchors": [
+        {
+          "base_id": "KV-COMPLETE-01",
+          "path": "llmtracefx/cache_audit/demo.py",
+          "sha256": "3b25a5a05af63c6290b0b2afd8286206d9c8dd906162033bbf45fb6194566813"
+        },
+        {
+          "base_id": "KV-INTEGRITY-02",
+          "path": "tests/cache_audit/test_reference_bundle.py",
+          "sha256": "d79752bda77b03c1f86b2be8fba6a6e3cf2160263fba32ce98969a1a286e938a"
+        },
+        {
+          "base_id": "KV-CONTRADICTION-03",
+          "path": "tests/cache_audit/test_verdicts.py",
+          "sha256": "0ea122a8a8717bdb3b8727b79d3909a5a302ceaf59d1fb1dd8c451e38a2951e4"
+        },
+        {
+          "base_id": "COMPARABILITY-IDENTITY-04",
+          "path": "tests/optimizer/test_compare_hardening.py",
+          "sha256": "0d73d0c265e49a19fd9df4571b08c3185af3c40cbf0103a047b06a6fa7313251"
+        },
+        {
+          "base_id": "ABSENCE-TTFT-05",
+          "path": "tests/optimizer/test_openai_api_collector.py",
+          "sha256": "ad3f1d29cd81ed2d67e92fbb1e556f7a3d868bf53d76d9b9f9da632f261ea00b"
+        },
+        {
+          "base_id": "REFUSAL-TEARDOWN-06",
+          "path": "tests/deploy/test_vllm_kv_truth_lifecycle.py",
+          "sha256": "18de1c9e93ef404ce32586d3cbfda41c3ca1b62e912afca248909d3ebca1b8e2"
+        },
+        {
+          "base_id": "CATALOG-LINEAGE-07",
+          "path": "tests/test_evidence_catalog.py",
+          "sha256": "ee6661b96a65216afe0e5a6f453a08f192169cbabacebe9ea23cd2d4431a8b39"
+        }
+      ]
+    },
+    {
+      "id": "agenttrace",
+      "repository": "Siddhant-K-code/agent-trace",
+      "commit": "b109ec5b3714b842746e97ee8e975329d8582667",
+      "commit_tree": "a01979b9b44d65393c88586c828559e9e95f1eac",
+      "role": "held_out",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "0a46f53c37edf8ba569b283cbc95fca5b37c7abee62fa5bd46efadf34fa82a80"
+      },
+      "anchors": [
+        {
+          "base_id": "AT-COV-01",
+          "path": "tests/test_hooks.py",
+          "sha256": "041027cce1229a0b893f0d5b4b1b9c47329a4ef403a122fafb7ea5eb3840ee51"
+        },
+        {
+          "base_id": "AT-CLAIM-01",
+          "path": "tests/test_assignment.py",
+          "sha256": "b928dd32da2de0276bbd5f15e5e72659d6ae9fa3f6404aba2d52be7c43059116"
+        },
+        {
+          "base_id": "AT-REC-01",
+          "path": "tests/test_lint.py",
+          "sha256": "3ee583f3bf4564abf7a412418ded28d3b8241f135fb8b7b4baf3acc05ffc47e7"
+        },
+        {
+          "base_id": "AT-DIFF-01",
+          "path": "tests/test_diff_compare.py",
+          "sha256": "28d026e368081013ce536701e887f2c8ea1a1e18ecbd32acb9bc00fb01165a0c"
+        },
+        {
+          "base_id": "AT-PRIV-01",
+          "path": "tests/test_anonymize.py",
+          "sha256": "5563fca89c19fd1b8a855aca9d14b51397d81ac4c77502731ecdbe69f388e712"
+        },
+        {
+          "base_id": "AT-INT-01",
+          "path": "tests/test_hash_chain.py",
+          "sha256": "1101a7e889a299593c481caee400e16f5870ad15610f0ce5de741b4164e07d8e"
+        },
+        {
+          "base_id": "AT-USAGE-01",
+          "path": "tests/test_provider_cost.py",
+          "sha256": "d1cc9cfe7d0cc52d95e3d05ddad9058e02e8b444e05c42b634d8360f515eca9f"
+        }
+      ],
+      "synthetic_bundle": {
+        "path": "examples/hiring/example-submission",
+        "members": [
+          {
+            "path": "trace.ndjson",
+            "sha256": "204e5510ce7b51712ffa2c3d3d14f20e494c026a3d6422258f792097de45cec4"
+          },
+          {
+            "path": "manifest.json",
+            "sha256": "84ae1f3227198490a71feed97fbf3a385d6017f1e2e2e73c59743761424b6092"
+          },
+          {
+            "path": "stats.json",
+            "sha256": "ee0b69854a32cbc82c494d7535572ab316d87d6312df91a8773c5db29f7a76d4"
+          },
+          {
+            "path": "cost.json",
+            "sha256": "3fb8b87519a749984b5e3e9749a2dcfc596bc99f69ae097db41576410c4c299c"
+          },
+          {
+            "path": "lint.json",
+            "sha256": "b311bdf42a21e0179b7a6220fe6bb1a8e9b1019dcffda06e302bfbf67f9e0d7c"
+          },
+          {
+            "path": "replay.html",
+            "sha256": "321e05253d4db95b7e0ce8a899824bddf4cdc1b4b21c30b8f8a5ab881b5efdce"
+          }
+        ]
+      }
+    }
+  ]
+}

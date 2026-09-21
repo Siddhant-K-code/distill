@@ -31,6 +31,21 @@ credential, outcome, or claim that an experiment has run.
   seven-question and untuned routing details for synthetic excluded fixtures.
 - [Offline pilot harness](pilot/README.md): zero-call generation, validation,
   and future-adapter gates.
+- [Final-study prospective amendment](final-amendment-v1.md): exact repository
+  allocation, condition count, arm/schedule freeze, policy precedence, custody,
+  and the non-evaluable confirmatory consequence of the 21-base allocation.
+- [Final-study amendment registry](final-amendment-v1.json): machine-readable
+  counts, seeds, thresholds, analysis constants, budget, and external gates.
+- [Final-study external gate review](final-external-gates-v1.md): current
+  TypeSafe public-source digests, gate classifications, no-go decision, and
+  exact clarification required before any final provider call.
+- [Final-study source registry](final-source-registry-v1.json): immutable
+  cross-repository commits, licenses, paths, and raw artifact digests.
+- [Final-study receipt schema](final-receipt-schema-v1.json): exact Draft
+  2020-12 schema packaged with the final offline corpus and applied before
+  semantic receipt validation.
+- [Final-study contamination ledger](final-contamination-ledger-v1.md):
+  excluded-pilot comparison and the bounded repository-level holdout claim.
 
 ## Distill Lock v0 anchors
 
@@ -53,6 +68,10 @@ provenance. It does not make a model or provider deterministic.
 
 The frozen `pilot-schema.json` SHA-256 is
 `1a63ab0a3f3e377e09b54c8993bc0d2bc8fb3fe3512fc401c10bc0f188ee2e41`.
+The frozen `final-receipt-schema-v1.json` SHA-256 is
+`074277e7b6f9ea30b6659ff7ea8d2d72433219b086c0fc3ef731a5679852c5bf`.
+The frozen `final-source-registry-v1.json` SHA-256 is
+`b5329538427ee98c6aff4027506622fd1b4c4b5920d2acd9bc470f2da9e2059c`.
 
 ## Independent review
 

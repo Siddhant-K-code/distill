@@ -1,0 +1,458 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:distill:context-build-artifact:final-receipt:v1",
+  "title": "Final study receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "call_id",
+    "schedule_index",
+    "condition_id",
+    "repository_role",
+    "split",
+    "arm",
+    "replicate",
+    "status",
+    "model",
+    "authorization_sha256",
+    "ledger_attempt_sha256",
+    "ledger_settlement_sha256",
+    "decision",
+    "provider_policy_facts",
+    "independent_policy_facts",
+    "facts_agreement",
+    "independent_disposition",
+    "independent_reason_codes",
+    "request_sha256",
+    "raw_response",
+    "raw_response_kind",
+    "response_sha256",
+    "parsed_response_sha256",
+    "http_status",
+    "usage",
+    "latency_nanoseconds",
+    "provider_request_id",
+    "provider_reported_cost_nano_usd",
+    "inferred_cost_nano_usd",
+    "cost_basis",
+    "error_code",
+    "raw_error",
+    "error_artifact_sha256",
+    "error_message_sha256",
+    "started_at",
+    "finished_at",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-build-artifact/final-study/v1/receipt"
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schedule_index": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_role": {
+      "enum": [
+        "threshold_development",
+        "safety_calibration",
+        "held_out",
+        "confirmatory_secondary"
+      ]
+    },
+    "split": {
+      "enum": [
+        "threshold-development",
+        "safety-calibration",
+        "held_out_repository",
+        "confirmatory_secondary"
+      ]
+    },
+    "arm": {
+      "enum": [
+        "A",
+        "C"
+      ]
+    },
+    "replicate": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "partial",
+        "not_attempted"
+      ]
+    },
+    "model": {
+      "const": "jev-1.13.0"
+    },
+    "authorization_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "ledger_attempt_sha256": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "ledger_settlement_sha256": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "decision": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/decision"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "provider_policy_facts": {
+      "$ref": "#/$defs/policy_facts"
+    },
+    "independent_policy_facts": {
+      "$ref": "#/$defs/policy_facts"
+    },
+    "facts_agreement": {
+      "type": "boolean"
+    },
+    "independent_disposition": {
+      "type": "string"
+    },
+    "independent_reason_codes": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "raw_response": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "contentEncoding": "base64"
+    },
+    "raw_response_kind": {
+      "type": "string"
+    },
+    "response_sha256": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "parsed_response_sha256": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "http_status": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "usage": {
+      "$ref": "#/$defs/usage"
+    },
+    "latency_nanoseconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "provider_request_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider_reported_cost_nano_usd": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "inferred_cost_nano_usd": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "cost_basis": {
+      "type": "string"
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "contentEncoding": "base64"
+    },
+    "error_artifact_sha256": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "error_message_sha256": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected_label",
+        "probabilities",
+        "raw_confidence",
+        "selected_label_probability"
+      ],
+      "properties": {
+        "selected_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probabilities": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "selected_label_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "model",
+        "answers",
+        "policy_facts",
+        "disposition",
+        "reason_codes",
+        "acceptance_score"
+      ],
+      "properties": {
+        "system": {
+          "enum": [
+            "jev",
+            "deterministic-baseline"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answers": {
+          "type": "object",
+          "minProperties": 7,
+          "maxProperties": 7,
+          "additionalProperties": {
+            "$ref": "#/$defs/answer"
+          }
+        },
+        "policy_facts": {
+          "$ref": "#/$defs/policy_facts"
+        },
+        "disposition": {
+          "enum": [
+            "accept",
+            "review",
+            "reject"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "policy_facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_contradiction",
+        "crypto_contradiction",
+        "privacy_contradiction",
+        "affirmative_unsupported_claim",
+        "honest_incomplete",
+        "honest_unsupported",
+        "honest_refusal",
+        "explicit_noncomparability",
+        "claimed_pooling_identity_mismatch",
+        "teardown_claimed",
+        "independent_provider_evidence",
+        "buffered_timing_claimed_as_ttft",
+        "checksum_valid_closed_registry_invalid",
+        "missing_required",
+        "stale_evidence",
+        "local_redaction_review",
+        "observed_tests_not_applicable",
+        "verifier_not_applicable",
+        "cleanup_not_applicable",
+        "external_effects_not_applicable"
+      ],
+      "properties": {
+        "schema_contradiction": {
+          "type": "boolean"
+        },
+        "crypto_contradiction": {
+          "type": "boolean"
+        },
+        "privacy_contradiction": {
+          "type": "boolean"
+        },
+        "affirmative_unsupported_claim": {
+          "type": "boolean"
+        },
+        "honest_incomplete": {
+          "type": "boolean"
+        },
+        "honest_unsupported": {
+          "type": "boolean"
+        },
+        "honest_refusal": {
+          "type": "boolean"
+        },
+        "explicit_noncomparability": {
+          "type": "boolean"
+        },
+        "claimed_pooling_identity_mismatch": {
+          "type": "boolean"
+        },
+        "teardown_claimed": {
+          "type": "boolean"
+        },
+        "independent_provider_evidence": {
+          "type": "boolean"
+        },
+        "buffered_timing_claimed_as_ttft": {
+          "type": "boolean"
+        },
+        "checksum_valid_closed_registry_invalid": {
+          "type": "boolean"
+        },
+        "missing_required": {
+          "type": "boolean"
+        },
+        "stale_evidence": {
+          "type": "boolean"
+        },
+        "local_redaction_review": {
+          "type": "boolean"
+        },
+        "observed_tests_not_applicable": {
+          "type": "boolean"
+        },
+        "verifier_not_applicable": {
+          "type": "boolean"
+        },
+        "cleanup_not_applicable": {
+          "type": "boolean"
+        },
+        "external_effects_not_applicable": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

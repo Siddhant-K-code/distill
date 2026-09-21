@@ -51,6 +51,16 @@ distill-jev-pilot: ## Generate and validate the excluded offline research pilot
 	$(GO) run ./cmd/distill-jev-pilot summarize build/pilot
 	@printf '%s\n' 'provider_calls=0 final_study_eligible=false'
 
+.PHONY: distill-jev-final
+distill-jev-final: ## Generate and validate the offline final-study package
+	$(GO) run ./cmd/distill-jev-final prepare \
+		--output build/final-study \
+		--agenttrace-contamination-artifact research/context-is-a-build-artifact/final-contamination-ledger-v1.md \
+		--agenttrace-contamination-sha256 fa2bb7022b30d043d1cabba085253190dba94dd0b85eed98a9cc4fa5e23d0c19
+	$(GO) run ./cmd/distill-jev-final validate --input build/final-study
+	$(GO) run ./cmd/distill-jev-final summarize --input build/final-study
+	@printf '%s\n' 'provider_calls=0 execution_authorized=false'
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...

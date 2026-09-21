@@ -31,3 +31,5 @@ Thumbs.db
 # Build
 dist/
 build/
+
+.agent-traces/
