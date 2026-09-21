@@ -36,9 +36,10 @@ credential, outcome, or claim that an experiment has run.
   and the non-evaluable confirmatory consequence of the 21-base allocation.
 - [Final-study amendment registry](final-amendment-v1.json): machine-readable
   counts, seeds, thresholds, analysis constants, budget, and external gates.
-- [Final-study external gate review](final-external-gates-v1.md): current
-  TypeSafe public-source digests, gate classifications, no-go decision, and
-  exact clarification required before any final provider call.
+- [Final-study external gate review v2](final-external-gates-v2.md): current
+  prospective TypeSafe provider-gate status and no-go blockers.
+- [Final-study external gate review v1](final-external-gates-v1.md): historical
+  frozen public-evidence review and exact 17-question clarification record.
 - [Final-study source registry](final-source-registry-v1.json): immutable
   cross-repository commits, licenses, paths, and raw artifact digests.
 - [Final-study receipt schema](final-receipt-schema-v1.json): exact Draft
