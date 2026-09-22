@@ -491,6 +491,16 @@ func TestModelManifestRequiresExactEightFiles(t *testing.T) {
 	}
 }
 
+func TestFrozenModelContractKnownAnswer(t *testing.T) {
+	data, err := frozenModelContractJSON(expectedModelFiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := DigestBytes(data); got != TargetModelArtifactSHA256 {
+		t.Fatalf("legacy model contract digest = %s, want %s", got, TargetModelArtifactSHA256)
+	}
+}
+
 func TestRuntimeManifestRetiredIdentityCannotAuthorize(t *testing.T) {
 	protocol, err := BuildProtocol()
 	if err != nil {

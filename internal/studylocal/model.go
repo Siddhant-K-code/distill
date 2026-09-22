@@ -109,7 +109,7 @@ func BuildModelManifest(modelDirectory string) (ModelManifest, error) {
 	if fmt.Sprint(files) != fmt.Sprint(expectedModelFiles) || total != ModelTotalBytes {
 		return ModelManifest{}, fmt.Errorf("model artifact differs from the frozen eight-file conversion receipt")
 	}
-	fileContract, err := canonicalJSON(files)
+	fileContract, err := frozenModelContractJSON(files)
 	if err != nil || DigestBytes(fileContract) != TargetModelArtifactSHA256 {
 		return ModelManifest{}, fmt.Errorf("model artifact aggregate digest mismatch")
 	}
@@ -138,6 +138,25 @@ func BuildModelManifest(modelDirectory string) (ModelManifest, error) {
 		return ModelManifest{}, err
 	}
 	return manifest, nil
+}
+
+// frozenModelContractJSON reproduces the byte format bound by
+// TargetModelArtifactSHA256: sorted object keys, two-space indentation, and one
+// trailing LF. It is intentionally separate from this study's RFC 8785 identities.
+func frozenModelContractJSON(files []ModelFile) ([]byte, error) {
+	contract := make([]map[string]any, len(files))
+	for i, file := range files {
+		contract[i] = map[string]any{
+			"path":       file.Path,
+			"sha256":     file.SHA256,
+			"size_bytes": file.SizeBytes,
+		}
+	}
+	data, err := json.MarshalIndent(contract, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
 }
 
 func ValidateModelManifest(modelDirectory string, manifest ModelManifest) error {
