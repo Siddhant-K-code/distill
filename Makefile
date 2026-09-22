@@ -63,6 +63,14 @@ distill-jev-final: ## Generate and validate the offline final-study package
 	$(GO) run ./cmd/distill-jev-final summarize --input build/final-study
 	@printf '%s\n' 'provider_calls=0 execution_authorized=false'
 
+.PHONY: distill-local-context-control
+distill-local-context-control: ## Generate and validate the offline local context-control package
+	rm -rf build/local-context-control
+	$(GO) run ./cmd/distill-local-context-control prepare --output build/local-context-control
+	$(GO) run ./cmd/distill-local-context-control validate --input build/local-context-control
+	$(GO) run ./cmd/distill-local-context-control summarize --input build/local-context-control
+	@printf '%s\n' 'provider_calls=0 local_observations=0 execution_authorized=false held_out_records=0'
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...

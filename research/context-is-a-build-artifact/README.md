@@ -47,6 +47,11 @@ credential, outcome, or claim that an experiment has run.
   semantic receipt validation.
 - [Final-study contamination ledger](final-contamination-ledger-v1.md):
   excluded-pilot comparison and the bounded repository-level holdout claim.
+- [Local context-control preregistration](local-control-preregistration-v1.md):
+  separate 14-base development/calibration study for an offline local open
+  model; it cannot alter or repair the frozen TypeSafe final study.
+- [Local context-control result projection](local-control-result-schema-v1.json):
+  strict one-field categorical generation schema.
 
 ## Distill Lock v0 anchors
 

@@ -1,0 +1,1 @@
+{"$id":"https://github.com/Siddhant-K-code/distill/research/context-is-a-build-artifact/local-control-result-schema-v1.json","$schema":"https://json-schema.org/draft/2020-12/schema","additionalProperties":false,"properties":{"answer":{"type":"string"}},"required":["answer"],"title":"Local context-control categorical model projection","type":"object"}

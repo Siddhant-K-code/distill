@@ -13,6 +13,10 @@ distill
 # Go
 vendor/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # IDE
 .idea/
 .vscode/
@@ -33,3 +37,8 @@ dist/
 build/
 
 .agent-traces/
+
+# Private local context-control execution artifacts
+.local-context-control/
+local-control-private/
+local-control-runs/
