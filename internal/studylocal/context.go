@@ -172,7 +172,7 @@ func ValidateContexts(corpus Corpus, contexts []Context) error {
 			len(context.ConfigurationHash) != 64 || context.LockSourceCount < 1 ||
 			context.LockChunkCount < context.LockSelectedCount ||
 			context.LockDuplicateCount < 0 || context.LockSelectedTokens < 0 {
-			return fmt.Errorf("Distill Lock identity missing for %s", condition.ID)
+			return fmt.Errorf("distill Lock identity missing for %s", condition.ID)
 		}
 		seen[key] = true
 	}

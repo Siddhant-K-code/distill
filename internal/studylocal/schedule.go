@@ -110,11 +110,12 @@ func ValidateSchedule(corpus Corpus, protocol Protocol, contexts []Context, sche
 		}
 		seenObservations[entry.ObservationID] = true
 		counts[key]++
-		if entry.Replicate == 1 {
+		switch entry.Replicate {
+		case 1:
 			primary++
-		} else if entry.Replicate == 2 || entry.Replicate == 3 {
+		case 2, 3:
 			repeat++
-		} else {
+		default:
 			return fmt.Errorf("invalid replicate at %d", i+1)
 		}
 	}

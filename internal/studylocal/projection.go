@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -239,16 +238,4 @@ func ParseCategorical(raw []byte, allowed []string) Projection {
 	projection.Answer = answer
 	projection.ParseStatus = ParseValid
 	return projection
-}
-
-func strictSingleJSONValue(data []byte, value any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(value); err != nil {
-		return err
-	}
-	if _, err := decoder.Token(); err != io.EOF {
-		return fmt.Errorf("trailing JSON")
-	}
-	return nil
 }

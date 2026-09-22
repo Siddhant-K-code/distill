@@ -1,9 +1,7 @@
 package studylocal
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -310,12 +308,4 @@ func ReadHostSnapshot(data []byte) (HostSnapshot, error) {
 
 func encodeHostSnapshot(snapshot HostSnapshot) ([]byte, error) {
 	return canonicalJSONFile(snapshot)
-}
-
-func hostSnapshotEqual(left, right HostSnapshot) bool {
-	left.CollectedAt = time.Time{}
-	right.CollectedAt = time.Time{}
-	leftBytes, _ := json.Marshal(left)
-	rightBytes, _ := json.Marshal(right)
-	return bytes.Equal(leftBytes, rightBytes)
 }

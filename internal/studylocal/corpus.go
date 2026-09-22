@@ -463,7 +463,7 @@ func ValidateCorpus(corpus Corpus) error {
 	}
 	for _, id := range distillBaseIDs {
 		if counts[id] != 11 {
-			return fmt.Errorf("Distill allocation mismatch for %s", id)
+			return fmt.Errorf("distill allocation mismatch for %s", id)
 		}
 	}
 	for _, id := range llmTraceBaseIDs {

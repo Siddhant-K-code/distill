@@ -12,8 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -500,8 +498,4 @@ func readRuntimeManifest(path string) (RuntimeManifest, []byte, error) {
 		return RuntimeManifest{}, nil, err
 	}
 	return manifest, data, nil
-}
-
-func parseInt(value string) (int, error) {
-	return strconv.Atoi(strings.TrimSpace(value))
 }

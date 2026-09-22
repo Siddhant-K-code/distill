@@ -418,11 +418,12 @@ func executeSchedule(
 				}
 				receipt.Questions = append(receipt.Questions, questionReceipt)
 			}
-			if receipt.Status == "valid" {
+			switch receipt.Status {
+			case "valid":
 				completion.Valid++
-			} else if receipt.Status == "malformed" {
+			case "malformed":
 				completion.Malformed++
-			} else {
+			default:
 				completion.AdapterErrors++
 			}
 		}
