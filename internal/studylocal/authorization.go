@@ -127,6 +127,7 @@ func Authorize(ctx context.Context, options AuthorizeOptions) (ExecutionAuthoriz
 	verifyOptions := RuntimeManifestOptions{
 		RuntimePython: options.RuntimePython, AdapterPath: options.AdapterPath,
 		RepositoryRoot: options.RepositoryRoot, ImplementationCommit: "",
+		ImplementationTree:      options.TrustedImplementationTree,
 		RuntimeTreeManifestPath: options.RuntimeTreeManifestPath,
 		BaseTreeManifestPath:    options.BaseTreeManifestPath,
 		WheelVerificationPath:   options.WheelVerificationPath,
@@ -446,6 +447,9 @@ func verifyMergedCleanRepository(repositoryRoot, mainRef, adapterPath string) (s
 	if err != nil {
 		return "", "", err
 	}
+	if err := requireTrustedPathAncestors(repository); err != nil {
+		return "", "", err
+	}
 	if mainRef != "origin/main" {
 		return "", "", fmt.Errorf("execution authorization requires the exact origin/main ref")
 	}
@@ -489,6 +493,9 @@ func verifyMergedCleanRepository(repositoryRoot, mainRef, adapterPath string) (s
 	relative, err := filepath.Rel(repository, adapter)
 	if err != nil || !safeRelative(filepath.ToSlash(relative)) {
 		return "", "", fmt.Errorf("adapter must be within the repository")
+	}
+	if err := requireTrustedPathAncestors(adapter); err != nil {
+		return "", "", err
 	}
 	committed, err := run("show", head+":"+filepath.ToSlash(relative))
 	if err != nil {

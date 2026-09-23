@@ -181,8 +181,8 @@ func WriteModelManifest(modelDirectory, outputPath string) (ModelManifest, error
 	if err != nil {
 		return ModelManifest{}, err
 	}
-	if outputPath == "" || filepath.Clean(outputPath) != outputPath {
-		return ModelManifest{}, fmt.Errorf("unsafe model-manifest output")
+	if outputPath == "" || !filepath.IsAbs(outputPath) || filepath.Clean(outputPath) != outputPath {
+		return ModelManifest{}, fmt.Errorf("model-manifest output must be a clean absolute path")
 	}
 	if err := writeExclusive(outputPath, data, 0o600); err != nil {
 		return ModelManifest{}, err

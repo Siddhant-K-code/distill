@@ -67,6 +67,13 @@ func TestGoPythonProjectionClassifierParity(t *testing.T) {
 		{`"accept|E01"`, []string{"accept|E01"}},
 		{`{"answer":{"a":1,"a":2}}`, []string{"accept|E01"}},
 		{`{"answer":"accept|E01"} `, []string{"accept|E01"}},
+		{`{"answer":NaN}`, []string{"accept|E01"}},
+		{`{"answer":Infinity}`, []string{"accept|E01"}},
+		{`{"answer":1e400}`, []string{"accept|E01"}},
+		{`{"answer":` + strings.Repeat("9", 400) + `}`, []string{"accept|E01"}},
+		{`{"answer":-` + strings.Repeat("9", 400) + `}`, []string{"accept|E01"}},
+		{`{"answer":{"x":` + strings.Repeat("9", 400) + `}}`, []string{"accept|E01"}},
+		{`{"answer":` + strings.Repeat("[", 300) + `0` + strings.Repeat("]", 300) + `}`, []string{"accept|E01"}},
 		{`{"answer":"accept|E01"} Explanation: ok`, []string{"accept|E01"}},
 		{`{"answer":"accept|E01"}{"answer":"reject|-"}`, []string{"accept|E01"}},
 		{"\"accept|E01\"\n", []string{"accept|E01"}},
@@ -144,6 +151,127 @@ func TestRuntimeManifestRejectsBytecodeContamination(t *testing.T) {
 	manifest.ManifestSHA256, _ = DigestDomain("runtime-manifest", projection)
 	if _, _, err := validateRuntimeManifestValue(manifest); err == nil {
 		t.Fatal("runtime with unexpected __pycache__/.pyc was accepted")
+	}
+}
+
+func TestTrustedTreeVerificationRejectsMutationAndWritableAncestor(t *testing.T) {
+	repositoryRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.MkdirTemp(repositoryRoot, ".trusted-path-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(root) }()
+	if err := os.Chmod(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	directory := filepath.Join(root, "lib")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(directory, "value.txt")
+	if err := os.WriteFile(file, []byte("trusted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := []byte("D\tlib\t755\nF\tlib/value.txt\t644\t8\t7bd39a7cbcf687fd60f819645b8bcaf731a9f19cb102484a7b84530516d7e8b8\n")
+	if err := verifyTreeManifest(root, manifest, 1, 1, 0, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("mutated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyTreeManifest(root, manifest, 1, 1, 0, true); err == nil {
+		t.Fatal("mutated tree passed trusted verification")
+	}
+	writable := filepath.Join(root, "writable")
+	if err := os.Mkdir(writable, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(writable, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	candidate := filepath.Join(writable, "candidate")
+	if err := os.WriteFile(candidate, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(writable, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireTrustedPathAncestors(candidate); err != nil {
+		t.Fatalf("trusted positive-control path was rejected: %v", err)
+	}
+	if err := os.Chmod(writable, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireTrustedPathAncestors(candidate); err == nil ||
+		!strings.Contains(err.Error(), "group/world writable") ||
+		!strings.Contains(err.Error(), writable) {
+		t.Fatalf("group/world-writable path ancestor was not specifically rejected: %v", err)
+	}
+}
+
+func TestTrustedTreeVerificationPinsSymlinkTargetsAndModes(t *testing.T) {
+	resolvedTemp, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(resolvedTemp, "tree")
+	lib := filepath.Join(root, "lib")
+	if err := os.MkdirAll(lib, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(lib, "value.txt")
+	if err := os.WriteFile(target, []byte("trusted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("value.txt", filepath.Join(lib, "value-link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("lib", filepath.Join(root, "lib-link")); err != nil {
+		t.Fatal(err)
+	}
+	manifest := []byte(
+		"D\tlib\t755\n" +
+			"F\tlib/value.txt\t644\t8\t7bd39a7cbcf687fd60f819645b8bcaf731a9f19cb102484a7b84530516d7e8b8\n" +
+			"L\tlib/value-link\t644\tvalue.txt\n" +
+			"L\tlib-link\t755\tlib\n",
+	)
+	if err := verifyTreeManifest(root, manifest, 1, 1, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(lib, "value-link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing.txt", filepath.Join(lib, "value-link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyTreeManifest(root, manifest, 1, 1, 2, true); err == nil {
+		t.Fatal("changed symlink target was accepted")
+	}
+
+	modeRoot := filepath.Join(resolvedTemp, "mode-tree")
+	if err := os.Mkdir(modeRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	externalTarget := filepath.Join(resolvedTemp, "external-target")
+	if err := os.WriteFile(externalTarget, []byte("external\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(externalTarget, filepath.Join(modeRoot, "external-link")); err != nil {
+		t.Fatal(err)
+	}
+	modeManifest := []byte("L\texternal-link\t644\t" + externalTarget + "\n")
+	if err := verifyTreeManifest(modeRoot, modeManifest, 0, 0, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(externalTarget, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyTreeManifest(modeRoot, modeManifest, 0, 0, 1, false); err == nil ||
+		!strings.Contains(err.Error(), "symlink target mode") {
+		t.Fatalf("changed symlink target mode was not rejected: %v", err)
 	}
 }
 
@@ -663,6 +791,27 @@ func TestAnalysisWeightsBasesEqually(t *testing.T) {
 	}
 	if summary.Inferred.EqualWeightMeanCorrectnessDelta != 0.5 {
 		t.Fatalf("condition counts influenced base weighting: got %f", summary.Inferred.EqualWeightMeanCorrectnessDelta)
+	}
+}
+
+func TestCitationJaccardDenominators(t *testing.T) {
+	valid := []observationScore{
+		{receipt: ExecutionReceipt{ConditionID: "c", Arm: ArmRaw, Replicate: 1, Status: "valid"}},
+		{receipt: ExecutionReceipt{ConditionID: "c", Arm: ArmRaw, Replicate: 2, Status: "valid"}},
+		{receipt: ExecutionReceipt{ConditionID: "c", Arm: ArmRaw, Replicate: 3, Status: "valid"}},
+	}
+	metrics := repeatMetrics(valid)
+	if metrics.CitationTriplesEvaluated != 1 || metrics.CitationNonemptyUnionTriples != 0 ||
+		metrics.MeanEvidenceJaccard == nil || *metrics.MeanEvidenceJaccard != 1 ||
+		metrics.MeanNonemptyEvidenceJaccard != nil {
+		t.Fatalf("unexpected empty-citation convention: %+v", metrics)
+	}
+	invalid := append([]observationScore(nil), valid...)
+	invalid[1].receipt.Status = "malformed"
+	metrics = repeatMetrics(invalid)
+	if metrics.CitationTriplesEvaluated != 0 || metrics.MeanEvidenceJaccard != nil ||
+		metrics.MeanNonemptyEvidenceJaccard != nil {
+		t.Fatalf("malformed triple entered citation denominator: %+v", metrics)
 	}
 }
 

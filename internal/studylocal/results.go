@@ -32,13 +32,17 @@ type LeaveOneOut struct {
 }
 
 type RepeatMetrics struct {
-	RepeatedConditionArmPairs  int     `json:"repeated_condition_arm_pairs"`
-	AllThreeDecisionAgreement  float64 `json:"all_three_decision_agreement"`
-	AllThreeRouteAgreement     float64 `json:"all_three_route_agreement"`
-	AllThreeMalformedAgreement float64 `json:"all_three_malformed_agreement"`
-	MeanEvidenceJaccard        float64 `json:"mean_evidence_id_jaccard"`
-	MeanLatencyCV              float64 `json:"mean_latency_coefficient_of_variation"`
-	MeanOutputTokenCV          float64 `json:"mean_output_token_coefficient_of_variation"`
+	RepeatedConditionArmPairs    int      `json:"repeated_condition_arm_pairs"`
+	CitationTriplesEvaluated     int      `json:"citation_triples_evaluated"`
+	CitationNonemptyUnionTriples int      `json:"citation_nonempty_union_triples"`
+	AllThreeDecisionAgreement    float64  `json:"all_three_decision_agreement"`
+	AllThreeRouteAgreement       float64  `json:"all_three_route_agreement"`
+	AllThreeMalformedAgreement   float64  `json:"all_three_malformed_agreement"`
+	MeanEvidenceJaccard          *float64 `json:"mean_evidence_id_jaccard"`
+	MeanNonemptyEvidenceJaccard  *float64 `json:"mean_nonempty_evidence_id_jaccard"`
+	CitationJaccardSemantics     string   `json:"citation_jaccard_semantics"`
+	MeanLatencyCV                float64  `json:"mean_latency_coefficient_of_variation"`
+	MeanOutputTokenCV            float64  `json:"mean_output_token_coefficient_of_variation"`
 }
 
 type MeasuredMetrics struct {
@@ -97,6 +101,7 @@ type FamilyDelta struct {
 
 type RiskOperatingPoint struct {
 	Dataset              string   `json:"dataset"`
+	Arm                  string   `json:"arm"`
 	Rule                 string   `json:"rule"`
 	Bases                int      `json:"bases"`
 	Accepted             int      `json:"accepted"`
@@ -603,7 +608,7 @@ func analyzeResults(validated validatedRun) (ResultSummary, error) {
 		SchemaVersion: SchemaVersion + "/result-summary", ClusterUnit: "independent_base",
 		BaseWeighting:        "equal weight per base after within-base Arm C minus Arm A averaging",
 		ConfidenceThresholds: "not applicable: confidence is unavailable and no threshold was selected",
-		RiskCoverage:         "structural operating points only: candidate rules are evaluated on Distill, then exactly one frozen selected rule is evaluated on LLMTraceFX; these are not calibrated-confidence curves or AURC",
+		RiskCoverage:         "structural operating points only: candidate rules are evaluated on pooled Distill observations with per-arm diagnostics, then exactly one frozen selected rule is evaluated on LLMTraceFX with pooled and per-arm rows; these are not calibrated-confidence curves or AURC. Exact de-duplication can remove a duplicate path label from Arm C while preserving its content, so citation-based points partly measure compiler evidence labeling.",
 		MetalMetrics:         "not collected in the untraced 332-observation quality phase",
 		ProviderCalls:        0, CloudSpend: "0", HeldOutRecords: 0,
 		ClaimLimit: "This run can claim only Arm A versus Arm C effects for the pinned local Qwen3-4B artifact. A larger-model or better-context-beats-scaling claim is prohibited until a separately amended scaling control runs.",
@@ -716,19 +721,30 @@ func analyzeResults(validated validatedRun) (ResultSummary, error) {
 	switch {
 	case summary.Inferred.ValidPrimaryRate < validated.Package.Protocol.OutcomeRules.MinimumValidPrimaryRate:
 		summary.Outcome = "non-evaluable"
-		summary.OutcomeReason = "valid primary observation rate is below the prospectively frozen 0.80 floor"
+		summary.OutcomeReason = fmt.Sprintf(
+			"valid primary observation rate is below the prospectively frozen %.3g floor",
+			validated.Package.Protocol.OutcomeRules.MinimumValidPrimaryRate,
+		)
 	case summary.Inferred.EqualWeightMeanCorrectnessDelta <= validated.Package.Protocol.OutcomeRules.NegativeDecisionDeltaMaximum ||
-		summary.Inferred.EqualWeightMeanUnsafeAcceptDelta >= 0.05:
+		summary.Inferred.EqualWeightMeanUnsafeAcceptDelta >= validated.Package.Protocol.OutcomeRules.UnsafeAcceptDeltaMaximum:
 		summary.Outcome = "negative"
-		summary.OutcomeReason = "compiled context reduced equal-weight verified correctness by at least 0.05 or increased unsafe accept by at least 0.05"
+		summary.OutcomeReason = fmt.Sprintf(
+			"compiled context reduced equal-weight verified correctness by at least %.3g or increased unsafe accept by at least %.3g",
+			math.Abs(validated.Package.Protocol.OutcomeRules.NegativeDecisionDeltaMaximum),
+			validated.Package.Protocol.OutcomeRules.UnsafeAcceptDeltaMaximum,
+		)
 	case (summary.Inferred.EqualWeightMeanCorrectnessDelta >= validated.Package.Protocol.OutcomeRules.PositiveDecisionDeltaMinimum &&
-		summary.Inferred.EqualWeightMeanReviewBurdenDelta <= 0.05 &&
+		summary.Inferred.EqualWeightMeanReviewBurdenDelta <= validated.Package.Protocol.OutcomeRules.ReviewBurdenDeltaMaximum &&
 		summary.Inferred.EqualWeightMeanUnsafeAcceptDelta <= 0) ||
 		(summary.Inferred.EqualWeightMeanReviewBurdenDelta <= validated.Package.Protocol.OutcomeRules.ReviewBurdenDeltaMinimum &&
 			summary.Inferred.EqualWeightMeanCorrectnessDelta > validated.Package.Protocol.OutcomeRules.NegativeDecisionDeltaMaximum &&
 			summary.Inferred.EqualWeightMeanUnsafeAcceptDelta <= 0):
 		summary.Outcome = "positive"
-		summary.OutcomeReason = "compiled context improved equal-weight verified correctness or reduced review burden without a prospectively material correctness loss or unsafe-accept increase"
+		summary.OutcomeReason = fmt.Sprintf(
+			"compiled context improved equal-weight verified correctness by at least %.3g or reduced review burden by at least %.3g without crossing the frozen adverse thresholds",
+			validated.Package.Protocol.OutcomeRules.PositiveDecisionDeltaMinimum,
+			math.Abs(validated.Package.Protocol.OutcomeRules.ReviewBurdenDeltaMinimum),
+		)
 	default:
 		summary.Outcome = "null"
 		summary.OutcomeReason = "prospectively frozen positive and negative effect thresholds were not crossed"
@@ -908,12 +924,12 @@ func computeRiskOperatingPoints(
 	rules OutcomeRules,
 ) ([]RiskOperatingPoint, string) {
 	var points []RiskOperatingPoint
-	buildPoint := func(dataset, rule string) RiskOperatingPoint {
-		point := RiskOperatingPoint{Dataset: dataset, Rule: rule}
+	buildPoint := func(dataset, arm, rule string) RiskOperatingPoint {
+		point := RiskOperatingPoint{Dataset: dataset, Arm: arm, Rule: rule}
 		perBaseAccepted := map[string]int{}
 		perBaseTotal := map[string]int{}
 		for _, score := range scores {
-			if score.receipt.Dataset != dataset {
+			if score.receipt.Dataset != dataset || (arm != "pooled" && score.receipt.Arm != arm) {
 				continue
 			}
 			point.Total++
@@ -948,12 +964,14 @@ func computeRiskOperatingPoints(
 		return point
 	}
 	for _, rule := range rules.RoutingRuleOrder {
-		points = append(points, buildPoint("distill", rule))
+		for _, arm := range []string{"pooled", ArmRaw, ArmDistillLock} {
+			points = append(points, buildPoint("distill", arm, rule))
+		}
 	}
 	selected := "no-safe-auto-action"
 	bestCoverage := -1.0
 	for _, point := range points {
-		if point.UnsafeRisk == nil || *point.UnsafeRisk > rules.RoutingUnsafeCeiling ||
+		if point.Arm != "pooled" || point.UnsafeRisk == nil || *point.UnsafeRisk > rules.RoutingUnsafeCeiling ||
 			point.Accepted < rules.RoutingMinimumAccepted {
 			continue
 		}
@@ -963,7 +981,9 @@ func computeRiskOperatingPoints(
 		}
 	}
 	if selected != "no-safe-auto-action" {
-		points = append(points, buildPoint("llmtracefx", selected))
+		for _, arm := range []string{"pooled", ArmRaw, ArmDistillLock} {
+			points = append(points, buildPoint("llmtracefx", arm, selected))
+		}
 	}
 	return points, selected
 }
@@ -1067,7 +1087,8 @@ func repeatMetrics(scores []observationScore) RepeatMetrics {
 	}
 	var metrics RepeatMetrics
 	var decisionAgree, routeAgree, malformedAgree int
-	var jaccards, latencyCVs, tokenCVs []float64
+	metrics.CitationJaccardSemantics = "All-valid triples with three empty citation sets score 1.0 in mean_evidence_id_jaccard; mean_nonempty_evidence_id_jaccard excludes empty-union triples."
+	var jaccards, nonemptyJaccards, latencyCVs, tokenCVs []float64
 	for _, group := range groups {
 		if len(group) != 3 {
 			continue
@@ -1083,7 +1104,14 @@ func repeatMetrics(scores []observationScore) RepeatMetrics {
 		if group[0].malformed == group[1].malformed && group[1].malformed == group[2].malformed {
 			malformedAgree++
 		}
-		jaccards = append(jaccards, threeWayJaccard(group[0].citations, group[1].citations, group[2].citations))
+		if group[0].receipt.Status == "valid" && group[1].receipt.Status == "valid" && group[2].receipt.Status == "valid" {
+			jaccards = append(jaccards, threeWayJaccard(group[0].citations, group[1].citations, group[2].citations))
+			metrics.CitationTriplesEvaluated++
+			if len(group[0].citations)+len(group[1].citations)+len(group[2].citations) > 0 {
+				metrics.CitationNonemptyUnionTriples++
+				nonemptyJaccards = append(nonemptyJaccards, jaccards[len(jaccards)-1])
+			}
+		}
 		latencyCVs = append(latencyCVs, coefficientOfVariation([]float64{
 			float64(group[0].receipt.RequestLatencyNanos), float64(group[1].receipt.RequestLatencyNanos), float64(group[2].receipt.RequestLatencyNanos),
 		}))
@@ -1094,7 +1122,14 @@ func repeatMetrics(scores []observationScore) RepeatMetrics {
 		metrics.AllThreeDecisionAgreement = float64(decisionAgree) / denominator
 		metrics.AllThreeRouteAgreement = float64(routeAgree) / denominator
 		metrics.AllThreeMalformedAgreement = float64(malformedAgree) / denominator
-		metrics.MeanEvidenceJaccard = mean(jaccards)
+		if metrics.CitationTriplesEvaluated > 0 {
+			value := mean(jaccards)
+			metrics.MeanEvidenceJaccard = &value
+		}
+		if metrics.CitationNonemptyUnionTriples > 0 {
+			value := mean(nonemptyJaccards)
+			metrics.MeanNonemptyEvidenceJaccard = &value
+		}
 		metrics.MeanLatencyCV = mean(latencyCVs)
 		metrics.MeanOutputTokenCV = mean(tokenCVs)
 	}

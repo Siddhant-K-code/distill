@@ -25,7 +25,10 @@ clean execution session starts from the exact merged `main` commit.
 3. Create an owner-only model manifest with `model-manifest`.
 4. Create an owner-only full-tree runtime manifest with `runtime-manifest`.
    Pass the private venv-tree manifest, base-CPython-tree manifest, and wheel
-   verification record. This command is deny-networked and uses `-I -B`.
+   verification record plus the externally reviewed merged commit and tree.
+   The Go executable authenticates the clean repository, adapter blob, runtime
+   trees, and its own build provenance before Python executes. This command is
+   deny-networked and uses `-I -B`.
 5. Run `preflight`. Any unrelated process at or above 1 GiB RSS blocks
    execution.
 6. Run `authorize` with the exact acknowledgement printed below. Authorization
@@ -33,6 +36,9 @@ clean execution session starts from the exact merged `main` commit.
    and an absent private output namespace. Pass the exact externally reviewed
    merged commit and tree IDs; a locally discovered moving ref is insufficient.
 7. Run the exact `run` command once. There is no retry flag.
+   Do not fetch, check out, or modify the repository until `completion.json`
+   is durably written; post-run verification intentionally requires the same
+   clean `origin/main`, HEAD, source tree, adapter, and executable identities.
 8. Use `verify-results` and `summarize-results` in a separate result session.
 
 Exact acknowledgement:

@@ -140,6 +140,13 @@ func StartCommandAdapter(ctx context.Context, options CommandAdapterOptions) (Ad
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return nil, fmt.Errorf("MLX adapter requires darwin/arm64")
 	}
+	runtimeOptions := RuntimeManifestOptions{
+		RuntimePython: options.RuntimePython, RuntimeTreeManifestPath: options.RuntimeTreeManifestPath,
+		BaseTreeManifestPath: options.BaseTreeManifestPath, WheelVerificationPath: options.WheelVerificationPath,
+	}
+	if err := verifyPrivateRuntimeInputs(runtimeOptions); err != nil {
+		return nil, err
+	}
 	python, err := safePythonExecutable(options.RuntimePython)
 	if err != nil {
 		return nil, fmt.Errorf("runtime python: %w", err)
@@ -152,11 +159,24 @@ func StartCommandAdapter(ctx context.Context, options CommandAdapterOptions) (Ad
 	if err != nil {
 		return nil, err
 	}
+	if err := requireTrustedPathAncestors(adapterPath); err != nil {
+		return nil, err
+	}
 	if _, err := safeExactDirectory(options.RepositoryRoot); err != nil {
 		return nil, fmt.Errorf("repository root: %w", err)
 	}
 	if _, err := safeExactDirectory(options.ModelDirectory); err != nil {
 		return nil, fmt.Errorf("model directory: %w", err)
+	}
+	if err := requireTrustedPathAncestors(options.ModelDirectory); err != nil {
+		return nil, err
+	}
+	modelManifest, _, err := ReadModelManifest(options.ModelManifestPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateModelManifest(options.ModelDirectory, modelManifest); err != nil {
+		return nil, err
 	}
 	if options.OutputNamespace == "" || !filepath.IsAbs(options.OutputNamespace) {
 		return nil, fmt.Errorf("output namespace must be absolute")
@@ -194,6 +214,12 @@ func StartCommandAdapter(ctx context.Context, options CommandAdapterOptions) (Ad
 		return nil, err
 	}
 	if err := os.Mkdir(filepath.Join(filepath.Dir(options.OutputNamespace), "tmp"), 0o700); err != nil {
+		return nil, err
+	}
+	if err := verifyPrivateRuntimeInputs(runtimeOptions); err != nil {
+		return nil, err
+	}
+	if err := ValidateModelManifest(options.ModelDirectory, modelManifest); err != nil {
 		return nil, err
 	}
 	if err := command.Start(); err != nil {
@@ -460,8 +486,11 @@ func safePythonExecutable(path string) (string, error) {
 		return "", fmt.Errorf("absolute runtime python path required")
 	}
 	info, err := os.Lstat(path)
-	if err != nil || info.Mode()&0o022 != 0 {
-		return "", fmt.Errorf("runtime python is missing or group/world writable")
+	if err != nil {
+		return "", fmt.Errorf("runtime python is missing")
+	}
+	if info.Mode()&os.ModeSymlink == 0 && info.Mode().Perm()&0o022 != 0 {
+		return "", fmt.Errorf("runtime python is group/world writable")
 	}
 	if err := requireCurrentOwner(info); err != nil {
 		return "", err

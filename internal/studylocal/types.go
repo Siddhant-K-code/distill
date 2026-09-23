@@ -159,6 +159,8 @@ type OutcomeRules struct {
 	PositiveDecisionDeltaMinimum float64  `json:"positive_decision_delta_minimum"`
 	NegativeDecisionDeltaMaximum float64  `json:"negative_decision_delta_maximum"`
 	ReviewBurdenDeltaMinimum     float64  `json:"review_burden_delta_minimum"`
+	ReviewBurdenDeltaMaximum     float64  `json:"review_burden_delta_maximum"`
+	UnsafeAcceptDeltaMaximum     float64  `json:"unsafe_accept_delta_maximum"`
 	MinimumValidPrimaryRate      float64  `json:"minimum_valid_primary_rate"`
 	ClusterUnit                  string   `json:"cluster_unit"`
 	ThresholdPolicy              string   `json:"threshold_policy"`
@@ -170,6 +172,8 @@ type OutcomeRules struct {
 type Protocol struct {
 	SchemaVersion                  string            `json:"schema_version"`
 	Status                         string            `json:"status"`
+	ProspectiveAmendment           string            `json:"prospective_amendment"`
+	ProspectiveAmendmentSHA256     string            `json:"prospective_amendment_sha256"`
 	StudyKind                      string            `json:"study_kind"`
 	IndependentUnit                string            `json:"independent_unit"`
 	ConditionRecordsClustered      bool              `json:"condition_records_clustered"`

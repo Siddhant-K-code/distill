@@ -14,6 +14,9 @@ const FinalReceiptSchemaSHA256 = "074277e7b6f9ea30b6659ff7ea8d2d72433219b086c0fc
 // FinalSourceRegistrySHA256 is the reviewed raw digest of final-source-registry-v1.json.
 const FinalSourceRegistrySHA256 = "b5329538427ee98c6aff4027506622fd1b4c4b5920d2acd9bc470f2da9e2059c"
 
+// LocalControlAmendmentSHA256 is the reviewed raw digest of the prospective local-control amendment.
+const LocalControlAmendmentSHA256 = "7f4654ccf9848761e6a832e5643bc32aa6689020d8e05d4a7e6698592ec1df82"
+
 // PilotSchema contains the authoritative adjacent schema bytes.
 //
 //go:embed pilot-schema.json
@@ -28,3 +31,8 @@ var FinalReceiptSchema []byte
 //
 //go:embed final-source-registry-v1.json
 var FinalSourceRegistry []byte
+
+// LocalControlAmendment contains the exact prospective local-control amendment bytes.
+//
+//go:embed local-control-amendment-v1.md
+var LocalControlAmendment []byte

@@ -33,6 +33,7 @@ type RuntimeManifestOptions struct {
 	AdapterPath             string
 	RepositoryRoot          string
 	ImplementationCommit    string
+	ImplementationTree      string
 	OutputPath              string
 	RuntimeTreeManifestPath string
 	BaseTreeManifestPath    string
@@ -42,6 +43,12 @@ type RuntimeManifestOptions struct {
 func WriteRuntimeManifest(ctx context.Context, options RuntimeManifestOptions) (RuntimeManifest, error) {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return RuntimeManifest{}, fmt.Errorf("MLX runtime manifest requires darwin/arm64")
+	}
+	if err := verifyPrivateRuntimeInputs(options); err != nil {
+		return RuntimeManifest{}, err
+	}
+	if err := authenticateRuntimeManifestLaunch(options); err != nil {
+		return RuntimeManifest{}, err
 	}
 	python, err := safePythonExecutable(options.RuntimePython)
 	if err != nil {
@@ -81,6 +88,12 @@ func WriteRuntimeManifest(ctx context.Context, options RuntimeManifestOptions) (
 	stdout.limit = maxAdapterLineBytes
 	stderr.limit = maxAdapterStderrBytes
 	command.Stdout, command.Stderr = &stdout, &stderr
+	if err := verifyPrivateRuntimeInputs(options); err != nil {
+		return RuntimeManifest{}, err
+	}
+	if err := authenticateRuntimeManifestLaunch(options); err != nil {
+		return RuntimeManifest{}, err
+	}
 	if err := command.Run(); err != nil {
 		return RuntimeManifest{}, fmt.Errorf("runtime manifest probe: %w: %s", err, stderr.String())
 	}
@@ -95,13 +108,28 @@ func WriteRuntimeManifest(ctx context.Context, options RuntimeManifestOptions) (
 	if _, _, err := validateRuntimeManifestValue(manifest); err != nil {
 		return RuntimeManifest{}, err
 	}
-	if options.OutputPath == "" || filepath.Clean(options.OutputPath) != options.OutputPath {
-		return RuntimeManifest{}, fmt.Errorf("unsafe runtime-manifest output")
+	if options.OutputPath == "" || !filepath.IsAbs(options.OutputPath) || filepath.Clean(options.OutputPath) != options.OutputPath {
+		return RuntimeManifest{}, fmt.Errorf("runtime-manifest output must be a clean absolute path")
 	}
 	if err := writeExclusive(options.OutputPath, append(data, '\n'), 0o600); err != nil {
 		return RuntimeManifest{}, err
 	}
 	return manifest, nil
+}
+
+func authenticateRuntimeManifestLaunch(options RuntimeManifestOptions) error {
+	if options.ImplementationCommit == "" || options.ImplementationTree == "" {
+		return fmt.Errorf("trusted implementation commit and tree are required")
+	}
+	commit, tree, err := verifyMergedCleanRepository(options.RepositoryRoot, "origin/main", options.AdapterPath)
+	if err != nil {
+		return err
+	}
+	if commit != options.ImplementationCommit || tree != options.ImplementationTree {
+		return fmt.Errorf("runtime-manifest adapter does not match the trusted implementation commit and tree")
+	}
+	_, err = verifyExecutableBuild(commit)
+	return err
 }
 
 func validateRuntimeManifestValue(manifest RuntimeManifest) (RuntimeManifest, []byte, error) {
@@ -163,6 +191,9 @@ func VerifyRuntimeManifest(ctx context.Context, options RuntimeManifestOptions, 
 	}
 	defer func() { _ = os.Remove(path) }()
 	options.OutputPath = path
+	if err := verifyPrivateRuntimeInputs(options); err != nil {
+		return err
+	}
 	actual, err := WriteRuntimeManifest(ctx, options)
 	if err != nil {
 		return err

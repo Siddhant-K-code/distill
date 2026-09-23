@@ -8,6 +8,7 @@ import base64
 import hashlib
 import importlib.metadata
 import json
+import math
 import os
 import platform
 import re
@@ -439,7 +440,26 @@ def parse_projection(raw: bytes, allowed: list[str]) -> dict[str, Any]:
     answer: str | None = None
     try:
         text = raw.decode("utf-8")
-        decoder = json.JSONDecoder(object_pairs_hook=no_duplicate_object)
+        def reject_constant(_value: str) -> Any:
+            raise ValueError("non-finite JSON number")
+
+        def finite_float(value: str) -> float:
+            result = float(value)
+            if not math.isfinite(result):
+                raise ValueError("non-finite JSON number")
+            return result
+
+        def bounded_int(value: str) -> int:
+            if not math.isfinite(float(value)):
+                raise ValueError("out-of-range JSON integer")
+            return int(value)
+
+        decoder = json.JSONDecoder(
+            object_pairs_hook=no_duplicate_object,
+            parse_constant=reject_constant,
+            parse_float=finite_float,
+            parse_int=bounded_int,
+        )
         value, end = decoder.raw_decode(text)
         if end != len(text):
             status = "trailing_text"
@@ -454,7 +474,7 @@ def parse_projection(raw: bytes, allowed: list[str]) -> dict[str, Any]:
             answer = value["answer"]
     except DuplicateKey:
         status = "duplicate_key"
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
         status = "invalid_json"
     return {
         "answer": answer,

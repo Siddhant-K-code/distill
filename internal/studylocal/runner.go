@@ -202,6 +202,7 @@ func Run(ctx context.Context, options RunOptions) (completion CompletionRecord, 
 	verifyOptions := RuntimeManifestOptions{
 		RuntimePython: options.RuntimePython, AdapterPath: options.AdapterPath,
 		RepositoryRoot: options.RepositoryRoot, ImplementationCommit: commit,
+		ImplementationTree:      tree,
 		RuntimeTreeManifestPath: options.RuntimeTreeManifestPath,
 		BaseTreeManifestPath:    options.BaseTreeManifestPath,
 		WheelVerificationPath:   options.WheelVerificationPath,
@@ -302,11 +303,8 @@ func Run(ctx context.Context, options RunOptions) (completion CompletionRecord, 
 	if err := ValidateModelManifest(options.ModelDirectory, modelManifest); err != nil {
 		return completion, fmt.Errorf("post-run model verification: %w", err)
 	}
-	verifyContext, cancel = runtimeManifestTimeoutContext(ctx)
-	err = VerifyRuntimeManifest(verifyContext, verifyOptions, runtimeManifest)
-	cancel()
-	if err != nil {
-		return completion, fmt.Errorf("post-run runtime verification: %w", err)
+	if err := verifyPostRunIdentities(options, authorization, verifyOptions, commit, tree); err != nil {
+		return completion, fmt.Errorf("post-run identity verification: %w", err)
 	}
 	completion.RuntimeReverified, completion.ModelReverified = true, true
 	completionBytes, _ := canonicalJSONFile(completion)
@@ -314,6 +312,59 @@ func Run(ctx context.Context, options RunOptions) (completion CompletionRecord, 
 		return completion, err
 	}
 	return completion, nil
+}
+
+func verifyPostRunIdentities(
+	options RunOptions,
+	authorization ExecutionAuthorization,
+	runtimeOptions RuntimeManifestOptions,
+	commit, tree string,
+) error {
+	if err := verifyPrivateRuntimeInputs(runtimeOptions); err != nil {
+		return err
+	}
+	actualCommit, actualTree, err := verifyMergedCleanRepository(
+		options.RepositoryRoot, authorization.MainRef, options.AdapterPath,
+	)
+	if err != nil {
+		return fmt.Errorf("verify repository identity: %w", err)
+	}
+	if actualCommit != commit || actualTree != tree {
+		return fmt.Errorf("repository implementation identity changed")
+	}
+	build, err := verifyExecutableBuild(commit)
+	if err != nil {
+		return fmt.Errorf("verify runner build: %w", err)
+	}
+	if build.Package != authorization.BuildPackage ||
+		build.GoVersion != authorization.BuildGoVersion ||
+		build.Revision != authorization.BuildVCSRevision ||
+		build.Modified != authorization.BuildVCSModified {
+		return fmt.Errorf("runner build provenance changed")
+	}
+	adapterBytes, err := os.ReadFile(options.AdapterPath)
+	if err != nil {
+		return fmt.Errorf("read adapter: %w", err)
+	}
+	if DigestBytes(adapterBytes) != authorization.AdapterSHA256 {
+		return fmt.Errorf("adapter identity changed")
+	}
+	toolPath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	toolInfo, err := os.Stat(toolPath)
+	if err != nil {
+		return err
+	}
+	toolDigest, err := digestRegularFile(toolPath, toolInfo)
+	if err != nil {
+		return fmt.Errorf("hash runner binary: %w", err)
+	}
+	if toolDigest != authorization.ToolSHA256 {
+		return fmt.Errorf("runner binary identity changed")
+	}
+	return nil
 }
 
 func executeSchedule(

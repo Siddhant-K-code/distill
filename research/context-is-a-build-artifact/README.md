@@ -50,6 +50,8 @@ credential, outcome, or claim that an experiment has run.
 - [Local context-control preregistration](local-control-preregistration-v1.md):
   separate 14-base development/calibration study for an offline local open
   model; it cannot alter or repair the frozen TypeSafe final study.
+- [Local context-control amendment](local-control-amendment-v1.md):
+  prospective pre-observation runtime and routing clarifications.
 - [Local context-control result projection](local-control-result-schema-v1.json):
   strict one-field categorical generation schema.
 - [Local context-control v2 preregistration](local-control-preregistration-v2.md):

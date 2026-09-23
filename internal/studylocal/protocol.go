@@ -1,11 +1,17 @@
 package studylocal
 
-import "fmt"
+import (
+	"fmt"
+
+	contextartifact "github.com/Siddhant-K-code/distill/research/context-is-a-build-artifact"
+)
 
 func BuildProtocol() (Protocol, error) {
 	protocol := Protocol{
 		SchemaVersion: SchemaVersion + "/protocol", Status: "prospective_frozen_no_observations",
-		StudyKind: "development_calibration_local_open_model", IndependentUnit: "base",
+		ProspectiveAmendment:       "research/context-is-a-build-artifact/local-control-amendment-v1.md",
+		ProspectiveAmendmentSHA256: contextartifact.LocalControlAmendmentSHA256,
+		StudyKind:                  "development_calibration_local_open_model", IndependentUnit: "base",
 		ConditionRecordsClustered: true, Arms: []string{ArmRaw, ArmDistillLock},
 		ArmDefinitions: map[string]string{
 			ArmRaw:         "Validate UTF-8 and emit sources in submitted manifest order with the frozen ASCII BEGIN/END wrappers; perform no normalization, deduplication, chunking, ranking, or truncation.",
@@ -16,7 +22,7 @@ func BuildProtocol() (Protocol, error) {
 		ObservationsPerModel: ObservationsPerModel, RepeatConditionIDs: RepeatConditionIDs(),
 		TargetModelID: TargetModelID, TargetModelRevision: TargetModelRevision,
 		TargetModelFormat: TargetModelFormat, TargetModelArtifactSHA256: TargetModelArtifactSHA256,
-		RuntimeStatus:                  "blocked_recreate_clean_runtime_and_freeze_new_full_tree_digest",
+		RuntimeStatus:                  "fresh_runtime_frozen_execution_requires_clean_host_preflight",
 		RetiredRuntimeSHA256:           RuntimeIdentitySHA256,
 		RuntimePackageClosureSHA256:    RuntimeClosureSHA256,
 		RuntimeRequirementsInputSHA256: "4f6fad6a9e96d8ee1efdf59f1bd423c4425647c6d72db83ab9d335f5fea7c21b",
@@ -71,9 +77,10 @@ func BuildProtocol() (Protocol, error) {
 		PerformanceTracing: "The 332-observation quality schedule is untraced. PID-attributed Metal tracing is an optional separately identified secondary phase on a prospectively amended small subset; its latency is never pooled with untraced latency, and missing or ambiguous Metal data cannot censor a valid quality observation.",
 		OutcomeRules: OutcomeRules{
 			PositiveDecisionDeltaMinimum: 0.05, NegativeDecisionDeltaMaximum: -0.05,
-			ReviewBurdenDeltaMinimum: -0.05, MinimumValidPrimaryRate: 0.80,
+			ReviewBurdenDeltaMinimum: -0.05, ReviewBurdenDeltaMaximum: 0.05,
+			UnsafeAcceptDeltaMaximum: 0.05, MinimumValidPrimaryRate: 0.80,
 			ClusterUnit:          "independent_base",
-			ThresholdPolicy:      "No confidence threshold is selected because confidence is unavailable. On Distill only, choose the highest-base-weighted-coverage rule meeting unsafe risk <=0.15 and at least 3 accepted observations; ties use the frozen strict-to-lenient order. Evaluate only that selected rule once on LLMTraceFX. If none qualifies, report no-safe-auto-action and do not evaluate a LLMTraceFX rule.",
+			ThresholdPolicy:      "No confidence threshold is selected because confidence is unavailable. Select on pooled Arm A+C Distill observations only: choose the highest equal-base-weighted-coverage rule meeting unsafe risk <=0.15 and at least 3 accepted observations; ties use the frozen strict-to-lenient order. Per-arm Distill rows are diagnostics only. Evaluate only that selected rule once on LLMTraceFX and report pooled plus per-arm diagnostic rows. If none qualifies, report no-safe-auto-action and do not evaluate a LLMTraceFX rule.",
 			RoutingUnsafeCeiling: 0.15, RoutingMinimumAccepted: 3,
 			RoutingRuleOrder: []string{"accept_with_all_evidence", "accept_with_any_evidence", "generated_accept"},
 		},
@@ -94,6 +101,9 @@ func protocolDigestProjection(protocol Protocol) Protocol {
 func ValidateProtocol(protocol Protocol) error {
 	if protocol.SchemaVersion != SchemaVersion+"/protocol" ||
 		protocol.Status != "prospective_frozen_no_observations" ||
+		protocol.ProspectiveAmendment != "research/context-is-a-build-artifact/local-control-amendment-v1.md" ||
+		protocol.ProspectiveAmendmentSHA256 != contextartifact.LocalControlAmendmentSHA256 ||
+		DigestBytes(contextartifact.LocalControlAmendment) != contextartifact.LocalControlAmendmentSHA256 ||
 		protocol.IndependentUnit != "base" || !protocol.ConditionRecordsClustered ||
 		protocol.BaseCount != 14 || protocol.ConditionCount != 118 ||
 		protocol.PrimaryObservations != PrimaryObservationCount ||
@@ -102,7 +112,7 @@ func ValidateProtocol(protocol Protocol) error {
 		protocol.ObservationsPerModel != ObservationsPerModel ||
 		protocol.TargetModelID != TargetModelID || protocol.TargetModelRevision != TargetModelRevision ||
 		protocol.TargetModelArtifactSHA256 != TargetModelArtifactSHA256 ||
-		protocol.RuntimeStatus != "blocked_recreate_clean_runtime_and_freeze_new_full_tree_digest" ||
+		protocol.RuntimeStatus != "fresh_runtime_frozen_execution_requires_clean_host_preflight" ||
 		protocol.RetiredRuntimeSHA256 != RuntimeIdentitySHA256 ||
 		protocol.RuntimePackageClosureSHA256 != RuntimeClosureSHA256 ||
 		protocol.RuntimeRequirementsInputSHA256 != "4f6fad6a9e96d8ee1efdf59f1bd423c4425647c6d72db83ab9d335f5fea7c21b" ||
@@ -115,7 +125,13 @@ func ValidateProtocol(protocol Protocol) error {
 		protocol.Generation.AttemptsPerScheduled != 1 || protocol.Generation.MaxOutputTokens != 256 ||
 		protocol.Generation.Sampling != "greedy_mlx_make_sampler_temp_0" ||
 		protocol.Generation.Temperature == nil || *protocol.Generation.Temperature != 0 ||
+		protocol.OutcomeRules.PositiveDecisionDeltaMinimum != 0.05 ||
+		protocol.OutcomeRules.NegativeDecisionDeltaMaximum != -0.05 ||
+		protocol.OutcomeRules.ReviewBurdenDeltaMinimum != -0.05 ||
 		protocol.OutcomeRules.RoutingUnsafeCeiling != 0.15 ||
+		protocol.OutcomeRules.ReviewBurdenDeltaMaximum != 0.05 ||
+		protocol.OutcomeRules.UnsafeAcceptDeltaMaximum != 0.05 ||
+		protocol.OutcomeRules.MinimumValidPrimaryRate != 0.80 ||
 		protocol.OutcomeRules.RoutingMinimumAccepted != 3 ||
 		fmt.Sprint(protocol.OutcomeRules.RoutingRuleOrder) != fmt.Sprint([]string{"accept_with_all_evidence", "accept_with_any_evidence", "generated_accept"}) ||
 		len(protocol.RepeatConditionIDs) != RepeatConditionCount {

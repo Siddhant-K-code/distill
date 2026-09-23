@@ -171,7 +171,7 @@ func buildCondition(baseID, dataset, role, family string, ordinal int) (Conditio
 func conditionSources(baseID, dataset, family string, ordinal int) ([]string, []string) {
 	root := "local-evidence/" + strings.ToLower(baseID) + "/" + fmt.Sprintf("%02d-%s", ordinal, family)
 	anchor := anchorForBase(baseID)
-	summary := fmt.Sprintf("evidence_id=E01\ndataset=%s\nbase=%s\ncondition=%s\nsource_anchor_path=%s\nsource_anchor_sha256=%s\nrequired_evidence=present\n", dataset, baseID, family, anchor.Path, anchor.SHA256)
+	summary := fmt.Sprintf("dataset=%s\nbase=%s\ncondition=%s\nsource_anchor_path=%s\nsource_anchor_sha256=%s\nrequired_evidence=present\n", dataset, baseID, family, anchor.Path, anchor.SHA256)
 	execution := baseExecution(baseID)
 	paths := []string{root + "/summary.txt", root + "/execution.txt"}
 	contents := []string{summary, execution}
@@ -186,7 +186,7 @@ func conditionSources(baseID, dataset, family string, ordinal int) ([]string, []
 		contents[0] = strings.ReplaceAll(summary, "\n", "\r\n")
 	case "metadata_noise":
 		paths = append(paths, root+"/metadata.txt")
-		contents = append(contents, "evidence_id=E03\nmetadata_only=true\ncatalog_order=17\n")
+		contents = append(contents, "metadata_only=true\ncatalog_order=17\n")
 	case "path_rename":
 		paths[0] = root + "/renamed-summary.txt"
 	case "irrelevant_append":
@@ -198,7 +198,7 @@ func conditionSources(baseID, dataset, family string, ordinal int) ([]string, []
 		paths, contents = paths[:1], contents[:1]
 	case "contradiction":
 		paths = append(paths, root+"/contradiction.txt")
-		contents = append(contents, "evidence_id=E03\ntests=fail\ncontradiction=true\n")
+		contents = append(contents, "tests=fail\ncontradiction=true\n")
 	case "stale_baseline":
 		contents[1] += "baseline=stale\n"
 	default:
@@ -228,7 +228,7 @@ func anchorForBase(baseID string) SourceAnchor {
 }
 
 func baseExecution(baseID string) string {
-	lines := "evidence_id=E02\ntests=pass\nverifier=pass\ncleanup=complete\nexternal_effects=resolved\nrisk=low\n"
+	lines := "tests=pass\nverifier=pass\ncleanup=complete\nexternal_effects=resolved\nrisk=low\n"
 	switch baseID {
 	case "distill-lock-source-drift":
 		lines = replaceEvidenceValue(lines, "risk", "medium")

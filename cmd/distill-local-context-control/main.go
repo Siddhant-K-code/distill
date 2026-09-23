@@ -78,6 +78,7 @@ func run(args []string) error {
 		adapter := flags.String("adapter", "tools/local-context-control-mlx.py", "committed trusted adapter")
 		repository := flags.String("repository", ".", "clean merged repository root")
 		commit := flags.String("expected-commit", "", "exact merged implementation commit")
+		tree := flags.String("expected-tree", "", "exact merged implementation tree")
 		runtimeTree := flags.String("runtime-tree-manifest", "", "private exact venv tree manifest")
 		baseTree := flags.String("base-tree-manifest", "", "private exact base CPython tree manifest")
 		wheelVerification := flags.String("wheel-verification", "", "private wheel RECORD verification record")
@@ -85,9 +86,9 @@ func run(args []string) error {
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
-		if *runtimePython == "" || *commit == "" || *runtimeTree == "" || *baseTree == "" ||
+		if *runtimePython == "" || *commit == "" || *tree == "" || *runtimeTree == "" || *baseTree == "" ||
 			*wheelVerification == "" || *output == "" {
-			return fmt.Errorf("--runtime-python, --expected-commit, --runtime-tree-manifest, --base-tree-manifest, --wheel-verification, and --output are required")
+			return fmt.Errorf("--runtime-python, --expected-commit, --expected-tree, --runtime-tree-manifest, --base-tree-manifest, --wheel-verification, and --output are required")
 		}
 		repoAbs, err := filepath.Abs(*repository)
 		if err != nil {
@@ -102,6 +103,7 @@ func run(args []string) error {
 		_, err = studylocal.WriteRuntimeManifest(ctx, studylocal.RuntimeManifestOptions{
 			RuntimePython: *runtimePython, AdapterPath: adapterAbs,
 			RepositoryRoot: repoAbs, ImplementationCommit: *commit, OutputPath: *output,
+			ImplementationTree:      *tree,
 			RuntimeTreeManifestPath: *runtimeTree, BaseTreeManifestPath: *baseTree,
 			WheelVerificationPath: *wheelVerification,
 		})
