@@ -1,0 +1,4 @@
+# Normalize displayed attribution without changing immutable commit objects.
+# GitHub noreply and bot service identities intentionally remain unmapped.
+Siddhant Khare <siddhantkhare2694@gmail.com> Siddhant Khare <Siddhantkhare2694@gmail.com>
+Siddhant Khare <siddhantkhare2694@gmail.com> Siddhant Khare <siddhant@usegitai.com>
