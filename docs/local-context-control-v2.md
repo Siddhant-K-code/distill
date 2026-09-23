@@ -32,8 +32,11 @@ merged `origin/main` commit.
 2. Prepare and validate the v2 offline package from that checkout and retain
    its path. The package is an input and may be under the repository build
    directory; only the private output namespaces below must be external.
-3. Recreate and independently retain the pinned CPython/runtime tree and wheel
-   verification records.
+3. Restore or reuse the exact pinned CPython/runtime tree and independently
+   retained wheel-verification records. The full-tree identity is
+   path-dependent and cannot be substituted by a new runtime at a different
+   path; any fresh reconstruction must independently prove byte-identical
+   custody.
 4. Write owner-only v2 model and runtime manifests.
 5. Run `preflight`; any frozen host eligibility failure blocks execution.
 6. Choose absent, absolute, owner-private adapter-check, authorization, and run

@@ -133,6 +133,8 @@ jobs:
           python-version: '3.13'
 
       - name: Test offline local context-control v2 harness
+        env:
+          DISTILL_REQUIRE_PYTHON: '1'
         run: go test ./internal/studylocalv2 ./cmd/distill-local-context-control-v2 -count=1
 
       - name: Generate and validate offline local context-control v2 package

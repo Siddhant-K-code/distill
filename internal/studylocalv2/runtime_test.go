@@ -17,6 +17,19 @@ import (
 	"time"
 )
 
+func requirePython3(t *testing.T) string {
+	t.Helper()
+	python, err := exec.LookPath("python3")
+	if err == nil {
+		return python
+	}
+	if os.Getenv("DISTILL_REQUIRE_PYTHON") != "" {
+		t.Fatalf("python3 is required for cross-language conformance: %v", err)
+	}
+	t.Skip("python3 unavailable")
+	return ""
+}
+
 func TestParseCategoricalPreservesTerminalFailures(t *testing.T) {
 	tests := []struct {
 		name string
@@ -55,10 +68,7 @@ func TestParseCategoricalPreservesTerminalFailures(t *testing.T) {
 }
 
 func TestGoPythonProjectionClassifierParity(t *testing.T) {
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 unavailable")
-	}
+	python := requirePython3(t)
 	vectors := []struct {
 		Raw     string
 		Allowed []string
@@ -103,10 +113,7 @@ func TestGoPythonProjectionClassifierParity(t *testing.T) {
 }
 
 func TestGoPythonFramingConformance(t *testing.T) {
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 unavailable")
-	}
+	python := requirePython3(t)
 	request := framingConformanceRequest()
 	goResponse, err := evaluateFramingConformance(request)
 	if err != nil {
@@ -139,10 +146,7 @@ func TestGoPythonFramingConformance(t *testing.T) {
 }
 
 func TestAdapterCheckCannotImportOrLoadModelRuntime(t *testing.T) {
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 unavailable")
-	}
+	python := requirePython3(t)
 	script := filepath.Join("..", "..", "tools", "local-context-control-mlx-v2.py")
 	check := `
 import ast, pathlib, sys
