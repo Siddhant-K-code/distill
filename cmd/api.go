@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -136,9 +137,19 @@ type APIServer struct {
 }
 
 func runAPI(cmd *cobra.Command, args []string) error {
+	if err := bindAPIFlags(cmd); err != nil {
+		return err
+	}
+
 	// Config file values are used as fallbacks via viper bindings
-	port := viper.GetInt("server.port")
-	host := viper.GetString("server.host")
+	host, port, err := resolveAPIListenAddress(
+		cmd,
+		viper.GetString("server.host"),
+		viper.GetInt("server.port"),
+	)
+	if err != nil {
+		return err
+	}
 	openaiKey, _ := cmd.Flags().GetString("openai-key")
 	embeddingModel := viper.GetString("embedding.model")
 	apiKeysStr, _ := cmd.Flags().GetString("api-keys")
@@ -251,6 +262,8 @@ func runAPI(cmd *cobra.Command, args []string) error {
 
 		memAPI := &MemoryAPI{store: memStore, embedder: embedder}
 		memAPI.RegisterMemoryRoutes(mux, m.Middleware)
+	} else {
+		mux.Handle("/v1/memory/", http.NotFoundHandler())
 	}
 
 	// Setup session store (opt-in)
@@ -268,6 +281,8 @@ func runAPI(cmd *cobra.Command, args []string) error {
 
 		sessAPI := &SessionAPI{store: sessStore}
 		sessAPI.RegisterSessionRoutes(mux, m.Middleware)
+	} else {
+		mux.Handle("/v1/session/", http.NotFoundHandler())
 	}
 
 	// Pipeline and batch routes.
@@ -334,6 +349,41 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	<-done
 	fmt.Println("Server stopped")
 	return nil
+}
+
+func bindAPIFlags(cmd *cobra.Command) error {
+	bindings := map[string]string{
+		"server.port":        "port",
+		"server.host":        "host",
+		"embedding.provider": "embedding-provider",
+		"embedding.model":    "embedding-model",
+		"embedding.base_url": "embedding-base-url",
+	}
+	for key, flagName := range bindings {
+		if err := viper.BindPFlag(key, cmd.Flags().Lookup(flagName)); err != nil {
+			return fmt.Errorf("bind API flag %q: %w", flagName, err)
+		}
+	}
+	return nil
+}
+
+func resolveAPIListenAddress(cmd *cobra.Command, host string, port int) (string, int, error) {
+	if cmd.Flags().Changed("host") {
+		host, _ = cmd.Flags().GetString("host")
+	}
+	if cmd.Flags().Changed("port") {
+		port, _ = cmd.Flags().GetInt("port")
+		return host, port, nil
+	}
+
+	if renderPort := os.Getenv("PORT"); renderPort != "" {
+		parsedPort, err := strconv.Atoi(renderPort)
+		if err != nil || parsedPort < 1 || parsedPort > 65535 {
+			return "", 0, fmt.Errorf("invalid PORT %q: must be an integer from 1 to 65535", renderPort)
+		}
+		port = parsedPort
+	}
+	return host, port, nil
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

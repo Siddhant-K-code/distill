@@ -35,7 +35,7 @@ server:
 
 | Flag | Env | Default | Description |
 |------|-----|---------|-------------|
-| `--port` | `PORT` | `8080` | Server port |
+| `--port` | `PORT` | `8080` | Server port; the flag takes precedence |
 | `--api-keys` | `DISTILL_API_KEYS` | — | Comma-separated API keys |
 | `--memory` | — | `false` | Enable memory subsystem |
 | `--memory-db` | — | `~/.distill/memory.db` | SQLite path for memory |
@@ -73,4 +73,4 @@ server:
 | `OPENAI_API_KEY` | OpenAI API key |
 | `COHERE_API_KEY` | Cohere API key |
 | `DISTILL_API_KEYS` | Comma-separated API keys for auth |
-| `PORT` | Server port |
+| `PORT` | API server port fallback when `--port` is omitted |

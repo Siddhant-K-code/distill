@@ -3,6 +3,7 @@ completions/
 
 # Binaries
 distill
+distill-api
 *.exe
 *.dll
 *.so

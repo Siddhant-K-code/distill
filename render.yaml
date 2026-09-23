@@ -3,17 +3,17 @@
 
 services:
   - type: web
-    name: distill
+    name: distill-api
     runtime: go
     region: oregon
     plan: free
-    buildCommand: go build -o distill .
-    startCommand: ./distill api --port $PORT --memory --session
+    buildCommand: go build -o distill-api .
+    startCommand: ./distill-api api --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false  # Set manually in dashboard
       - key: DISTILL_API_KEYS
-        sync: false  # Optional: comma-separated API keys for auth
+        sync: false  # Recommended: comma-separated API keys for auth
       - key: GO_VERSION
         value: 1.24.2
     healthCheckPath: /health
