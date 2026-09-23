@@ -71,6 +71,14 @@ distill-local-context-control: ## Generate and validate the offline local contex
 	$(GO) run ./cmd/distill-local-context-control summarize --input build/local-context-control
 	@printf '%s\n' 'provider_calls=0 local_observations=0 execution_authorized=false held_out_records=0'
 
+.PHONY: distill-local-context-control-v2
+distill-local-context-control-v2: ## Generate and validate the offline local context-control v2 package
+	rm -rf build/local-context-control-v2
+	$(GO) run ./cmd/distill-local-context-control-v2 prepare --output build/local-context-control-v2
+	$(GO) run ./cmd/distill-local-context-control-v2 validate --input build/local-context-control-v2
+	$(GO) run ./cmd/distill-local-context-control-v2 summarize --input build/local-context-control-v2
+	@printf '%s\n' 'provider_calls=0 local_observations=0 execution_authorized=false held_out_records=0'
+
 .PHONY: bench
 bench: ## Run benchmarks
 	$(GO) test -bench=. -benchmem ./...

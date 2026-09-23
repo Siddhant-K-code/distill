@@ -52,6 +52,10 @@ credential, outcome, or claim that an experiment has run.
   model; it cannot alter or repair the frozen TypeSafe final study.
 - [Local context-control result projection](local-control-result-schema-v1.json):
   strict one-field categorical generation schema.
+- [Local context-control v2 preregistration](local-control-preregistration-v2.md):
+  separate prospective successor after the outcome-free v1 startup failure.
+- [Local context-control v2 result projection](local-control-result-schema-v2.json):
+  independently identified v2 categorical generation schema.
 
 ## Distill Lock v0 anchors
 
