@@ -23,9 +23,18 @@ func TestOfflineLifecycle(t *testing.T) {
 }
 
 func TestRunRejectsMissingArguments(t *testing.T) {
-	for _, args := range [][]string{nil, {"prepare"}, {"validate"}, {"summarize"}, {"unknown"}} {
+	for _, args := range [][]string{nil, {"prepare"}, {"validate"}, {"summarize"}, {"validate-public"}, {"unknown"}} {
 		if err := run(args); err == nil {
 			t.Fatalf("expected error for %v", args)
 		}
+	}
+}
+
+func TestValidatePublishedPublicEvidence(t *testing.T) {
+	if err := run([]string{
+		"validate-public",
+		"--input", filepath.Join("..", "..", "research", "context-is-a-build-artifact"),
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

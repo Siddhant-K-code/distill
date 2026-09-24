@@ -77,6 +77,7 @@ distill-local-context-control-v2: ## Generate and validate the offline local con
 	$(GO) run ./cmd/distill-local-context-control-v2 prepare --output build/local-context-control-v2
 	$(GO) run ./cmd/distill-local-context-control-v2 validate --input build/local-context-control-v2
 	$(GO) run ./cmd/distill-local-context-control-v2 summarize --input build/local-context-control-v2
+	$(GO) run ./cmd/distill-local-context-control-v2 validate-public --input research/context-is-a-build-artifact
 	@printf '%s\n' 'provider_calls=0 local_observations=0 execution_authorized=false held_out_records=0'
 
 .PHONY: bench
