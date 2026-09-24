@@ -60,6 +60,16 @@ func run(args []string) error {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(summary)
+	case "validate-public":
+		flags := flag.NewFlagSet("validate-public", flag.ContinueOnError)
+		input := flags.String("input", "", "directory containing the public aggregate evidence")
+		if err := flags.Parse(args[1:]); err != nil {
+			return err
+		}
+		if *input == "" {
+			return fmt.Errorf("--input is required")
+		}
+		return studylocalv2.ValidatePublicEvidence(*input)
 	case "model-manifest":
 		flags := flag.NewFlagSet("model-manifest", flag.ContinueOnError)
 		modelPath := flags.String("model-path", "", "verified local model directory")
@@ -298,5 +308,5 @@ func run(args []string) error {
 }
 
 func usageError() error {
-	return fmt.Errorf("usage: distill-local-context-control-v2 <prepare|validate|summarize|model-manifest|runtime-manifest|preflight|adapter-check|authorize|run|verify-results|summarize-results>")
+	return fmt.Errorf("usage: distill-local-context-control-v2 <prepare|validate|summarize|validate-public|model-manifest|runtime-manifest|preflight|adapter-check|authorize|run|verify-results|summarize-results>")
 }

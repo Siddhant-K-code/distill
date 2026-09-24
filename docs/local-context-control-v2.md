@@ -89,3 +89,17 @@ I authorize only the pinned local 4B v2 development/calibration schedule with ze
 There is no retry flag. Any consumed failure is terminal and must remain
 preserved. No TypeSafe/AgentTrace held-out, provider, cloud, network, or scaling
 access is authorized.
+
+## Public aggregate result
+
+The completed amendment-1 study produced a valid negative result. The
+[public result report](../research/context-is-a-build-artifact/local-control-result-v2.md)
+and [canonical aggregate record](../research/context-is-a-build-artifact/local-control-public-aggregate-v1.json)
+publish aggregate values and public hashes only.
+
+Validate the public package with:
+
+```bash
+go run ./cmd/distill-local-context-control-v2 validate-public \
+  --input research/context-is-a-build-artifact
+```

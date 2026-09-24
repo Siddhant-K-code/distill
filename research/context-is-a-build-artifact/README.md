@@ -1,6 +1,6 @@
 # Context Is a Build Artifact
 
-**Status:** preregistered design / no model runs
+**Status:** preregistered design / completed local v2 aggregate result
 
 Working title:
 
@@ -13,8 +13,9 @@ Research question:
 > calibration, selective risk, and cost under equivalent source perturbations?
 
 This directory freezes an independently reviewable study design before any Jev
-integration or paid execution. It contains no model adapter, provider call,
-credential, outcome, or claim that an experiment has run.
+integration or paid execution. It also publishes the aggregate-only result of
+the separate completed local context-control v2 amendment-1 study. It contains
+no model adapter, provider call, credential, or private execution record.
 
 ## Documents
 
@@ -58,6 +59,13 @@ credential, outcome, or claim that an experiment has run.
   separate prospective successor after the outcome-free v1 startup failure.
 - [Local context-control v2 result projection](local-control-result-schema-v2.json):
   independently identified v2 categorical generation schema.
+- [Local context-control v2 public aggregate](local-control-public-aggregate-v1.json):
+  canonical aggregate-only result with a frozen public schema name and version.
+- [Local context-control v2 result report](local-control-result-v2.md):
+  design, integrity chain, aggregate findings, failure chronology, limitations,
+  and claim boundaries.
+- [Local context-control v2 public checksums](local-control-public-evidence-v1.SHA256SUMS):
+  SHA-256 identities for the public aggregate and report.
 
 ## Distill Lock v0 anchors
 

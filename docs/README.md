@@ -22,5 +22,5 @@
 
 ## Research
 
-- [Context Is a Build Artifact](../research/context-is-a-build-artifact/) —
-  preregistered decision-reliability study design; no model runs
+- [Context Is a Build Artifact](../research/context-is-a-build-artifact/):
+  preregistered decision-reliability design and local v2 aggregate result
