@@ -1032,6 +1032,29 @@ def exact_file_hash(path: Path, expected: str, label: str) -> None:
         raise AdapterError(f"{label} input hash mismatch")
 
 
+def validate_host_preflight(host_raw: bytes, expected_sha256: str) -> dict[str, Any]:
+    host = strict_json_file(host_raw)
+    allowed_host_keys = {
+        "schema_version", "collected_at", "os_version", "os_build",
+        "architecture", "chip", "physical_memory_bytes", "vm_available_percent",
+        "memory_pressure_free_percent", "swap_used_bytes", "disk_free_bytes",
+        "power_source", "sandbox_exec_available", "metal_trace_available",
+        "heavy_processes", "eligible", "failures",
+    }
+    if "xctrace_version" in host:
+        allowed_host_keys.add("xctrace_version")
+    exact_object(host, allowed_host_keys, "host preflight")
+    if (
+        host["schema_version"] != SCHEMA + "/host-preflight"
+        or host["eligible"] is not True
+        or host["heavy_processes"] != []
+        or host["failures"] != []
+        or sha256(host_raw) != expected_sha256
+    ):
+        raise AdapterError("host preflight binding mismatch")
+    return host
+
+
 def adapter_check(args: argparse.Namespace) -> dict[str, Any]:
     if any(name == "mlx" or name.startswith("mlx.") or name == "mlx_lm" or name.startswith("mlx_lm.") for name in sys.modules):
         raise AdapterError("adapter-check process has imported model runtime modules")
@@ -1162,24 +1185,7 @@ def adapter_check(args: argparse.Namespace) -> dict[str, Any]:
         raise AdapterError("runtime manifest binding mismatch")
 
     host_raw = input_paths["host_preflight"].read_bytes()
-    host = strict_json_file(host_raw)
-    allowed_host_keys = {
-        "schema_version", "collected_at", "os_version", "os_build",
-        "architecture", "chip", "physical_memory_bytes", "vm_available_percent",
-        "memory_pressure_free_percent", "swap_used_bytes", "disk_free_bytes",
-        "power_source", "sandbox_exec_available", "metal_trace_available",
-        "heavy_processes", "eligible", "failures",
-    }
-    if "xctrace_version" in host:
-        allowed_host_keys.add("xctrace_version")
-    exact_object(host, allowed_host_keys, "host preflight")
-    if (
-        host["schema_version"] != SCHEMA + "/host-preflight"
-        or host["eligible"] is not True
-        or host["failures"] != []
-        or sha256(host_raw) != request["host_preflight_sha256"]
-    ):
-        raise AdapterError("host preflight binding mismatch")
+    validate_host_preflight(host_raw, request["host_preflight_sha256"])
 
     conformance_raw = input_paths["conformance_request"].read_bytes()
     conformance_request = strict_json_file(conformance_raw)
@@ -1250,6 +1256,8 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("classifier-self-test")
     commands.add_parser("framing-conformance")
+    host = commands.add_parser("host-preflight-conformance")
+    host.add_argument("--expected-sha256", required=True)
     check = commands.add_parser("adapter-check")
     check.add_argument("--request", required=True)
     manifest = commands.add_parser("runtime-manifest")
@@ -1294,6 +1302,20 @@ def main() -> None:
     if args.command == "framing-conformance":
         request = strict_json_frame(sys.stdin.buffer.read())
         write_frame(framing_conformance(request))
+        return
+    if args.command == "host-preflight-conformance":
+        host_raw = sys.stdin.buffer.read()
+        host = validate_host_preflight(host_raw, args.expected_sha256)
+        write_frame({
+            "eligible": host["eligible"],
+            "host_preflight_sha256": sha256(host_raw),
+            "model_loaded": False,
+            "model_runtime_imported": any(
+                name == "mlx" or name.startswith("mlx.")
+                or name == "mlx_lm" or name.startswith("mlx_lm.")
+                for name in sys.modules
+            ),
+        })
         return
     if args.command == "adapter-check":
         write_frame(adapter_check(args))

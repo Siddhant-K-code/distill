@@ -75,7 +75,12 @@ func CollectHostPreflight(ctx context.Context, outputParent string, limits Isola
 }
 
 func collectHostPreflight(ctx context.Context, outputParent string, limits IsolationLimits, probe systemProbe) (HostSnapshot, error) {
-	snapshot := HostSnapshot{SchemaVersion: SchemaVersion + "/host-preflight", CollectedAt: time.Now().UTC()}
+	snapshot := HostSnapshot{
+		SchemaVersion:  SchemaVersion + "/host-preflight",
+		CollectedAt:    time.Now().UTC(),
+		HeavyProcesses: make([]ProcessSnapshot, 0),
+		Failures:       make([]string, 0),
+	}
 	run := func(name string, args ...string) (string, error) {
 		output, err := probe.Run(ctx, name, args...)
 		if err != nil {
@@ -204,6 +209,9 @@ raise SystemExit(1)`
 		snapshot.Failures = append(snapshot.Failures, "unrelated_high_memory_process")
 	}
 	snapshot.Eligible = len(snapshot.Failures) == 0
+	if err := validateHostSnapshot(snapshot); err != nil {
+		return snapshot, err
+	}
 	return snapshot, nil
 }
 
@@ -303,9 +311,31 @@ func ReadHostSnapshot(data []byte) (HostSnapshot, error) {
 	if err := strictJSONObjectFileDecode(data, &snapshot); err != nil {
 		return HostSnapshot{}, err
 	}
+	if err := validateHostSnapshot(snapshot); err != nil {
+		return HostSnapshot{}, err
+	}
 	return snapshot, nil
 }
 
 func encodeHostSnapshot(snapshot HostSnapshot) ([]byte, error) {
+	if err := validateHostSnapshot(snapshot); err != nil {
+		return nil, err
+	}
 	return canonicalJSONFile(snapshot)
+}
+
+func validateHostSnapshot(snapshot HostSnapshot) error {
+	if snapshot.SchemaVersion != SchemaVersion+"/host-preflight" {
+		return fmt.Errorf("host preflight schema mismatch")
+	}
+	if snapshot.HeavyProcesses == nil || snapshot.Failures == nil {
+		return fmt.Errorf("host preflight arrays must be concrete")
+	}
+	if snapshot.Eligible != (len(snapshot.Failures) == 0) {
+		return fmt.Errorf("host preflight eligibility mismatch")
+	}
+	if snapshot.Eligible && len(snapshot.HeavyProcesses) != 0 {
+		return fmt.Errorf("eligible host preflight contains heavy processes")
+	}
+	return nil
 }
