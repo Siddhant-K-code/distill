@@ -511,8 +511,8 @@ func LoadAndVerifyAdapterCheck(
 	if err := strictJSONObjectFileDecode(files["adapter-check.json"], &receipt); err != nil {
 		return AdapterCheckRequest{}, AdapterCheckReceipt{}, HostSnapshot{}, err
 	}
-	var host HostSnapshot
-	if err := strictJSONObjectFileDecode(files["host-preflight.json"], &host); err != nil || !host.Eligible {
+	host, err := ReadHostSnapshot(files["host-preflight.json"])
+	if err != nil || !host.Eligible {
 		return AdapterCheckRequest{}, AdapterCheckReceipt{}, HostSnapshot{}, fmt.Errorf("invalid adapter-check host preflight")
 	}
 	var conformanceRequest FramingConformanceRequest

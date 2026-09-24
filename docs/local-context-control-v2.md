@@ -23,6 +23,33 @@ Frozen v2 identities:
 - package manifest: `c0ad25e2c16bb38bf80b1164696580367836248bcd4a9697d7e5e91b7a943f85`
 - framing conformance receipt: `d864b23a23ff10402bc44a9261b31903077f6f7915a2374db7c4e122caaedae3`
 
+## Outcome-free v2 preparation history
+
+Two private v2 preparations are classified `NO_RUN` and are not study
+results:
+
+1. The first stopped at readiness because Colima exceeded the frozen 1 GiB
+   unrelated-process RSS bound.
+2. The second passed three host-readiness samples, then the adapter check
+   rejected an eligible Go-produced `HostSnapshot`: the Go producer encoded
+   empty `heavy_processes` and `failures` slices as `null`, while the strict
+   Python binding requires concrete empty arrays. It failed with
+   `local-context-control-mlx-v2: AdapterError: host preflight binding mismatch`.
+
+Both events ended before authorization, attempt-ledger creation, model load, or
+inference. The failed adapter-check directory did not survive, and there is no
+model output or valid result to interpret.
+
+Because no authorization, attempt, model load, observation, or outcome exists,
+the correction is an outcome-independent implementation amendment within v2,
+not a v3 protocol. The frozen scientific protocol and package identities above
+remain unchanged. Re-execution requires a newly reviewed and merged
+implementation commit/tree, a rebuilt runner, the corrected adapter hash, and
+fresh owner-only runtime and adapter-check records. The old private binary must
+not be reused or represented as execution-eligible. A v3 namespace would be
+required only for a scientific protocol, schedule, outcome, or authorization
+contract change.
+
 ## Clean-main execution sequence
 
 Use a separate, explicitly authorized session from the exact reviewed and
@@ -37,7 +64,9 @@ merged `origin/main` commit.
    path-dependent and cannot be substituted by a new runtime at a different
    path; any fresh reconstruction must independently prove byte-identical
    custody.
-4. Write owner-only v2 model and runtime manifests.
+4. Build a fresh runner and write owner-only v2 model and runtime manifests
+   from the corrected merged implementation. Do not reuse the old private
+   binary.
 5. Run `preflight`; any frozen host eligibility failure blocks execution.
 6. Choose absent, absolute, owner-private adapter-check, authorization, and run
    namespaces. They must be distinct and outside the repository, model, and

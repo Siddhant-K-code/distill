@@ -455,6 +455,18 @@ func TestPreflightRejectsUnrelatedHeavyProcess(t *testing.T) {
 		len(snapshot.HeavyProcesses) != 1 || snapshot.HeavyProcesses[0].PID != 900 {
 		t.Fatalf("heavy process did not fail closed: %+v", snapshot)
 	}
+	data, err := encodeHostSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := ReadHostSnapshot(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Failures) == 0 || decoded.Failures[0] == "" ||
+		len(decoded.HeavyProcesses) != 1 {
+		t.Fatalf("ineligible snapshot lost concrete failure details: %+v", decoded)
+	}
 }
 
 func TestPreflightExcludesOwnAncestorChain(t *testing.T) {
@@ -471,6 +483,50 @@ func TestPreflightExcludesOwnAncestorChain(t *testing.T) {
 	}
 	if !snapshot.Eligible || len(snapshot.HeavyProcesses) != 0 {
 		t.Fatalf("own ancestor was treated as unrelated: %+v", snapshot)
+	}
+}
+
+func TestGoHostSnapshotPassesPythonAdapterPreflightContract(t *testing.T) {
+	python := requirePython3(t)
+	protocol, err := BuildProtocol()
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := collectHostPreflight(
+		context.Background(), t.TempDir(), protocol.Isolation, cleanPreflightProbe(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snapshot.Eligible {
+		t.Fatalf("clean preflight probe was ineligible: %+v", snapshot)
+	}
+	data, err := encodeHostSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join("..", "..", "tools", "local-context-control-mlx-v2.py")
+	command := exec.Command(
+		python, "-I", "-B", "-S", script, "host-preflight-conformance",
+		"--expected-sha256", DigestBytes(data),
+	)
+	command.Stdin = bytes.NewReader(data)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("python adapter host-preflight validation: %v: %s", err, output)
+	}
+	var result struct {
+		Eligible             bool   `json:"eligible"`
+		HostPreflightSHA256  string `json:"host_preflight_sha256"`
+		ModelLoaded          bool   `json:"model_loaded"`
+		ModelRuntimeImported bool   `json:"model_runtime_imported"`
+	}
+	if err := strictJSONObjectFileDecode(output, &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.Eligible || result.HostPreflightSHA256 != DigestBytes(data) ||
+		result.ModelLoaded || result.ModelRuntimeImported {
+		t.Fatalf("unexpected Python host-preflight result: %+v", result)
 	}
 }
 

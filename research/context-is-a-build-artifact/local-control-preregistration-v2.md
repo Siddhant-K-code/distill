@@ -1,6 +1,7 @@
 # Local context-control study v2 preregistration
 
-Status: prospective, frozen before any v2 model output.
+Status: prospective, frozen before any v2 model output; two private
+pre-authorization preparations are classified `NO_RUN`.
 
 V2 is a new provider-independent local protocol after the outcome-free v1
 startup failure documented in
@@ -40,3 +41,19 @@ requirements.
 This implementation preregistration performs no real model inference. Execution
 is blocked until the exact implementation is independently reviewed, merged to
 main, and separately authorized from a clean-main execution session.
+
+The first private preparation stopped at readiness because Colima exceeded the
+frozen 1 GiB unrelated-process RSS limit. A later preparation passed three
+readiness samples but stopped during adapter-check because an eligible
+Go-produced host snapshot encoded empty `heavy_processes` and `failures` as
+`null`, which failed the strict Python `failures == []` binding. No
+adapter-check directory survived; neither preparation created authorization or
+attempt-ledger records, loaded the model, ran inference, or produced model
+output.
+
+The producer correction is therefore an outcome-independent implementation
+amendment under the existing v2 protocol. It does not change the frozen
+scientific identities above and does not justify a v3 namespace. Any future
+private preparation must use the corrected reviewed merged commit/tree, rebuilt
+runner, corrected adapter identity, and newly generated owner-only runtime and
+adapter-check records; the old private binary is execution-ineligible.
