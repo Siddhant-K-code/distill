@@ -196,7 +196,7 @@ or patch drafting. This is an experimental Markdown/local-repository alpha, not
 general availability or evidence of adoption. Run `make handoff-v0-demo` or see
 the [bounded contract and 5–10 minute flow](docs/handoff-v0.md).
 
-The separate research-only
+For Distill Lock, the separate research-only
 [offline excluded-pilot harness](research/context-is-a-build-artifact/pilot/README.md)
 generates synthetic, zero-provider-call protocol fixtures and is not wired into
 the public `distill` CLI.
