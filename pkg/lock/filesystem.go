@@ -1,18 +1,15 @@
 package lock
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
-	"golang.org/x/text/unicode/norm"
+	"github.com/Siddhant-K-code/distill/internal/artifact"
 )
 
 type sourceInput struct {
@@ -135,47 +132,11 @@ func validateSupportedFile(portable string) error {
 }
 
 func readRegularFile(filePath string, before fs.FileInfo) ([]byte, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	opened, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
-		return nil, fmt.Errorf("file identity changed while opening")
-	}
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	after, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !os.SameFile(opened, after) || opened.Size() != after.Size() {
-		return nil, fmt.Errorf("file identity changed while reading")
-	}
-	return data, nil
+	return artifact.ReadRegularFile(filePath, before)
 }
 
 func normalizeText(original []byte) ([]byte, error) {
-	if bytes.IndexByte(original, 0) >= 0 {
-		return nil, fmt.Errorf("NUL byte indicates binary input")
-	}
-	if !utf8.Valid(original) {
-		return nil, fmt.Errorf("input is not valid UTF-8")
-	}
-
-	nfc := norm.NFC.Bytes(original)
-	lf := bytes.ReplaceAll(nfc, []byte("\r\n"), []byte("\n"))
-	lf = bytes.ReplaceAll(lf, []byte("\r"), []byte("\n"))
-	return lf, nil
+	return artifact.NormalizeText(original)
 }
 
 func resolvedDirectory(dir string) (string, error) {

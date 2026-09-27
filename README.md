@@ -115,6 +115,7 @@ make check        # fmt + vet + test
 make test-cover   # test with coverage report
 make bench        # run benchmarks
 make distill-lock-demo # deterministic lock/build/verify demo
+make handoff-v0-demo # offline review-only decision handoff demo
 make lint         # golangci-lint (requires golangci-lint in PATH)
 make docker-build # build Docker image
 make help         # list all targets
@@ -175,6 +176,25 @@ The existing semantic Distill pipeline remains available and unchanged.
 See [the frozen Distill Lock v0 specification](docs/distill-lock-v0.md) for the
 canonical JSON rules, algorithms, failure behavior, and a complete
 configuration example.
+
+## Handoff v0 alpha: decisions become review artifacts
+
+Handoff freezes one exported Markdown conversation and a local Markdown docs
+tree, then verifies a strict proposal produced by an external coding agent:
+
+```bash
+distill handoff prepare --conversation export.md --docs ./docs --out ./request
+distill handoff verify --request ./request/handoff.request.json \
+  --proposal ./proposal.json --out ./review
+```
+
+Distill makes no model or network call, never changes source docs, never applies
+a patch, and accepts only `require_review` routes. The deterministic guarantee
+covers normalization, identities, evidence checks, patch validation, receipts,
+review rendering, and checksum-bound patch files—not probabilistic extraction
+or patch drafting. This is an experimental Markdown/local-repository alpha, not
+general availability or evidence of adoption. Run `make handoff-v0-demo` or see
+the [bounded contract and 5–10 minute flow](docs/handoff-v0.md).
 
 The separate research-only
 [offline excluded-pilot harness](research/context-is-a-build-artifact/pilot/README.md)

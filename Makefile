@@ -44,6 +44,10 @@ test-cover: ## Run tests and show coverage
 distill-lock-demo: ## Build, verify, repeat, and mutate the Distill Lock v0 fixture
 	$(GO) test ./pkg/lock -run '^TestDistillLockDemo$$' -count=1 -v
 
+.PHONY: handoff-v0-demo
+handoff-v0-demo: ## Prepare and verify the offline review-only Handoff v0 alpha fixtures
+	$(GO) test ./pkg/handoff -run '^(TestGoldenReviewFixture|TestHandoffDemo)$$' -count=1 -v
+
 .PHONY: distill-jev-pilot
 distill-jev-pilot: ## Generate and validate the excluded offline research pilot
 	$(GO) run ./cmd/distill-jev-pilot prepare --output build/pilot
