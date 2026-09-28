@@ -18,7 +18,7 @@ flowchart TD
     subgraph trusted["Trusted local runner"]
         sources["Conversation + Markdown docs"] --> prepare["distill handoff prepare"]
         prepare --> bundle["Private request bundle<br/>(only artifact sent to the agent)"]
-        prepare --> digest["Trusted request digest<br/>(retained; never sent to the agent)"]
+        prepare --> digest["Trusted copy of request digest<br/>(retained outside agent boundary)"]
         verify["distill handoff verify"]
     end
 
@@ -45,9 +45,9 @@ proposal.schema.json exactly. Do not modify the source docs; write no files
 other than proposal.json.
 ```
 
-The human or another trusted runner must retain the digest printed by `prepare`
-and pass it to `verify`. Never ask the proposal-generating agent to supply or
-choose the trusted expected digest.
+Retain an independently trusted copy of the digest printed by `prepare`. The
+bundle and proposal may contain the same value, but neither is authoritative for
+`--expected-request-sha256`; never source it from the proposing agent or output.
 
 ## Contract and guarantees
 
