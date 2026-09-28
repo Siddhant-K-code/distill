@@ -49,24 +49,22 @@ func evaluateACL(path string) (aclEvaluation, error) {
 		if err != nil {
 			return aclEvaluation{}, err
 		}
-		unsafeACL, err := linuxACLGrantsMutation(data[:read], uint32(os.Geteuid()))
+		unsafeACL, exposedACL, err := linuxACLEvaluation(data[:read], uint32(os.Geteuid()))
 		if err != nil {
 			return aclEvaluation{}, fmt.Errorf("%s: %w", name, err)
 		}
-		if unsafeACL {
-			result.unsafe = true
-			return result, nil
-		}
+		result.unsafe = result.unsafe || unsafeACL
+		result.exposed = result.exposed || exposedACL
 	}
 	return result, nil
 }
 
-func linuxACLGrantsMutation(data []byte, currentUID uint32) (bool, error) {
+func linuxACLEvaluation(data []byte, currentUID uint32) (bool, bool, error) {
 	if len(data) < 4 || (len(data)-4)%8 != 0 {
-		return false, fmt.Errorf("invalid POSIX ACL length %d", len(data))
+		return false, false, fmt.Errorf("invalid POSIX ACL length %d", len(data))
 	}
 	if version := binary.LittleEndian.Uint32(data[:4]); version != linuxACLVersion {
-		return false, fmt.Errorf("unsupported POSIX ACL version %d", version)
+		return false, false, fmt.Errorf("unsupported POSIX ACL version %d", version)
 	}
 	entries := make([]linuxACLEntry, 0, (len(data)-4)/8)
 	mask := uint16(7)
@@ -81,7 +79,10 @@ func linuxACLGrantsMutation(data []byte, currentUID uint32) (bool, error) {
 		}
 		entries = append(entries, entry)
 	}
+	var unsafeACL bool
+	var exposedACL bool
 	for _, entry := range entries {
+		var effective uint16
 		switch entry.tag {
 		case linuxACLUserObj, linuxACLMask:
 			continue
@@ -89,20 +90,20 @@ func linuxACLGrantsMutation(data []byte, currentUID uint32) (bool, error) {
 			if entry.id == 0 || entry.id == currentUID {
 				continue
 			}
-			if entry.permissions&mask&linuxACLWrite != 0 {
-				return true, nil
-			}
+			effective = entry.permissions & mask
 		case linuxACLGroupObj, linuxACLGroup:
-			if entry.permissions&mask&linuxACLWrite != 0 {
-				return true, nil
-			}
+			effective = entry.permissions & mask
 		case linuxACLOther:
-			if entry.permissions&linuxACLWrite != 0 {
-				return true, nil
-			}
+			effective = entry.permissions
 		default:
-			return false, fmt.Errorf("unsupported POSIX ACL tag %#x", entry.tag)
+			return false, false, fmt.Errorf("unsupported POSIX ACL tag %#x", entry.tag)
+		}
+		if effective != 0 {
+			exposedACL = true
+		}
+		if effective&linuxACLWrite != 0 {
+			unsafeACL = true
 		}
 	}
-	return false, nil
+	return unsafeACL, exposedACL, nil
 }

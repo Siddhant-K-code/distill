@@ -64,26 +64,34 @@ func evaluateACL(path string) (aclEvaluation, error) {
 	if buffer.Reference.Length == 0 {
 		return aclEvaluation{}, nil
 	}
-	unsafeACL, err := darwinACLGrantsMutation(buffer.Data[:], int(buffer.Reference.Length))
-	return aclEvaluation{unsafe: unsafeACL}, err
+	unsafeACL, exposedACL, err := darwinACLEvaluation(buffer.Data[:], int(buffer.Reference.Length))
+	return aclEvaluation{unsafe: unsafeACL, exposed: exposedACL}, err
 }
 
-func darwinACLGrantsMutation(data []byte, length int) (bool, error) {
+func darwinACLEvaluation(data []byte, length int) (bool, bool, error) {
 	if length < darwinFileSecurityHeaderBytes || length > len(data) {
-		return false, fmt.Errorf("invalid extended security data length %d", length)
+		return false, false, fmt.Errorf("invalid extended security data length %d", length)
 	}
 	data = data[:length]
 	entryCount := int(binary.LittleEndian.Uint32(data[36:40]))
 	if expected := darwinFileSecurityHeaderBytes + entryCount*darwinACEBytes; expected != length {
-		return false, fmt.Errorf("invalid ACL entry count %d for length %d", entryCount, length)
+		return false, false, fmt.Errorf("invalid ACL entry count %d for length %d", entryCount, length)
 	}
+	var unsafeACL bool
+	var exposedACL bool
 	for index := 0; index < entryCount; index++ {
 		offset := darwinFileSecurityHeaderBytes + index*darwinACEBytes
 		flags := binary.LittleEndian.Uint32(data[offset+16 : offset+20])
 		rights := binary.LittleEndian.Uint32(data[offset+20 : offset+24])
-		if flags&darwinACEKindMask == darwinACEPermit && rights&darwinWriteRights != 0 {
-			return true, nil
+		if flags&darwinACEKindMask != darwinACEPermit {
+			continue
+		}
+		if rights != 0 {
+			exposedACL = true
+		}
+		if rights&darwinWriteRights != 0 {
+			unsafeACL = true
 		}
 	}
-	return false, nil
+	return unsafeACL, exposedACL, nil
 }

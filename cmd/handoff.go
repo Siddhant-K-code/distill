@@ -58,16 +58,23 @@ func newHandoffVerifyCommand() *cobra.Command {
 	var requestPath string
 	var proposalPath string
 	var outputDirectory string
+	var expectedRequestSHA256 string
 	command := &cobra.Command{
 		Use:   "verify",
 		Short: "Verify and package an external proposal for human review",
 		Example: `  distill handoff verify \
     --request ./handoff-request/handoff.request.json \
+    --expected-request-sha256 <trusted-prepare-digest> \
     --proposal ./proposal.json \
     --out ./handoff-review`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			summary, err := handoff.Verify(requestPath, proposalPath, outputDirectory)
+			summary, err := handoff.VerifyWithExpectedRequest(
+				requestPath,
+				proposalPath,
+				outputDirectory,
+				expectedRequestSHA256,
+			)
 			if err != nil {
 				return err
 			}
@@ -84,9 +91,16 @@ func newHandoffVerifyCommand() *cobra.Command {
 		},
 	}
 	command.Flags().StringVar(&requestPath, "request", "", "prepared handoff.request.json path")
+	command.Flags().StringVar(
+		&expectedRequestSHA256,
+		"expected-request-sha256",
+		"",
+		"trusted request SHA-256 printed by handoff prepare",
+	)
 	command.Flags().StringVar(&proposalPath, "proposal", "", "canonical external proposal JSON path")
 	command.Flags().StringVar(&outputDirectory, "out", "", "fresh review package directory")
 	_ = command.MarkFlagRequired("request")
+	_ = command.MarkFlagRequired("expected-request-sha256")
 	_ = command.MarkFlagRequired("proposal")
 	_ = command.MarkFlagRequired("out")
 	return command

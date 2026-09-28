@@ -20,13 +20,20 @@ type requestBundle struct {
 	documents    map[string][]byte
 }
 
-func loadRequestBundle(requestPath string) (*requestBundle, []byte, error) {
+func loadRequestBundle(requestPath, expectedRequestSHA256 string) (*requestBundle, []byte, error) {
 	if filepath.Base(requestPath) != RequestFileName {
 		return nil, nil, fmt.Errorf("request file must be named %q", RequestFileName)
 	}
 	root, err := artifact.ResolveDirectory(filepath.Dir(requestPath))
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve request bundle: %w", err)
+	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil {
+		return nil, nil, fmt.Errorf("inspect request bundle: %w", err)
+	}
+	if err := artifact.ValidatePrivateInfo(rootInfo, root, true); err != nil {
+		return nil, nil, fmt.Errorf("request bundle privacy: %w", err)
 	}
 	requestPath = filepath.Join(root, RequestFileName)
 	requestBytes, err := readSafeFile(requestPath)
@@ -36,6 +43,13 @@ func loadRequestBundle(requestPath string) (*requestBundle, []byte, error) {
 	var request Request
 	if err := artifact.DecodeCanonicalJSON(requestBytes, &request); err != nil {
 		return nil, nil, fmt.Errorf("request: %w", err)
+	}
+	if actual := artifact.DigestBytes(requestBytes); actual != expectedRequestSHA256 {
+		return nil, nil, fmt.Errorf(
+			"request SHA-256 mismatch: got %s, want trusted %s",
+			actual,
+			expectedRequestSHA256,
+		)
 	}
 	if err := validateRequest(request); err != nil {
 		return nil, nil, fmt.Errorf("request: %w", err)
@@ -79,7 +93,7 @@ func loadRequestBundle(requestPath string) (*requestBundle, []byte, error) {
 			if _, ok := expectedDirectories[portable]; !ok {
 				return fmt.Errorf("unexpected request bundle directory %q", portable)
 			}
-			return artifact.ValidateTrustedInfo(info, filePath, true)
+			return artifact.ValidatePrivateInfo(info, filePath, true)
 		}
 
 		if !info.Mode().IsRegular() {
@@ -87,6 +101,9 @@ func loadRequestBundle(requestPath string) (*requestBundle, []byte, error) {
 		}
 		if _, ok := expectedFiles[portable]; !ok {
 			return fmt.Errorf("unexpected request bundle file %q", portable)
+		}
+		if err := artifact.ValidatePrivateInfo(info, filePath, false); err != nil {
+			return err
 		}
 		data, err := artifact.ReadRegularFile(filePath, info)
 		if err != nil {

@@ -17,6 +17,7 @@ import (
 
 type aclEvaluation struct {
 	unsafe           bool
+	exposed          bool
 	groupModeCovered bool
 }
 
@@ -142,6 +143,27 @@ func ValidateTrustedInfo(info fs.FileInfo, filePath string, directory bool) erro
 		return nil
 	}
 	return fmt.Errorf("%q is writable by group or other users", filePath)
+}
+
+func ValidatePrivateInfo(info fs.FileInfo, filePath string, directory bool) error {
+	if err := ValidateTrustedInfo(info, filePath, directory); err != nil {
+		return err
+	}
+	want := fs.FileMode(0o600)
+	if directory {
+		want = 0o700
+	}
+	if info.Mode().Perm() != want {
+		return fmt.Errorf("%q permissions are %04o, want %04o", filePath, info.Mode().Perm(), want)
+	}
+	acl, err := evaluateACL(filePath)
+	if err != nil {
+		return fmt.Errorf("inspect access controls for %q: %w", filePath, err)
+	}
+	if acl.exposed {
+		return fmt.Errorf("%q has an access-control list granting access to another principal", filePath)
+	}
+	return nil
 }
 
 func ExistingPathWithin(parent, child string) (bool, error) {

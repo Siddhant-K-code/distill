@@ -254,6 +254,9 @@ func validatePatchDigest(patch Patch) error {
 	if err != nil || string(normalized) != patch.UnifiedDiff {
 		return fmt.Errorf("patch is not normalized UTF-8/LF")
 	}
+	if err := validateDisplayText("patch", patch.UnifiedDiff, true, true); err != nil {
+		return err
+	}
 	if artifact.DigestBytes([]byte(patch.UnifiedDiff)) != patch.SHA256 {
 		return fmt.Errorf("patch sha256 mismatch")
 	}

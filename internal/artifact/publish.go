@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type PublishedDurabilityError struct {
@@ -36,7 +37,11 @@ func RenderChecksums(files map[string][]byte) []byte {
 }
 
 func PublishDirectory(outputDirectory string, files map[string][]byte, verify func(string) error) error {
-	return publishDirectoryWith(outputDirectory, files, verify, syncDirectory, renameNoReplace)
+	return publishDirectoryWith(outputDirectory, files, verify, syncDirectory, renameNoReplace, 0o755, 0o644)
+}
+
+func PublishPrivateDirectory(outputDirectory string, files map[string][]byte, verify func(string) error) error {
+	return publishDirectoryWith(outputDirectory, files, verify, syncDirectory, renameNoReplace, 0o700, 0o600)
 }
 
 func publishDirectoryWith(
@@ -45,6 +50,8 @@ func publishDirectoryWith(
 	verify func(string) error,
 	syncDirectoryFn func(string) error,
 	renameNoReplaceFn func(string, string) error,
+	directoryMode os.FileMode,
+	fileMode os.FileMode,
 ) error {
 	outputAbsolute, err := filepath.Abs(outputDirectory)
 	if err != nil {
@@ -74,11 +81,12 @@ func publishDirectoryWith(
 			_ = os.RemoveAll(temporary)
 		}
 	}()
-	if err := os.Chmod(temporary, 0o755); err != nil {
+	if err := os.Chmod(temporary, directoryMode); err != nil {
 		return fmt.Errorf("set temporary output permissions: %w", err)
 	}
 
 	names := make([]string, 0, len(files))
+	directoryNames := make(map[string]struct{})
 	for name := range files {
 		canonical, err := CanonicalPortablePath(name)
 		if err != nil {
@@ -88,14 +96,36 @@ func publishDirectoryWith(
 			return fmt.Errorf("output path %q is not canonical; use %q", name, canonical)
 		}
 		names = append(names, name)
+		parts := strings.Split(name, "/")
+		for length := 1; length < len(parts); length++ {
+			directoryNames[strings.Join(parts[:length], "/")] = struct{}{}
+		}
 	}
 	sort.Strings(names)
+	directories := make([]string, 0, len(directoryNames))
+	for name := range directoryNames {
+		directories = append(directories, name)
+	}
+	sort.Slice(directories, func(i, j int) bool {
+		leftDepth := strings.Count(directories[i], "/")
+		rightDepth := strings.Count(directories[j], "/")
+		if leftDepth != rightDepth {
+			return leftDepth < rightDepth
+		}
+		return directories[i] < directories[j]
+	})
+	for _, name := range directories {
+		destination := filepath.Join(temporary, filepath.FromSlash(name))
+		if err := os.Mkdir(destination, directoryMode); err != nil {
+			return fmt.Errorf("create output directory %q: %w", name, err)
+		}
+		if err := os.Chmod(destination, directoryMode); err != nil {
+			return fmt.Errorf("set output directory permissions for %q: %w", name, err)
+		}
+	}
 	for _, name := range names {
 		destination := filepath.Join(temporary, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			return fmt.Errorf("create output parent for %q: %w", name, err)
-		}
-		if err := writeSyncedFile(destination, files[name]); err != nil {
+		if err := writeSyncedFile(destination, files[name], fileMode); err != nil {
 			return fmt.Errorf("write output %q: %w", name, err)
 		}
 	}
@@ -118,9 +148,13 @@ func publishDirectoryWith(
 	return nil
 }
 
-func writeSyncedFile(path string, data []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+func writeSyncedFile(path string, data []byte, mode os.FileMode) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
+		return err
+	}
+	if err := file.Chmod(mode); err != nil {
+		_ = file.Close()
 		return err
 	}
 	if _, err := file.Write(data); err != nil {

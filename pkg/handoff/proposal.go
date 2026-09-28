@@ -87,6 +87,9 @@ func validateProposalEnvelope(bundle *requestBundle, proposal Proposal) error {
 	if !cleanReason(proposal.Reason) {
 		return fmt.Errorf("proposal reason must not be blank")
 	}
+	if err := validateDisplayText("proposal reason", proposal.Reason, true, true); err != nil {
+		return err
+	}
 	switch proposal.Outcome {
 	case OutcomeNoDecision:
 		if len(proposal.Candidates) != 0 {
@@ -121,6 +124,18 @@ func validateCandidateShape(candidate Candidate) error {
 	if !cleanReason(candidate.DecisionText) || !cleanReason(candidate.Reason) {
 		return fmt.Errorf("candidate %q decision_text and reason must not be blank", candidate.ID)
 	}
+	for _, field := range []struct {
+		label string
+		value string
+	}{
+		{label: "candidate decision_text", value: candidate.DecisionText},
+		{label: "candidate reason", value: candidate.Reason},
+		{label: "candidate evidence quote", value: candidate.Evidence.Quote},
+	} {
+		if err := validateDisplayText(field.label, field.value, true, true); err != nil {
+			return fmt.Errorf("candidate %q: %w", candidate.ID, err)
+		}
+	}
 	types := map[string]bool{
 		"api": true, "architecture": true, "operations": true, "policy": true,
 		"process": true, "product": true, "other": true,
@@ -140,6 +155,9 @@ func validateCandidateShape(candidate Candidate) error {
 	}
 	if canonical != candidate.Target.Path || !strings.HasSuffix(candidate.Target.Path, ".md") {
 		return fmt.Errorf("candidate %q target path is not canonical Markdown", candidate.ID)
+	}
+	if err := validateDisplayText("candidate target path", candidate.Target.Path, false, false); err != nil {
+		return fmt.Errorf("candidate %q: %w", candidate.ID, err)
 	}
 	if !artifact.ValidDigest(candidate.Target.OriginalSHA256) ||
 		!artifact.ValidDigest(candidate.Target.NormalizedSHA256) ||

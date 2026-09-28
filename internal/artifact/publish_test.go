@@ -68,6 +68,8 @@ func TestPostPublishSyncFailureIsClassified(t *testing.T) {
 			return nil
 		},
 		renameNoReplace,
+		0o755,
+		0o644,
 	)
 	var publishedError *PublishedDurabilityError
 	if !errors.As(err, &publishedError) || !errors.Is(err, syncFailure) {
@@ -79,6 +81,91 @@ func TestPostPublishSyncFailureIsClassified(t *testing.T) {
 	if data, readErr := os.ReadFile(filepath.Join(output, "artifact.txt")); readErr != nil || string(data) != "content\n" {
 		t.Fatalf("published output missing after durability error: %q, %v", data, readErr)
 	}
+}
+
+func TestPublishPrivateDirectoryUsesPrivateModes(t *testing.T) {
+	root := realTempDir(t)
+	output := filepath.Join(root, "output")
+	files := map[string][]byte{
+		"request.json":      []byte("{}\n"),
+		"nested/input.md":   []byte("private\n"),
+		"nested/deeper/doc": []byte("private\n"),
+	}
+	verify := func(directory string) error {
+		return verifyPrivateTree(directory)
+	}
+	if err := PublishPrivateDirectory(output, files, verify); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyPrivateTree(output); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPublishDirectoryRetainsPortableModes(t *testing.T) {
+	root := realTempDir(t)
+	output := filepath.Join(root, "output")
+	if err := PublishDirectory(
+		output,
+		map[string][]byte{"nested/artifact.txt": []byte("content\n")},
+		func(string) error { return nil },
+	); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]os.FileMode{
+		output:                          0o755,
+		filepath.Join(output, "nested"): 0o755,
+		filepath.Join(output, "nested", "artifact.txt"): 0o644,
+	} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := info.Mode().Perm(); got != want {
+			t.Fatalf("%q permissions = %04o, want %04o", path, got, want)
+		}
+	}
+}
+
+func TestValidatePrivateInfoRejectsReadableMode(t *testing.T) {
+	root := realTempDir(t)
+	path := filepath.Join(root, "artifact")
+	if err := os.WriteFile(path, []byte("private\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidatePrivateInfo(info, path, false); err == nil {
+		t.Fatal("group-readable private artifact was accepted")
+	}
+}
+
+func verifyPrivateTree(root string) error {
+	rootInfo, err := os.Lstat(root)
+	if err != nil {
+		return err
+	}
+	if err := ValidatePrivateInfo(rootInfo, root, true); err != nil {
+		return err
+	}
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		return ValidatePrivateInfo(info, path, entry.IsDir())
+	})
 }
 
 func realTempDir(t *testing.T) string {

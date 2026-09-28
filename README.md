@@ -185,16 +185,19 @@ tree, then verifies a strict proposal produced by an external coding agent:
 ```bash
 distill handoff prepare --conversation export.md --docs ./docs --out ./request
 distill handoff verify --request ./request/handoff.request.json \
+  --expected-request-sha256 <digest-printed-by-prepare> \
   --proposal ./proposal.json --out ./review
 ```
 
 Distill makes no model or network call, never changes source docs, never applies
-a patch, and accepts only `require_review` routes. The deterministic guarantee
-covers normalization, identities, evidence checks, patch validation, receipts,
-review rendering, and checksum-bound patch files—not probabilistic extraction
-or patch drafting. This is an experimental Markdown/local-repository alpha, not
-general availability or evidence of adoption. Run `make handoff-v0-demo` or see
-the [bounded contract and 5–10 minute flow](docs/handoff-v0.md).
+a patch, and accepts only `require_review` routes. Request and review bundles
+use private `0700` directories and `0600` files, and verification requires the
+trusted request SHA-256 printed by `prepare`. The deterministic guarantee covers
+normalization, identities, evidence checks, patch validation, receipts, review
+rendering, and checksum-bound patch files—not probabilistic extraction or patch
+drafting. This is an experimental Markdown/local-repository alpha, not general
+availability or evidence of adoption. Run `make handoff-v0-demo` or see the
+[bounded contract and 5–10 minute flow](docs/handoff-v0.md).
 
 For Distill Lock, the separate research-only
 [offline excluded-pilot harness](research/context-is-a-build-artifact/pilot/README.md)

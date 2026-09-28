@@ -80,15 +80,16 @@ func Prepare(conversationPath, docsDirectory, outputDirectory string) (Summary, 
 		files[document.identity.BundlePath] = document.data
 	}
 	files[ChecksumsFileName] = artifact.RenderChecksums(files)
+	requestSHA256 := artifact.DigestBytes(requestBytes)
 
-	if err := artifact.PublishDirectory(outputDirectory, files, func(directory string) error {
-		_, _, verifyErr := loadRequestBundle(filepath.Join(directory, RequestFileName))
+	if err := artifact.PublishPrivateDirectory(outputDirectory, files, func(directory string) error {
+		_, _, verifyErr := loadRequestBundle(filepath.Join(directory, RequestFileName), requestSHA256)
 		return verifyErr
 	}); err != nil {
 		return Summary{}, err
 	}
 	return Summary{
-		RequestID: request.RequestID, RequestSHA256: artifact.DigestBytes(requestBytes), DocumentCount: len(documents),
+		RequestID: request.RequestID, RequestSHA256: requestSHA256, DocumentCount: len(documents),
 	}, nil
 }
 
@@ -118,6 +119,7 @@ func readDocuments(inputDirectory string) (string, []preparedInput, error) {
 	}
 	var documents []preparedInput
 	canonicalPaths := make(map[string]string)
+	var portablePaths []string
 	err = filepath.WalkDir(root, func(filePath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -137,6 +139,10 @@ func readDocuments(inputDirectory string) (string, []preparedInput, error) {
 		if canonical != portable {
 			return fmt.Errorf("docs path %q is not canonical; use %q", portable, canonical)
 		}
+		if err := validateDisplayText("docs path", canonical, false, false); err != nil {
+			return err
+		}
+		portablePaths = append(portablePaths, canonical)
 		info, err := os.Lstat(filePath)
 		if err != nil {
 			return err
@@ -162,6 +168,9 @@ func readDocuments(inputDirectory string) (string, []preparedInput, error) {
 		return nil
 	})
 	if err != nil {
+		return "", nil, err
+	}
+	if err := validateCaseFoldPaths(portablePaths); err != nil {
 		return "", nil, err
 	}
 	if len(documents) == 0 {
@@ -194,6 +203,9 @@ func readMarkdownFile(filePath, bundlePath, logicalPath string) (preparedInput, 
 	normalized, err := artifact.NormalizeText(original)
 	if err != nil {
 		return preparedInput{}, fmt.Errorf("normalize file: %w", err)
+	}
+	if err := validateDisplayText("Markdown input", string(normalized), true, true); err != nil {
+		return preparedInput{}, err
 	}
 	return preparedInput{
 		identity: InputIdentity{
@@ -245,6 +257,7 @@ func validateRequest(request Request) error {
 		return fmt.Errorf("proposal schema identity mismatch")
 	}
 	previous := ""
+	documentPaths := make([]string, 0, len(request.Documents))
 	for _, document := range request.Documents {
 		canonical, err := artifact.CanonicalPortablePath(document.Path)
 		if err != nil {
@@ -253,13 +266,20 @@ func validateRequest(request Request) error {
 		if canonical != document.Path || filepath.Ext(document.Path) != ".md" {
 			return fmt.Errorf("document path %q is not canonical Markdown", document.Path)
 		}
+		if err := validateDisplayText("document path", document.Path, false, false); err != nil {
+			return err
+		}
 		if document.Path <= previous {
 			return fmt.Errorf("document paths must be unique and sorted")
 		}
 		if document.BundlePath != "inputs/docs/"+document.Path {
 			return fmt.Errorf("document bundle path mismatch for %q", document.Path)
 		}
+		documentPaths = append(documentPaths, document.Path)
 		previous = document.Path
+	}
+	if err := validateCaseFoldPaths(documentPaths); err != nil {
+		return err
 	}
 	for _, input := range append([]InputIdentity{request.Conversation}, request.Documents...) {
 		if !artifact.ValidDigest(input.OriginalSHA256) || !artifact.ValidDigest(input.NormalizedSHA256) ||

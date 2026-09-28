@@ -29,3 +29,20 @@ func TestHandoffSubcommandsRequireAllInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestHandoffVerifyRequiresTrustedRequestDigest(t *testing.T) {
+	command := newHandoffVerifyCommand()
+	for name, value := range map[string]string{
+		"request":  "request/handoff.request.json",
+		"proposal": "proposal.json",
+		"out":      "review",
+	} {
+		if err := command.Flags().Set(name, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := command.ValidateRequiredFlags(); err == nil ||
+		!strings.Contains(err.Error(), "expected-request-sha256") {
+		t.Fatalf("missing trusted digest error = %v", err)
+	}
+}

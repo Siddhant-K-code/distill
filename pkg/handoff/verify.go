@@ -11,8 +11,16 @@ import (
 	"github.com/Siddhant-K-code/distill/internal/artifact"
 )
 
-func Verify(requestPath, proposalPath, outputDirectory string) (Summary, error) {
-	bundle, requestBytes, err := loadRequestBundle(requestPath)
+func VerifyWithExpectedRequest(
+	requestPath,
+	proposalPath,
+	outputDirectory,
+	expectedRequestSHA256 string,
+) (Summary, error) {
+	if !artifact.ValidDigest(expectedRequestSHA256) {
+		return Summary{}, fmt.Errorf("expected request SHA-256 must be 64 lowercase hexadecimal characters")
+	}
+	bundle, requestBytes, err := loadRequestBundle(requestPath, expectedRequestSHA256)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -75,7 +83,7 @@ func Verify(requestPath, proposalPath, outputDirectory string) (Summary, error) 
 	files[ReceiptFileName] = receiptBytes
 	files[ChecksumsFileName] = artifact.RenderChecksums(files)
 
-	if err := artifact.PublishDirectory(outputDirectory, files, func(directory string) error {
+	if err := artifact.PublishPrivateDirectory(outputDirectory, files, func(directory string) error {
 		return verifyPublishedFiles(directory, files)
 	}); err != nil {
 		return Summary{}, err
@@ -175,9 +183,16 @@ func verifyEvidence(bundle *requestBundle, candidate Candidate) error {
 }
 
 func verifyPublishedFiles(directory string, expected map[string][]byte) error {
+	rootInfo, err := os.Lstat(directory)
+	if err != nil {
+		return err
+	}
+	if err := artifact.ValidatePrivateInfo(rootInfo, directory, true); err != nil {
+		return err
+	}
 	actual := make(map[string][]byte, len(expected))
 	expectedDirectories := allowedDirectories(expected)
-	err := filepath.WalkDir(directory, func(filePath string, entry os.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(directory, func(filePath string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -200,12 +215,12 @@ func verifyPublishedFiles(directory string, expected map[string][]byte) error {
 			if _, ok := expectedDirectories[portable]; !ok {
 				return fmt.Errorf("unexpected published directory %q", portable)
 			}
-			return artifact.ValidateTrustedInfo(info, filePath, true)
+			return artifact.ValidatePrivateInfo(info, filePath, true)
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("published path %q is not regular", portable)
 		}
-		if err := artifact.ValidateTrustedInfo(info, filePath, false); err != nil {
+		if err := artifact.ValidatePrivateInfo(info, filePath, false); err != nil {
 			return err
 		}
 		if _, ok := expected[portable]; !ok {

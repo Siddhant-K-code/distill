@@ -28,6 +28,7 @@ func TestPrepareAndVerifyReviewPackage(t *testing.T) {
 	if prepared.DocumentCount != 1 || !artifact.ValidDigest(prepared.RequestID) {
 		t.Fatalf("unexpected prepare summary: %+v", prepared)
 	}
+	assertPrivateArtifactTree(t, requestDirectory)
 
 	proposalPath := filepath.Join(root, "proposal.json")
 	proposal := retryProposal(t, requestDirectory)
@@ -35,7 +36,7 @@ func TestPrepareAndVerifyReviewPackage(t *testing.T) {
 	sourceBefore := mustRead(t, filepath.Join(root, "docs", "runbook", "retries.md"))
 
 	reviewDirectory := filepath.Join(root, "review")
-	verified, err := Verify(
+	verified, err := verifyCurrentRequest(t,
 		filepath.Join(requestDirectory, RequestFileName),
 		proposalPath,
 		reviewDirectory,
@@ -47,6 +48,7 @@ func TestPrepareAndVerifyReviewPackage(t *testing.T) {
 		!artifact.ValidDigest(verified.ReceiptSHA256) {
 		t.Fatalf("unexpected verify summary: %+v", verified)
 	}
+	assertPrivateArtifactTree(t, reviewDirectory)
 	if after := mustRead(t, filepath.Join(root, "docs", "runbook", "retries.md")); !bytes.Equal(after, sourceBefore) {
 		t.Fatal("verify mutated the source docs")
 	}
@@ -81,7 +83,7 @@ func TestNoDecisionProposal(t *testing.T) {
 	if _, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory); err != nil {
 		t.Fatal(err)
 	}
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +99,7 @@ func TestNoDecisionProposal(t *testing.T) {
 	proposalPath := filepath.Join(root, "proposal.json")
 	writeCanonical(t, proposalPath, proposal)
 	output := filepath.Join(root, "review")
-	if _, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, output); err != nil {
+	if _, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, output); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(strings.Join(fileNames(t, output), "\n"), "patches/") {
@@ -142,10 +144,10 @@ func TestRequestAndReviewAreDeterministicAcrossCreationOrderAndCWD(t *testing.T)
 	if !bytes.Equal(mustRead(t, firstProposalPath), mustRead(t, secondProposalPath)) {
 		t.Fatal("equivalent proposals differ")
 	}
-	if _, err := Verify(filepath.Join(firstRequest, RequestFileName), firstProposalPath, filepath.Join(first, "review")); err != nil {
+	if _, err := verifyCurrentRequest(t, filepath.Join(firstRequest, RequestFileName), firstProposalPath, filepath.Join(first, "review")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(filepath.Join(secondRequest, RequestFileName), secondProposalPath, filepath.Join(second, "review")); err != nil {
+	if _, err := verifyCurrentRequest(t, filepath.Join(secondRequest, RequestFileName), secondProposalPath, filepath.Join(second, "review")); err != nil {
 		t.Fatal(err)
 	}
 	assertTreesEqual(t, filepath.Join(first, "review"), filepath.Join(second, "review"))
@@ -167,8 +169,83 @@ func TestVerifyUsesFrozenBundleNotChangedSourceTree(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err != nil {
+	if _, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err != nil {
 		t.Fatalf("verify must judge the frozen portable bundle: %v", err)
+	}
+}
+
+func TestTrustedRequestDigestRejectsCoherentReplacement(t *testing.T) {
+	original := copyPublicFixture(t, "retry-policy")
+	originalRequest := filepath.Join(original, "request")
+	originalSummary, err := Prepare(
+		filepath.Join(original, "conversation.md"),
+		filepath.Join(original, "docs"),
+		originalRequest,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replacement := copyPublicFixture(t, "api-deprecation")
+	replacementRequest := filepath.Join(replacement, "request")
+	if _, err := Prepare(
+		filepath.Join(replacement, "conversation.md"),
+		filepath.Join(replacement, "docs"),
+		replacementRequest,
+	); err != nil {
+		t.Fatal(err)
+	}
+	_, err = VerifyWithExpectedRequest(
+		filepath.Join(replacementRequest, RequestFileName),
+		filepath.Join(replacement, "proposal.json"),
+		filepath.Join(replacement, "review"),
+		originalSummary.RequestSHA256,
+	)
+	if err == nil || !strings.Contains(err.Error(), "request SHA-256 mismatch") {
+		t.Fatalf("coherent replacement error = %v", err)
+	}
+}
+
+func TestExpectedRequestDigestMustBeCanonical(t *testing.T) {
+	root := copyPublicFixture(t, "brainstorming")
+	requestDirectory := filepath.Join(root, "request")
+	summary, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = VerifyWithExpectedRequest(
+		filepath.Join(requestDirectory, RequestFileName),
+		filepath.Join(root, "proposal.json"),
+		filepath.Join(root, "review"),
+		strings.ToUpper(summary.RequestSHA256),
+	)
+	if err == nil || !strings.Contains(err.Error(), "64 lowercase") {
+		t.Fatalf("non-canonical trusted digest error = %v", err)
+	}
+}
+
+func TestVerifyRejectsRequestWhosePrivateModeDrifted(t *testing.T) {
+	root := copyPublicFixture(t, "brainstorming")
+	requestDirectory := filepath.Join(root, "request")
+	summary, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(requestDirectory, RequestFileName)
+	if err := os.Chmod(requestPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "review")
+	if _, err := VerifyWithExpectedRequest(
+		requestPath,
+		filepath.Join(root, "proposal.json"),
+		output,
+		summary.RequestSHA256,
+	); err == nil || !strings.Contains(err.Error(), "permissions are 0644, want 0600") {
+		t.Fatalf("request privacy drift error = %v", err)
+	}
+	if _, err := os.Lstat(output); !os.IsNotExist(err) {
+		t.Fatalf("privacy failure published output: %v", err)
 	}
 }
 
@@ -218,7 +295,7 @@ func TestVerifyRejectsFabricatedEvidenceAndStaleTarget(t *testing.T) {
 			proposal.Candidates[0].ID = mustCandidateID(t, proposal.Candidates[0])
 			proposalPath := filepath.Join(root, "proposal.json")
 			writeCanonical(t, proposalPath, proposal)
-			_, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review"))
+			_, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review"))
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("got error %v, want containing %q", err, test.want)
 			}
@@ -229,13 +306,168 @@ func TestVerifyRejectsFabricatedEvidenceAndStaleTarget(t *testing.T) {
 	}
 }
 
+func TestPrepareRejectsUnsafeDisplayControls(t *testing.T) {
+	tests := []struct {
+		name         string
+		conversation string
+		document     string
+	}{
+		{name: "conversation ANSI", conversation: "# Conversation\n\x1b[31mred\n", document: "# Doc\n"},
+		{name: "document bidi", conversation: "# Conversation\nsafe\n", document: "# Doc\n\u202Eunsafe\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := realTempDir(t)
+			mustWrite(t, filepath.Join(root, "conversation.md"), test.conversation)
+			mustWrite(t, filepath.Join(root, "docs", "doc.md"), test.document)
+			if _, err := Prepare(
+				filepath.Join(root, "conversation.md"),
+				filepath.Join(root, "docs"),
+				filepath.Join(root, "request"),
+			); err == nil || !strings.Contains(err.Error(), "unsafe control or format") {
+				t.Fatalf("unsafe Markdown input error = %v", err)
+			}
+		})
+	}
+}
+
+func TestVerifyRejectsUnsafeProposalDisplayControls(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Proposal)
+	}{
+		{
+			name: "proposal reason ANSI",
+			mutate: func(proposal *Proposal) {
+				proposal.Reason += "\x1b[31m"
+			},
+		},
+		{
+			name: "decision bidi",
+			mutate: func(proposal *Proposal) {
+				proposal.Candidates[0].DecisionText += "\u202E"
+				proposal.Candidates[0].ID = mustCandidateID(t, proposal.Candidates[0])
+			},
+		},
+		{
+			name: "candidate reason ANSI",
+			mutate: func(proposal *Proposal) {
+				proposal.Candidates[0].Reason += "\x1b[2J"
+				proposal.Candidates[0].ID = mustCandidateID(t, proposal.Candidates[0])
+			},
+		},
+		{
+			name: "added patch line ANSI",
+			mutate: func(proposal *Proposal) {
+				candidate := &proposal.Candidates[0]
+				candidate.Patch.UnifiedDiff = strings.Replace(
+					candidate.Patch.UnifiedDiff,
+					"+Production requests",
+					"+\x1b[31mProduction requests",
+					1,
+				)
+				candidate.Patch.SHA256 = artifact.DigestBytes([]byte(candidate.Patch.UnifiedDiff))
+				candidate.ID = mustCandidateID(t, *candidate)
+			},
+		},
+		{
+			name: "added patch line bidi",
+			mutate: func(proposal *Proposal) {
+				candidate := &proposal.Candidates[0]
+				candidate.Patch.UnifiedDiff = strings.Replace(
+					candidate.Patch.UnifiedDiff,
+					"+Production requests",
+					"+\u202EProduction requests",
+					1,
+				)
+				candidate.Patch.SHA256 = artifact.DigestBytes([]byte(candidate.Patch.UnifiedDiff))
+				candidate.ID = mustCandidateID(t, *candidate)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := copyPublicFixture(t, "retry-policy")
+			requestDirectory := filepath.Join(root, "request")
+			if _, err := Prepare(
+				filepath.Join(root, "conversation.md"),
+				filepath.Join(root, "docs"),
+				requestDirectory,
+			); err != nil {
+				t.Fatal(err)
+			}
+			proposal := retryProposal(t, requestDirectory)
+			test.mutate(&proposal)
+			proposalPath := filepath.Join(root, "unsafe.json")
+			writeCanonical(t, proposalPath, proposal)
+			if _, err := verifyCurrentRequest(
+				t,
+				filepath.Join(requestDirectory, RequestFileName),
+				proposalPath,
+				filepath.Join(root, "review"),
+			); err == nil || !strings.Contains(err.Error(), "unsafe control or format") {
+				t.Fatalf("unsafe proposal error = %v", err)
+			}
+		})
+	}
+}
+
+func TestCaseFoldPathCollisionsAreRejected(t *testing.T) {
+	for _, paths := range [][]string{
+		{"Foo.md", "foo.md"},
+		{"Straße/doc.md", "STRASSE/other.md"},
+	} {
+		if err := validateCaseFoldPaths(paths); err == nil {
+			t.Fatalf("case-fold collision was accepted: %v", paths)
+		}
+	}
+	if err := validateCaseFoldPaths([]string{"guide/a.md", "guide/b.md"}); err != nil {
+		t.Fatalf("non-colliding paths were rejected: %v", err)
+	}
+}
+
+func TestRequestLoadRejectsCaseFoldPathCollisions(t *testing.T) {
+	root := copyPublicFixture(t, "retry-policy")
+	requestDirectory := filepath.Join(root, "request")
+	if _, err := Prepare(
+		filepath.Join(root, "conversation.md"),
+		filepath.Join(root, "docs"),
+		requestDirectory,
+	); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(requestDirectory, RequestFileName)
+	var request Request
+	if err := artifact.DecodeCanonicalJSON(mustRead(t, requestPath), &request); err != nil {
+		t.Fatal(err)
+	}
+	collision := request.Documents[0]
+	collision.Path = strings.Replace(collision.Path, "runbook", "RUNBOOK", 1)
+	collision.BundlePath = "inputs/docs/" + collision.Path
+	request.Documents = append(request.Documents, collision)
+	sort.Slice(request.Documents, func(i, j int) bool {
+		return request.Documents[i].Path < request.Documents[j].Path
+	})
+	request.RequestID = ""
+	var err error
+	request.RequestID, err = requestID(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCanonical(t, requestPath, request)
+	if _, _, err := loadCurrentRequestBundle(t, requestPath); err == nil ||
+		!strings.Contains(err.Error(), "case-folded path collision") {
+		t.Fatalf("request case-fold collision error = %v", err)
+	}
+}
+
 func TestVerifyRejectsAllowRouteAndNonCanonicalJSON(t *testing.T) {
 	root := copyPublicFixture(t, "brainstorming")
 	requestDirectory := filepath.Join(root, "request")
 	if _, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory); err != nil {
 		t.Fatal(err)
 	}
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +479,7 @@ func TestVerifyRejectsAllowRouteAndNonCanonicalJSON(t *testing.T) {
 	if err := os.WriteFile(proposalPath, []byte(proposal), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err == nil {
+	if _, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err == nil {
 		t.Fatal("direct allow route was accepted")
 	}
 
@@ -263,7 +495,7 @@ func TestVerifyRejectsAllowRouteAndNonCanonicalJSON(t *testing.T) {
 	if err := os.WriteFile(proposalPath, bytes.Replace(data, []byte("  \""), []byte("\t\""), 1), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review-2")); err == nil ||
+	if _, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review-2")); err == nil ||
 		!strings.Contains(err.Error(), "not canonical") {
 		t.Fatalf("non-canonical proposal error = %v", err)
 	}
@@ -329,14 +561,14 @@ func TestVerifyRejectsOutputInsideRequestBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 	proposalPath := filepath.Join(root, "proposal.json")
-	if _, err := Verify(
+	if _, err := verifyCurrentRequest(t,
 		filepath.Join(requestDirectory, RequestFileName),
 		proposalPath,
 		filepath.Join(requestDirectory, "review"),
 	); err == nil || !strings.Contains(err.Error(), "outside the immutable request bundle") {
 		t.Fatalf("inside-request output error = %v", err)
 	}
-	if _, _, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName)); err != nil {
+	if _, _, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName)); err != nil {
 		t.Fatalf("failed verify invalidated request bundle: %v", err)
 	}
 }
@@ -351,7 +583,7 @@ func TestVerifyRejectsOversizedProposalBeforeJSONParsing(t *testing.T) {
 	if err := os.WriteFile(proposalPath, bytes.Repeat([]byte{'x'}, (8<<20)+1), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(
+	if _, err := verifyCurrentRequest(t,
 		filepath.Join(requestDirectory, RequestFileName),
 		proposalPath,
 		filepath.Join(root, "review"),
@@ -371,7 +603,7 @@ func TestTamperedRequestBundleFailsClosed(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(requestDirectory, filepath.FromSlash(path)), []byte("tampered\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName)); err == nil {
+			if _, _, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName)); err == nil {
 				t.Fatal("tampered request bundle was accepted")
 			}
 		})
@@ -387,7 +619,7 @@ func TestUnexpectedEmptyRequestDirectoryFailsClosed(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(requestDirectory, "unexpected"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName)); err == nil {
+	if _, _, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName)); err == nil {
 		t.Fatal("unexpected empty request directory was accepted")
 	}
 }
@@ -409,7 +641,7 @@ func TestOverlappingCandidatePatchesAreRejected(t *testing.T) {
 	sort.Slice(proposal.Candidates, func(i, j int) bool { return proposal.Candidates[i].ID < proposal.Candidates[j].ID })
 	proposalPath := filepath.Join(root, "proposal.json")
 	writeCanonical(t, proposalPath, proposal)
-	if _, err := Verify(filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err == nil ||
+	if _, err := verifyCurrentRequest(t, filepath.Join(requestDirectory, RequestFileName), proposalPath, filepath.Join(root, "review")); err == nil ||
 		!strings.Contains(err.Error(), "overlaps") {
 		t.Fatalf("overlap error = %v", err)
 	}
@@ -467,7 +699,7 @@ func TestPublicFixtureProposals(t *testing.T) {
 			if err := os.WriteFile(proposalPath, data, 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := Verify(
+			if _, err := verifyCurrentRequest(t,
 				filepath.Join(requestDirectory, RequestFileName),
 				proposalPath,
 				filepath.Join(root, "review"),
@@ -529,7 +761,7 @@ func TestPublicFixtureProposals(t *testing.T) {
 			if err := os.WriteFile(proposalPath, data, 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := Verify(
+			if _, err := verifyCurrentRequest(t,
 				filepath.Join(requestDirectory, RequestFileName),
 				proposalPath,
 				filepath.Join(root, "review-"+test.name),
@@ -549,7 +781,7 @@ func TestHandoffDemo(t *testing.T) {
 				t.Fatal(err)
 			}
 			proposalPath := filepath.Join(root, "proposal.json")
-			if _, err := Verify(
+			if _, err := verifyCurrentRequest(t,
 				filepath.Join(requestDirectory, RequestFileName),
 				proposalPath,
 				filepath.Join(root, "review"),
@@ -572,7 +804,7 @@ func TestGoldenReviewFixture(t *testing.T) {
 	if _, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Verify(
+	if _, err := verifyCurrentRequest(t,
 		filepath.Join(requestDirectory, RequestFileName),
 		filepath.Join(root, "proposal.json"),
 		reviewDirectory,
@@ -610,7 +842,7 @@ func TestGoldenReviewFixture(t *testing.T) {
 
 func retryProposal(t *testing.T, requestDirectory string) Proposal {
 	t.Helper()
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +866,7 @@ func retryProposal(t *testing.T, requestDirectory string) Proposal {
 
 func apiDeprecationProposal(t *testing.T, requestDirectory string) Proposal {
 	t.Helper()
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +890,7 @@ func apiDeprecationProposal(t *testing.T, requestDirectory string) Proposal {
 
 func noDecisionProposal(t *testing.T, requestDirectory string) Proposal {
 	t.Helper()
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -672,7 +904,7 @@ func noDecisionProposal(t *testing.T, requestDirectory string) Proposal {
 
 func determinismProposal(t *testing.T, requestDirectory string) Proposal {
 	t.Helper()
-	bundle, requestBytes, err := loadRequestBundle(filepath.Join(requestDirectory, RequestFileName))
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(requestDirectory, RequestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -774,6 +1006,31 @@ func writeCanonical(t *testing.T, path string, value any) {
 	}
 }
 
+func verifyCurrentRequest(
+	t *testing.T,
+	requestPath,
+	proposalPath,
+	outputDirectory string,
+) (Summary, error) {
+	t.Helper()
+	requestBytes := mustRead(t, requestPath)
+	return VerifyWithExpectedRequest(
+		requestPath,
+		proposalPath,
+		outputDirectory,
+		artifact.DigestBytes(requestBytes),
+	)
+}
+
+func loadCurrentRequestBundle(
+	t *testing.T,
+	requestPath string,
+) (*requestBundle, []byte, error) {
+	t.Helper()
+	requestBytes := mustRead(t, requestPath)
+	return loadRequestBundle(requestPath, artifact.DigestBytes(requestBytes))
+}
+
 func realTempDir(t *testing.T) string {
 	t.Helper()
 	directory, err := filepath.EvalSymlinks(t.TempDir())
@@ -853,5 +1110,22 @@ func assertTreesEqual(t *testing.T, left, right string) {
 		) {
 			t.Fatalf("tree file %q differs", name)
 		}
+	}
+}
+
+func assertPrivateArtifactTree(t *testing.T, root string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		return artifact.ValidatePrivateInfo(info, path, entry.IsDir())
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

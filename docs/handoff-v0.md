@@ -32,12 +32,14 @@ general patch engine, adoption claim, or release-readiness signal.
 ```text
 distill handoff prepare --conversation <file> --docs <dir> --out <fresh-dir>
 distill handoff verify --request <bundle/handoff.request.json> \
+  --expected-request-sha256 <trusted-prepare-digest> \
   --proposal <proposal.json> --out <fresh-dir>
 ```
 
 `prepare` validates every input and path, normalizes text with
-`utf8-nfc-lf-v1`, records original and normalized byte identities, copies only
-normalized bytes, and atomically publishes:
+`utf8-nfc-lf-v1`, rejects unsafe control/format characters and Unicode
+case-folded path collisions, records original and normalized byte identities,
+copies only normalized bytes, and atomically publishes:
 
 ```text
 handoff.request.json
@@ -60,10 +62,13 @@ Documents are sorted by bytewise portable path. `SHA256SUMS` sorts every other
 file by path and records lowercase SHA-256, byte length, and path.
 
 The normalized files inside this request bundle are the authoritative snapshot.
-`verify` never revisits the original working tree. If the live docs change,
-prepare a new request before asking for review. Any change to a bundled input,
-request field, schema, instruction, checksum, or extra file makes verification
-fail.
+`verify` never revisits the original working tree. The SHA-256 printed by
+`prepare` is the out-of-band trust anchor and is required as
+`--expected-request-sha256`; a proposal repeating a request hash is not trusted.
+Verification rejects a coherently replaced bundle when its canonical request
+bytes differ from that trusted digest. If the live docs change, prepare a new
+request before asking for review. Any change to a bundled input, request field,
+schema, instruction, checksum, or extra file makes verification fail.
 
 An external agent writes one canonical JSON proposal against the included
 draft-2020-12 schema. A proposal is either:
@@ -97,6 +102,11 @@ context/removal lines. File creation/deletion, traversal, rename/copy, mode
 changes, binary/submodule patches, Git metadata, and no-newline markers are
 unsupported and fail closed.
 
+Proposal reason, decision text, candidate reason, evidence, paths, and patch
+content reject C0/C1 controls and Unicode format controls such as bidi
+overrides. LF and TAB remain available where Markdown or diff content requires
+them. This prevents ANSI terminal injection and visually reordered review text.
+
 `verify` applies nothing to disk. It applies each patch only in memory against
 the frozen normalized target, rejects duplicate or overlapping candidates, and
 atomically publishes:
@@ -122,15 +132,19 @@ This flow uses only repository fixtures and local commands:
 make build
 work="$(cd "$(mktemp -d)" && pwd -P)"
 
-./distill handoff prepare \
+prepare_output="$(./distill handoff prepare \
   --conversation testdata/handoff-v0/retry-policy/conversation.md \
   --docs testdata/handoff-v0/retry-policy/docs \
-  --out "$work/request"
+  --out "$work/request")"
+printf '%s\n' "$prepare_output"
+request_sha256="$(printf '%s\n' "$prepare_output" |
+  sed -n 's/.* request_sha256=\([0-9a-f]*\) .*/\1/p')"
 
 cp testdata/handoff-v0/retry-policy/proposal.json "$work/proposal.json"
 
 ./distill handoff verify \
   --request "$work/request/handoff.request.json" \
+  --expected-request-sha256 "$request_sha256" \
   --proposal "$work/proposal.json" \
   --out "$work/review"
 
@@ -155,8 +169,9 @@ Negative proposals are under
 
 All validation failures are explicit and nonzero. Handoff rejects path
 traversal, absolute/backslash paths, Unicode-canonical collisions, unsupported
-files, invalid UTF-8, NUL bytes, special files, every symlink (including
-in-tree links), unsafe ownership/mode/ACL conditions, stale identities,
+files, invalid UTF-8, NUL bytes, unsafe display controls, Unicode case-fold
+collisions, special files, every symlink (including in-tree links), unsafe
+ownership/mode/ACL conditions, stale or unanchored request identities,
 fabricated quotes, malformed patches, direct-allow routes, existing outputs,
 and unexpected bundle files.
 
@@ -168,7 +183,9 @@ inspect the named output rather than retrying blindly.
 
 The request deliberately contains the full normalized conversation and docs
 snapshot. Treat it as potentially sensitive source material: store, transmit,
-and retain it under the same controls as the originals. Handoff performs no
-redaction, secret scanning, encryption, upload, telemetry, or network access.
-Processes running as the same OS account remain inside the local trust
-boundary.
+and retain it under the same controls as the originals. Handoff publishes every
+request/review directory as `0700` and every file as `0600`, rejects
+access-granting ACLs, and fails if those protections drift before verification.
+It performs no redaction, secret scanning, encryption, upload, telemetry, or
+network access. Processes running as the same OS account remain inside the
+local trust boundary.
