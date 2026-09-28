@@ -1,0 +1,35 @@
+{
+  "schema_version": "distill-handoff/proposal/v0alpha1",
+  "request_id": "3af7d9824217d8b5ff6204333da84faaef2500b215edb931f282692b04a4fe25",
+  "request_sha256": "a02bb3476888cae65a21b4a0a5662431817db7c74ea3e44825c06c7f14bb0066",
+  "outcome": "candidate_decisions",
+  "route": "require_review",
+  "reason": "One committed API lifecycle decision is ready for review.",
+  "candidates": [
+    {
+      "id": "decision_7f95010ce9b6010e798c3808a6406d8ce01a47968abd02855e92c55ca5051d47",
+      "decision_text": "Decision: deprecate API v1 on 2026-12-01 and remove it on 2027-03-01.",
+      "decision_type": "api",
+      "evidence": {
+        "source_path": "inputs/conversation.md",
+        "source_normalized_sha256": "2a9e084e628ff5c032484f3bd802dbf3955d988f8eb48ae28ce3590922dac308",
+        "quote": "Decision: deprecate API v1 on 2026-12-01 and remove it on 2027-03-01.",
+        "start_byte": 87,
+        "end_byte": 156,
+        "start_line": 4,
+        "end_line": 4
+      },
+      "target": {
+        "path": "reference/api.md",
+        "original_sha256": "cd87a1dc146148fe77bad4063b46843074ce46052bd603eae1b1a6f916d3b0d8",
+        "normalized_sha256": "cd87a1dc146148fe77bad4063b46843074ce46052bd603eae1b1a6f916d3b0d8"
+      },
+      "patch": {
+        "unified_diff": "--- a/reference/api.md\n+++ b/reference/api.md\n@@ -1,3 +1,3 @@\n # API lifecycle\n \n-API v1 remains supported indefinitely.\n+API v1 is deprecated on 2026-12-01 and will be removed on 2027-03-01.\n",
+        "sha256": "5c9ece9f63061ed85a55df588800fd20361d3db3dfef54095d5d329a43b3f1eb"
+      },
+      "route": "require_review",
+      "reason": "The patch is only a candidate and requires a human reviewer."
+    }
+  ]
+}

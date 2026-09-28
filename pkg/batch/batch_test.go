@@ -1,14 +1,13 @@
 package batch
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Siddhant-K-code/distill/pkg/pipeline"
 	"github.com/Siddhant-K-code/distill/pkg/types"
 )
-
-
 
 func TestSubmitAndGet(t *testing.T) {
 	p := NewProcessor(Config{Workers: 1, QueueSize: 10, ResultTTL: time.Minute})
@@ -112,13 +111,39 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestGenerateID_Unique(t *testing.T) {
-	ids := map[string]bool{}
-	for i := 0; i < 100; i++ {
+	ids := make(map[string]bool, 10000)
+	for i := 0; i < 10000; i++ {
 		id := generateID()
 		if ids[id] {
-			t.Errorf("duplicate ID generated: %s", id)
+			t.Fatalf("duplicate ID generated: %s", id)
 		}
 		ids[id] = true
-		time.Sleep(time.Nanosecond)
+	}
+}
+
+func TestGenerateID_ConcurrentUnique(t *testing.T) {
+	const goroutines = 100
+	const perGoroutine = 1000
+
+	ids := make(chan string, goroutines*perGoroutine)
+	var workers sync.WaitGroup
+	for range goroutines {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for range perGoroutine {
+				ids <- generateID()
+			}
+		}()
+	}
+	workers.Wait()
+	close(ids)
+
+	seen := make(map[string]struct{}, goroutines*perGoroutine)
+	for id := range ids {
+		if _, exists := seen[id]; exists {
+			t.Fatalf("duplicate concurrent ID generated: %s", id)
+		}
+		seen[id] = struct{}{}
 	}
 }

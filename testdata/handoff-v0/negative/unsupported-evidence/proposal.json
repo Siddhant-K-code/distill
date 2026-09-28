@@ -1,0 +1,35 @@
+{
+  "schema_version": "distill-handoff/proposal/v0alpha1",
+  "request_id": "2eb92b4b491278791a81e642049d9ab6cd3817065a87672681ede9a20703c771",
+  "request_sha256": "84fa1bd3a4d48e5583cccd6e01d57f7a4061142c74e010e30be826403afabf89",
+  "outcome": "candidate_decisions",
+  "route": "require_review",
+  "reason": "One committed retry-policy decision is ready for review.",
+  "candidates": [
+    {
+      "id": "decision_d01a63512b0dc25479a6c75fec91b576af1f4faa1e19e24ccc214c00bcfec961",
+      "decision_text": "Decision: production requests will use three attempts with exponential backoff starting at 200ms.",
+      "decision_type": "policy",
+      "evidence": {
+        "source_path": "inputs/conversation.md",
+        "source_normalized_sha256": "94a8d1951427b388d37919fecee4d68ae2f0d4398199b29214ce5230ef74077a",
+        "quote": "Decision: use unlimited retries.",
+        "start_byte": 86,
+        "end_byte": 183,
+        "start_line": 4,
+        "end_line": 4
+      },
+      "target": {
+        "path": "runbook/retries.md",
+        "original_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70",
+        "normalized_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70"
+      },
+      "patch": {
+        "unified_diff": "--- a/runbook/retries.md\n+++ b/runbook/retries.md\n@@ -1,3 +1,3 @@\n # Retry policy\n \n-Production requests use two immediate retries.\n+Production requests use three attempts with exponential backoff starting at 200ms.\n",
+        "sha256": "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23"
+      },
+      "route": "require_review",
+      "reason": "The patch is only a candidate and requires a human reviewer."
+    }
+  ]
+}

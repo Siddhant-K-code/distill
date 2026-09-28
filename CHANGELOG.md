@@ -9,6 +9,15 @@ All notable changes to Distill are documented here.
 - **Distill Lock v0** — Offline `lock`, `build`, and `verify` commands for
   deterministic, byte-identical context artifacts with exact deduplication,
   canonical manifests, drift detection, and portable macOS/Linux goldens.
+- **Handoff v0 alpha** — Experimental offline `handoff prepare` and
+  `handoff verify` commands for freezing Markdown decision contexts and
+  packaging external-agent proposals as deterministic, review-only artifacts.
+
+### Fixed
+
+- **macOS batch job ID collisions** — Preserve the existing time-ordered ID
+  format while making IDs process-locally monotonic under coarse clock
+  granularity and concurrent submissions.
 
 ## [v0.9.0] - 2026-05-09
 

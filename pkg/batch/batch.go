@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Siddhant-K-code/distill/pkg/pipeline"
@@ -257,7 +258,19 @@ func (p *Processor) evict() {
 	}
 }
 
-// generateID returns a simple time-based unique ID.
+var lastGeneratedID atomic.Int64
+
+// generateID returns a process-local unique, time-ordered ID.
 func generateID() string {
-	return fmt.Sprintf("batch_%d", time.Now().UnixNano())
+	now := time.Now().UnixNano()
+	for {
+		previous := lastGeneratedID.Load()
+		next := now
+		if next <= previous {
+			next = previous + 1
+		}
+		if lastGeneratedID.CompareAndSwap(previous, next) {
+			return fmt.Sprintf("batch_%d", next)
+		}
+	}
 }

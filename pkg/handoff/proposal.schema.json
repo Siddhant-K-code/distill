@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:distill:handoff:proposal:v0alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "request_sha256",
+    "outcome",
+    "route",
+    "reason",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "distill-handoff/proposal/v0alpha1"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "candidate_decisions",
+        "no_decision"
+      ]
+    },
+    "route": {
+      "const": "require_review"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "decision_text",
+        "decision_type",
+        "evidence",
+        "target",
+        "patch",
+        "route",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{64}$"
+        },
+        "decision_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_type": {
+          "enum": [
+            "api",
+            "architecture",
+            "operations",
+            "policy",
+            "process",
+            "product",
+            "other"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "patch": {
+          "$ref": "#/$defs/patch"
+        },
+        "route": {
+          "const": "require_review"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_path",
+        "source_normalized_sha256",
+        "quote",
+        "start_byte",
+        "end_byte",
+        "start_line",
+        "end_line"
+      ],
+      "properties": {
+        "source_path": {
+          "const": "inputs/conversation.md"
+        },
+        "source_normalized_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_byte": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "original_sha256",
+        "normalized_sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "normalized_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unified_diff",
+        "sha256"
+      ],
+      "properties": {
+        "unified_diff": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
