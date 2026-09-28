@@ -21,8 +21,11 @@ Write one canonical JSON proposal matching proposal.schema.json:
 4. Propose exactly one existing-Markdown-file unified diff with headers
    --- a/<target> and +++ b/<target>. Do not create, delete, rename, copy, change
    modes, or emit binary patches.
-5. SHA-256 the exact unified_diff UTF-8 bytes and compute the stable candidate ID
-   as documented in docs/handoff-v0.md.
+5. SHA-256 the exact unified_diff UTF-8 bytes. For the stable candidate ID,
+   set id to "", encode that candidate in schema field order as two-space JSON
+   without HTML escaping and with one final LF, SHA-256 the UTF-8 bytes of
+   "distill-handoff/candidate/v0alpha1\n" followed by that JSON, then prefix
+   the lowercase hex digest with "decision_".
 6. Set every proposal and candidate route to require_review.
 7. Use strict two-space canonical JSON with the schema field order and one final
    LF. Do not add fields.

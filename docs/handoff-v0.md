@@ -6,6 +6,10 @@ Handoff freezes a consequential conversation and its reference docs into a
 portable request, then deterministically verifies and packages an external
 agent's proposal for human review.
 
+Running a first retrospective test? Use the
+[tester-ready pilot kit](handoff-pilot-kit.md). This document remains the
+authoritative protocol and failure-boundary reference.
+
 ## Use Handoff with any agent
 
 Handoff is currently an agent-independent CLI and file protocol. It is not an
@@ -101,6 +105,11 @@ schema: either sorted `candidate_decisions` or `no_decision` with a reason.
 Each candidate binds its decision, exact conversation evidence and byte/line
 ranges, frozen target identities, normalized single-file patch, and
 `route: "require_review"`.
+
+The stable candidate ID is `decision_` plus the lowercase SHA-256 of
+`distill-handoff/candidate/v0alpha1\n` followed by the canonical candidate JSON
+with `id` set to `""`. Canonical JSON uses schema field order, two-space
+indentation, no HTML escaping, and one final LF.
 
 The accepted diff subset may modify exactly one existing Markdown target.
 Creation, deletion, traversal, rename/copy, mode changes, binary/submodule

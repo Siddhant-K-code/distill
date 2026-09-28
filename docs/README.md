@@ -7,6 +7,7 @@
 - [Sessions](guides/sessions.md) — Token-budgeted context windows
 - [MCP Integration](guides/mcp.md) — Use Distill with Claude Desktop, Cursor, and other MCP clients
 - [Deployment](guides/deployment.md) — Docker, binary, and cloud deployment
+- [Handoff Pilot Kit](handoff-pilot-kit.md): Run one review-only retrospective trial
 
 ## Reference
 

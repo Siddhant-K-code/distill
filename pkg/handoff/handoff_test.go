@@ -2,6 +2,9 @@ package handoff
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -665,6 +668,69 @@ func TestHandoffPackageHasNoNetworkOrProviderImports(t *testing.T) {
 	}
 }
 
+func TestBundleInstructionsAreSelfContainedForCandidateID(t *testing.T) {
+	root := copyPublicFixture(t, "retry-policy")
+	requestDirectory := filepath.Join(root, "request")
+	if _, err := Prepare(
+		filepath.Join(root, "conversation.md"),
+		filepath.Join(root, "docs"),
+		requestDirectory,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	instructions := mustRead(t, filepath.Join(requestDirectory, InstructionsFileName))
+	for _, required := range []string{
+		`set id to ""`,
+		"schema field order",
+		"two-space JSON",
+		"without HTML escaping",
+		"one final LF",
+		`"distill-handoff/candidate/v0alpha1\n"`,
+		`prefix`,
+		`"decision_"`,
+	} {
+		if !bytes.Contains(instructions, []byte(required)) {
+			t.Fatalf("bundle instructions omit candidate-ID rule %q", required)
+		}
+	}
+	if bytes.Contains(instructions, []byte("docs/handoff-v0.md")) {
+		t.Fatal("bundle instructions depend on documentation outside the bundle")
+	}
+
+	proposal := retryProposal(t, requestDirectory)
+	expectedID := proposal.Candidates[0].ID
+	candidate := proposal.Candidates[0]
+	candidate.ID = ""
+	var canonical bytes.Buffer
+	encoder := json.NewEncoder(&canonical)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(candidate); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(append(
+		[]byte("distill-handoff/candidate/v0alpha1\n"),
+		canonical.Bytes()...,
+	))
+	derivedID := "decision_" + hex.EncodeToString(sum[:])
+	if derivedID != expectedID {
+		t.Fatalf("bundle-only candidate ID = %q, want %q", derivedID, expectedID)
+	}
+
+	proposal.Candidates[0].ID = derivedID
+	proposalPath := filepath.Join(root, "bundle-only-proposal.json")
+	writeCanonical(t, proposalPath, proposal)
+	if _, err := verifyCurrentRequest(
+		t,
+		filepath.Join(requestDirectory, RequestFileName),
+		proposalPath,
+		filepath.Join(root, "review"),
+	); err != nil {
+		t.Fatalf("bundle-only candidate ID was rejected: %v", err)
+	}
+}
+
 func TestPublicFixtureProposals(t *testing.T) {
 	update := os.Getenv("UPDATE_HANDOFF_FIXTURES") == "1"
 	fixtures := []struct {
@@ -824,16 +890,16 @@ func TestGoldenReviewFixture(t *testing.T) {
 		}
 	}
 	expected := map[string]string{
-		"request/SHA256SUMS":                     "3fa8eb3141c79b7b74a65b49af0b9c271234bbcd645f3d5eaa9623c13ad07a5e",
-		"request/agent-instructions.md":          "3fa0521ae38e1ef4693689000f5090e289c7089c999f02d7f6b6252ec3f75768",
-		"request/handoff.request.json":           "84fa1bd3a4d48e5583cccd6e01d57f7a4061142c74e010e30be826403afabf89",
+		"request/SHA256SUMS":                     "8ecff1be6ae90d9929c4ca95fc2a7f07e48e03a6c7b1f7f64d0e92d130e4d9f8",
+		"request/agent-instructions.md":          "d27d45acb60b5884a4f9f786b6bfbc8c567604ce45e29d8024a839dde9d757d8",
+		"request/handoff.request.json":           "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38",
 		"request/inputs/conversation.md":         "94a8d1951427b388d37919fecee4d68ae2f0d4398199b29214ce5230ef74077a",
 		"request/inputs/docs/runbook/retries.md": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70",
 		"request/proposal.schema.json":           "a0cb1730ea215fa276774546f245d2994fa3d6a35879b8a806711c3ef09aea2f",
-		"review/SHA256SUMS":                      "22f5bb13c9c8cd3e08ecf16a3ef47d90f3ed81ec12bfea816c1e2d565111ddbc",
-		"review/handoff.receipt.json":            "5d138eef331973f0430be0d1bb77c30f6d925f9d07686f4125381a196f0066f3",
+		"review/SHA256SUMS":                      "bfc234b3ca8fe72eadcf4b2db1e417c186ebcbafba384262927c824f312960c7",
+		"review/handoff.receipt.json":            "8b4df5de076991a40d9642c4a6b932ee510765957f6d180240f8e39a57340968",
 		"review/patches/decision_31aa07641f4dca8447a579d6a42acc80ca3657d3ccae0fa43a715667ee1861cd.patch": "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23",
-		"review/review.md": "c0aeae554a1d419dc8592f40bdbfb1cd7c1d3c6d842ffc2edabb749e09c7b628",
+		"review/review.md": "fe9afa5ea6aaaf5cf51f0db5eeeb1d5216d1fae8fc525f006929d2fb54dfcfe7",
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("golden hashes differ\nactual: %#v", actual)
