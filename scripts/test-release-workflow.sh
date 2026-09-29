@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+workflow=.github/workflows/release.yml
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+
 accepted=(
   v0.9.1
   v0.10.0-alpha.1
@@ -33,3 +37,18 @@ for version in "${rejected[@]}"; do
 done
 
 ./scripts/validate-release-workflow.sh
+
+awk '
+  $0 == "      - name: Run GoReleaser" { publishing = 1 }
+  publishing && /^        if:/ {
+    print "        if: github.event_name == '\''push'\'' && startsWith(github.ref, '\''refs/tags/v'\'')"
+    publishing = 0
+    next
+  }
+  { print }
+' "$workflow" >"$tmp_dir/tag-push-only.yml"
+
+if ./scripts/validate-release-workflow.sh "$tmp_dir/tag-push-only.yml" >/dev/null 2>&1; then
+  echo "accepted tag-push-only publication regression" >&2
+  exit 1
+fi

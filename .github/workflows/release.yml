@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -32,21 +36,58 @@ jobs:
       - name: Validate release version
         run: ./scripts/validate-release-version.sh "$RELEASE_VERSION"
 
+      - name: Refuse duplicate GitHub release
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_check_error="$RUNNER_TEMP/release-check-error"
+          if gh api --silent "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_VERSION}" 2>"$release_check_error"; then
+            echo "::error::GitHub release '$RELEASE_VERSION' already exists; refusing duplicate publication."
+            exit 1
+          fi
+          if ! grep -Fq "(HTTP 404)" "$release_check_error"; then
+            cat "$release_check_error" >&2
+            echo "::error::Unable to verify whether GitHub release '$RELEASE_VERSION' exists."
+            exit 1
+          fi
+          rm -f "$release_check_error"
+
+      # GITHUB_TOKEN tag pushes do not trigger another workflow run, so a
+      # non-dry dispatch must publish in this job after ensuring its tag.
+      - name: Prepare dispatch release tag
+        if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
+        run: |
+          dispatch_commit=$(git rev-parse HEAD)
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_VERSION"; then
+            tag_type=$(git cat-file -t "refs/tags/$RELEASE_VERSION")
+            if [[ "$tag_type" != "tag" ]]; then
+              echo "::error::Existing tag '$RELEASE_VERSION' is not an annotated tag."
+              exit 1
+            fi
+            tag_commit=$(git rev-parse "${RELEASE_VERSION}^{commit}")
+            echo "Using existing annotated tag '$RELEASE_VERSION' at '$tag_commit'."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_VERSION" "$dispatch_commit" -m "Release $RELEASE_VERSION"
+            git push origin "refs/tags/$RELEASE_VERSION"
+          fi
+          git checkout --detach "refs/tags/$RELEASE_VERSION"
+          tag_commit=$(git rev-parse "${RELEASE_VERSION}^{commit}")
+          checked_out_commit=$(git rev-parse HEAD)
+          if [[ "$checked_out_commit" != "$tag_commit" ]]; then
+            echo "::error::Checked out '$checked_out_commit' instead of tag commit '$tag_commit'."
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: '1.24'
 
-      - name: Create and push tag
-        if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION"
-          git push origin "$RELEASE_VERSION"
-
       - name: Run GoReleaser
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
           distribution: goreleaser
