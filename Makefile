@@ -122,6 +122,7 @@ docker-run: ## Run the Docker container (API mode, port 8080)
 .PHONY: release-dry
 release-dry: ## Dry-run goreleaser (snapshot, no publish)
 	goreleaser release --snapshot --clean
+	./scripts/validate-release.sh
 
 .PHONY: release
 release: ## Run goreleaser (requires GITHUB_TOKEN)
