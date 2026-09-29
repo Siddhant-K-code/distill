@@ -3,8 +3,40 @@
 set -euo pipefail
 
 workflow=.github/workflows/release.yml
+goreleaser_config=.goreleaser.yml
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
+
+assert_auto_prerelease() {
+  local config=$1
+  awk '
+    $0 == "release:" {
+      in_release = 1
+      next
+    }
+    in_release && /^[^[:space:]#]/ {
+      in_release = 0
+    }
+    in_release && /^  prerelease:[[:space:]]+auto([[:space:]]*(#.*)?)?$/ {
+      matches++
+    }
+    END {
+      exit matches == 1 ? 0 : 1
+    }
+  ' "$config"
+}
+
+if ! assert_auto_prerelease "$goreleaser_config"; then
+  echo "GoReleaser must automatically mark semantic prerelease tags" >&2
+  exit 1
+fi
+
+sed 's/^  prerelease: auto$/  prerelease: false/' \
+  "$goreleaser_config" >"$tmp_dir/stable-only-goreleaser.yml"
+if assert_auto_prerelease "$tmp_dir/stable-only-goreleaser.yml"; then
+  echo "accepted disabled automatic prerelease marking" >&2
+  exit 1
+fi
 
 accepted=(
   v0.9.1
