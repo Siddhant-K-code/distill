@@ -64,26 +64,40 @@ Query → Over-fetch (50) → Cluster → Select → MMR Re-rank (8) → LLM
 
 ### Binary (Recommended)
 
-Download from [GitHub Releases](https://github.com/Siddhant-K-code/distill/releases):
+After a release is published, replace `vX.Y.Z-alpha.N` below with its tag:
 
 ```bash
-# macOS (Apple Silicon)
-curl -sL $(curl -s https://api.github.com/repos/Siddhant-K-code/distill/releases/latest | grep "browser_download_url.*darwin_arm64.tar.gz" | cut -d '"' -f 4) | tar xz
+set -euo pipefail
 
-# macOS (Intel)
-curl -sL $(curl -s https://api.github.com/repos/Siddhant-K-code/distill/releases/latest | grep "browser_download_url.*darwin_amd64.tar.gz" | cut -d '"' -f 4) | tar xz
+TAG=vX.Y.Z-alpha.N
+VERSION=${TAG#v}
+case "$(uname -s)/$(uname -m)" in
+  Darwin/arm64) TARGET=darwin_arm64 ;;
+  Darwin/x86_64) TARGET=darwin_amd64 ;;
+  Linux/x86_64) TARGET=linux_amd64 ;;
+  Linux/aarch64|Linux/arm64) TARGET=linux_arm64 ;;
+  *) echo "Unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
+esac
 
-# Linux (amd64)
-curl -sL $(curl -s https://api.github.com/repos/Siddhant-K-code/distill/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d '"' -f 4) | tar xz
+BASE_URL="https://github.com/Siddhant-K-code/distill/releases/download/${TAG}"
+ARCHIVE="distill_${VERSION}_${TARGET}.tar.gz"
+curl -fLO "${BASE_URL}/${ARCHIVE}"
+curl -fLO "${BASE_URL}/checksums.txt"
 
-# Linux (arm64)
-curl -sL $(curl -s https://api.github.com/repos/Siddhant-K-code/distill/releases/latest | grep "browser_download_url.*linux_arm64.tar.gz" | cut -d '"' -f 4) | tar xz
+CHECKSUM=$(grep "  ${ARCHIVE}$" checksums.txt)
+if command -v sha256sum >/dev/null 2>&1; then
+  printf '%s\n' "$CHECKSUM" | sha256sum --check -
+else
+  printf '%s\n' "$CHECKSUM" | shasum -a 256 --check -
+fi
 
-# Move to PATH
-sudo mv distill /usr/local/bin/
+tar -xzf "$ARCHIVE"
+sudo mkdir -p /usr/local/bin
+sudo install -m 0755 distill /usr/local/bin/distill
+distill handoff --help
 ```
 
-Or download directly from the [releases page](https://github.com/Siddhant-K-code/distill/releases/latest).
+Or download directly from the [releases page](https://github.com/Siddhant-K-code/distill/releases).
 
 ### Go Install
 

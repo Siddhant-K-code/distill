@@ -59,3 +59,7 @@ jobs:
           args: release --clean --snapshot --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release archives
+        if: ${{ inputs.dry_run }}
+        run: ./scripts/validate-release.sh

@@ -4,13 +4,9 @@
 
 ### Binary (recommended)
 
-Download from [GitHub Releases](https://github.com/Siddhant-K-code/distill/releases):
-
-```bash
-# macOS / Linux
-curl -sSL https://github.com/Siddhant-K-code/distill/releases/latest/download/distill_$(uname -s)_$(uname -m).tar.gz | tar xz
-sudo mv distill /usr/local/bin/
-```
+Choose a published tag and follow the checksummed
+[binary installation steps](../../README.md#binary-recommended). GoReleaser
+publishes `darwin` and `linux` archives for `amd64` and `arm64`.
 
 ### Docker
 
