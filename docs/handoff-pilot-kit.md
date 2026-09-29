@@ -47,9 +47,10 @@ using a hosted agent may transmit it under that provider's terms.
    cp -R /absolute/path/to/related-docs/. "$trial/docs/"
    ```
 
-   `umask 077` creates staging directories for the owner only (`0700`) and
-   regular files without group or other access (`0600`). It avoids traversing
-   copied content to rewrite permissions; Handoff rejects any copied symlink.
+   `umask 077` removes all group and other permissions from newly created
+   staging content. Handoff publishes the request itself with exact `0700`
+   directories and `0600` files. This avoids traversing copied content to
+   rewrite permissions; Handoff rejects any copied symlink.
 
 2. Prepare the private bundle and retain the printed digest outside it.
 
