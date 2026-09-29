@@ -197,7 +197,8 @@ normalization, identities, evidence checks, patch validation, receipts, review
 rendering, and checksum-bound patch files—not probabilistic extraction or patch
 drafting. This is an experimental Markdown/local-repository alpha, not general
 availability or evidence of adoption. Run `make handoff-v0-demo` or see the
-[bounded contract and 5–10 minute flow](docs/handoff-v0.md).
+[tester-ready retrospective pilot](docs/handoff-pilot-kit.md) and
+[bounded protocol](docs/handoff-v0.md).
 
 For Distill Lock, the separate research-only
 [offline excluded-pilot harness](research/context-is-a-build-artifact/pilot/README.md)

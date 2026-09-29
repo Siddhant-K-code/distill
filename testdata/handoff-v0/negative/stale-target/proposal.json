@@ -1,7 +1,7 @@
 {
   "schema_version": "distill-handoff/proposal/v0alpha1",
-  "request_id": "2eb92b4b491278791a81e642049d9ab6cd3817065a87672681ede9a20703c771",
-  "request_sha256": "84fa1bd3a4d48e5583cccd6e01d57f7a4061142c74e010e30be826403afabf89",
+  "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+  "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38",
   "outcome": "candidate_decisions",
   "route": "require_review",
   "reason": "One committed retry-policy decision is ready for review.",

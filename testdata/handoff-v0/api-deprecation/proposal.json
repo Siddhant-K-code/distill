@@ -1,7 +1,7 @@
 {
   "schema_version": "distill-handoff/proposal/v0alpha1",
-  "request_id": "3af7d9824217d8b5ff6204333da84faaef2500b215edb931f282692b04a4fe25",
-  "request_sha256": "a02bb3476888cae65a21b4a0a5662431817db7c74ea3e44825c06c7f14bb0066",
+  "request_id": "11d6a24c9ae4e653a6e0b226de558b9896c2fd04e1e690985a0d1f150424bff1",
+  "request_sha256": "d9cb069ab39dcec57ee2e9c4d7d7397c1d1e0ab58289f506ad6ed4d365af297b",
   "outcome": "candidate_decisions",
   "route": "require_review",
   "reason": "One committed API lifecycle decision is ready for review.",
