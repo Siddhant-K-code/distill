@@ -38,15 +38,18 @@ using a hosted agent may transmit it under that provider's terms.
    Replace the two source paths below.
 
    ```bash
+   previous_umask="$(umask)"
+   umask 077
    trial="$(cd "$(mktemp -d)" && pwd -P)"
    trusted_digest_file="$(mktemp)"
-   chmod 700 "$trial"
-   chmod 600 "$trusted_digest_file"
    mkdir "$trial/docs"
    cp /absolute/path/to/conversation.md "$trial/conversation.md"
    cp -R /absolute/path/to/related-docs/. "$trial/docs/"
-   chmod -R go-rwx "$trial"
    ```
+
+   `umask 077` creates staging directories for the owner only (`0700`) and
+   regular files without group or other access (`0600`). It avoids traversing
+   copied content to rewrite permissions; Handoff rejects any copied symlink.
 
 2. Prepare the private bundle and retain the printed digest outside it.
 
@@ -84,6 +87,15 @@ using a hosted agent may transmit it under that provider's terms.
 
    Check each decision, exact evidence quote and range, target, and patch.
    Record a disposition; do not apply a patch as part of this trial.
+
+6. After recording feedback, remove the temporary trusted-digest copy and
+   restore the caller's previous file-creation mask. Retain or delete the
+   private trial directory according to the source material's retention policy.
+
+   ```bash
+   rm -f "$trusted_digest_file"
+   umask "$previous_umask"
+   ```
 
 ## Agent recipes (examples, not native integrations)
 
