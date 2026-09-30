@@ -1,0 +1,38 @@
+Read only the copied request under request/. Write exactly one JSON file at
+output/semantic-draft.json, then stop. Do not read or modify any other path.
+Do not modify the request copy.
+
+Decide whether the conversation contains a committed decision that should be
+reflected in one of the copied Markdown documents. If it does not, use
+"abstain". If it does, provide one semantic candidate intent. Do not calculate
+or provide hashes, byte or line ranges, unified diffs, patch digests, candidate
+IDs, request identities, or verification results.
+
+The file must be one JSON object with exactly these keys:
+
+{
+  "schema_version": "distill-handoff/semantic-draft-research/v1",
+  "outcome": "candidate_intent",
+  "reason": "Concise proposal-level reason.",
+  "candidate": {
+    "decision_text": "Concise statement of the committed decision.",
+    "decision_type": "policy",
+    "evidence_quote": "Exact unique quote copied from request/inputs/conversation.md.",
+    "evidence_occurrence": 1,
+    "target_path": "POSIX path relative to request/inputs/docs.",
+    "target_anchor_quote": "Exact unique complete line copied from the target document, without its newline.",
+    "target_anchor_occurrence": 1,
+    "operation": "replace",
+    "replacement_text": "Exact replacement line, without a newline.",
+    "rationale": "Concise reason this edit reflects the evidence."
+  }
+}
+
+For abstention, use the same top-level keys, set "outcome" to "abstain", give a
+concise reason, and set "candidate" to null.
+
+The only supported operation is "replace". Both quoted strings must match
+exactly once, and both occurrence fields must be 1. The target anchor and
+replacement must each be one complete non-empty line without CR or LF. Use one
+of these exact decision types: api, architecture, operations, policy, process,
+product, or other. Do not add keys or candidates. Do not guess missing text.

@@ -1,0 +1,35 @@
+{
+  "schema_version": "distill-handoff/proposal/v0alpha1",
+  "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+  "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38",
+  "outcome": "candidate_decisions",
+  "route": "require_review",
+  "reason": "The conversation records an explicit retry-policy decision that the runbook does not yet reflect.",
+  "candidates": [
+    {
+      "id": "decision_ca5c754c61dcc9a2b18a5c5e72f5e82920746f1ddbc91d6ff88bf5fe943573e6",
+      "decision_text": "Production requests will use three attempts with exponential backoff starting at 200ms.",
+      "decision_type": "policy",
+      "evidence": {
+        "source_path": "inputs/conversation.md",
+        "source_normalized_sha256": "94a8d1951427b388d37919fecee4d68ae2f0d4398199b29214ce5230ef74077a",
+        "quote": "Lead: Decision: production requests will use three attempts with exponential backoff starting at 200ms.",
+        "start_byte": 80,
+        "end_byte": 183,
+        "start_line": 4,
+        "end_line": 4
+      },
+      "target": {
+        "path": "runbook/retries.md",
+        "original_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70",
+        "normalized_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70"
+      },
+      "patch": {
+        "unified_diff": "--- a/runbook/retries.md\n+++ b/runbook/retries.md\n@@ -1,3 +1,3 @@\n # Retry policy\n \n-Production requests use two immediate retries.\n+Production requests use three attempts with exponential backoff starting at 200ms.\n",
+        "sha256": "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23"
+      },
+      "route": "require_review",
+      "reason": "Replacing the outdated immediate-retry line makes the runbook match the committed production retry policy."
+    }
+  ]
+}

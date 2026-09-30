@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:distill:handoff:semantic-draft:research:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "outcome",
+    "reason",
+    "candidate"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "distill-handoff/semantic-draft-research/v1"
+    },
+    "outcome": {
+      "enum": [
+        "abstain",
+        "candidate_intent"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "abstain"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "candidate": {
+            "$ref": "#/$defs/candidate"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_text",
+        "decision_type",
+        "evidence_quote",
+        "evidence_occurrence",
+        "target_path",
+        "target_anchor_quote",
+        "target_anchor_occurrence",
+        "operation",
+        "replacement_text",
+        "rationale"
+      ],
+      "properties": {
+        "decision_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_type": {
+          "enum": [
+            "api",
+            "architecture",
+            "operations",
+            "policy",
+            "process",
+            "product",
+            "other"
+          ]
+        },
+        "evidence_quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_occurrence": {
+          "const": 1
+        },
+        "target_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_anchor_quote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_anchor_occurrence": {
+          "const": 1
+        },
+        "operation": {
+          "const": "replace"
+        },
+        "replacement_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

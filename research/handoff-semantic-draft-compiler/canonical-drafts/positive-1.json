@@ -1,0 +1,17 @@
+{
+  "schema_version": "distill-handoff/semantic-draft-research/v1",
+  "outcome": "candidate_intent",
+  "reason": "The conversation explicitly commits to a production retry policy and says the runbook must reflect it.",
+  "candidate": {
+    "decision_text": "Production requests will use three attempts with exponential backoff starting at 200ms.",
+    "decision_type": "policy",
+    "evidence_quote": "Decision: production requests will use three attempts with exponential backoff starting at 200ms.",
+    "evidence_occurrence": 1,
+    "target_path": "runbook/retries.md",
+    "target_anchor_quote": "Production requests use two immediate retries.",
+    "target_anchor_occurrence": 1,
+    "operation": "replace",
+    "replacement_text": "Production requests use three attempts with exponential backoff starting at 200ms.",
+    "rationale": "Replacing the outdated immediate-retry line records the agreed attempt count and backoff policy."
+  }
+}

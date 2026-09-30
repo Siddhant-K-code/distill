@@ -219,6 +219,11 @@ For Distill Lock, the separate research-only
 generates synthetic, zero-provider-call protocol fixtures and is not wired into
 the public `distill` CLI.
 
+The research-only
+[Handoff semantic-draft compiler experiment](research/handoff-semantic-draft-compiler/README.md)
+tests semantic model output plus deterministic proposal construction without
+changing Handoff product behavior.
+
 ## Quick Start
 
 ### 1. Standalone API (No Vector DB Required)

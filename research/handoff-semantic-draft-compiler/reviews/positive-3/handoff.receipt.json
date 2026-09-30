@@ -1,0 +1,45 @@
+{
+  "schema_version": "distill-handoff/receipt/v0alpha1",
+  "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+  "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38",
+  "proposal_sha256": "777c3b088c44430b63c65bf2a5af34bfef37aa78c1f59a2569f3d706a0350cfb",
+  "outcome": "candidate_decisions",
+  "route": "require_review",
+  "reason": "The conversation records an explicit retry-policy decision that the runbook should reflect.",
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "id": "decision_6c0bb5bec4490ae8972a87407345b532683d0ba4f30bf0305c3cf83657d95ed4",
+      "decision_type": "policy",
+      "evidence": {
+        "source_path": "inputs/conversation.md",
+        "source_normalized_sha256": "94a8d1951427b388d37919fecee4d68ae2f0d4398199b29214ce5230ef74077a",
+        "quote": "Lead: Decision: production requests will use three attempts with exponential backoff starting at 200ms.",
+        "start_byte": 80,
+        "end_byte": 183,
+        "start_line": 4,
+        "end_line": 4
+      },
+      "target": {
+        "path": "runbook/retries.md",
+        "original_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70",
+        "normalized_sha256": "21f128d20f43ebeaa8a37a8519363103ea8cf4d57b126c7643879bfc07fbea70"
+      },
+      "patch_sha256": "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23",
+      "patched_normalized_sha256": "bd6762f9916cb673ab5cfce400381a6d9f99699efe6a6a59003a3992a24670af",
+      "route": "require_review"
+    }
+  ],
+  "review": {
+    "path": "review.md",
+    "sha256": "f7decad61363e88b1d3d9810cac910f3362bd331ea4bdc9c098c16e0bc0817cc",
+    "bytes": 1669
+  },
+  "patches": [
+    {
+      "path": "patches/decision_6c0bb5bec4490ae8972a87407345b532683d0ba4f30bf0305c3cf83657d95ed4.patch",
+      "sha256": "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23",
+      "bytes": 216
+    }
+  ]
+}

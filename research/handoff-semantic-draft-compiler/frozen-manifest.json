@@ -1,0 +1,29 @@
+{
+  "schema_name": "handoff-semantic-draft-frozen-manifest",
+  "schema_version": 1,
+  "frozen_at": "2026-09-30T20:09:54+05:30",
+  "repository_baseline": "6aaefbb53acc5cb177d617292f96cd3b87f693ba",
+  "protocol_sha256": "8d76e52cd88ee5896add3f76f9aa3afe1a9044ecf019b56a94e9fc0d35039ea5",
+  "prompt_sha256": "f348b76c98ed70a09835e17c14d9b281da113dc45ab142a1a382829899f9838d",
+  "semantic_draft_schema_sha256": "7f05117827b50c7ddec7ac33fbab9b58194aa272a698588e870f93fec34ce5a6",
+  "compiler_source_sha256": "fd5bd856f4bf9cdee49e2705b48fbdb369e80023cf720101457d59df9bad2311",
+  "compiler_main_sha256": "1b98d4b264a8796d55a238331d5e9b34782e9056086ca4b08cea490702353f99",
+  "compiler_test_sha256": "8ca47a0ebc9cf58cc40b9a88fbd6b8e7bd0e15a5cea982740188e50f44b85726",
+  "launcher_sha256": "8ca72aa3284465dd1573c29a2d91409d966432924b5664f4be8535d28df890aa",
+  "compiler_binary": {
+    "go_version": "go1.26.4",
+    "platform": "darwin/arm64",
+    "sha256": "335050613d3cf9db8848031ffcd1e06d527911a245d885fda8a9eca5ffba5b2c"
+  },
+  "distill_binary_sha256": "c4af7ca6894a2d1d826d662978e4d4e325d89e978c26957487a440fd8267b11a",
+  "runtime": {
+    "name": "GitHub Copilot CLI",
+    "version": "1.0.90-5",
+    "sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+    "model": "gpt-5.6-sol",
+    "available_tools": [
+      "view",
+      "apply_patch"
+    ]
+  }
+}

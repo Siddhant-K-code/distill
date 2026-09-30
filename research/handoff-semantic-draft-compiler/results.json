@@ -1,0 +1,809 @@
+{
+  "aggregate_mutations": {
+    "canonical_request": 0,
+    "request_copy": 0,
+    "source_repository": 0,
+    "trust_boundary": 36
+  },
+  "claim_boundary": {
+    "adoption_claim": false,
+    "descriptive_only": true,
+    "general_model_quality_claim": false,
+    "safety_generalization_claim": false,
+    "significance_claim": false,
+    "superiority_claim": false
+  },
+  "cost_review_comparison": {
+    "cost_metrics": {
+      "input_tokens": {
+        "material_regression": false,
+        "maximum_non_material": 188111.25,
+        "observed": 148524,
+        "prior": 150489
+      },
+      "model_requests": {
+        "material_regression": true,
+        "maximum_non_material": 33.75,
+        "observed": 36,
+        "prior": 27
+      },
+      "output_tokens": {
+        "material_regression": false,
+        "maximum_non_material": 10955.0,
+        "observed": 3217,
+        "prior": 8764
+      },
+      "session_ms": {
+        "material_regression": null,
+        "maximum_non_material": 239722.5,
+        "observed": null,
+        "prior": 191778,
+        "reason": "The current runtime did not directly report session duration."
+      },
+      "total_nano_aiu": {
+        "material_regression": false,
+        "maximum_non_material": 52226500000.0,
+        "observed": 24892260000,
+        "prior": 41781200000
+      }
+    },
+    "no_material_regression": false,
+    "review_duration_us": [
+      4412,
+      3156,
+      2562,
+      2269,
+      2587,
+      2966
+    ],
+    "review_duration_us_median": 2776.5,
+    "review_material_regression": false
+  },
+  "directly_reported_totals": {
+    "api_ms": 106831,
+    "cache_read_tokens": 121289,
+    "cache_write_tokens": 27127,
+    "input_tokens": 148524,
+    "model_requests": 36,
+    "monetary_cost": null,
+    "output_tokens": 3217,
+    "premium_request_cost": 6,
+    "reasoning_tokens": 758,
+    "session_ms": null,
+    "total_nano_aiu": 24892260000,
+    "uncached_input_tokens": 108,
+    "user_requests": 6
+  },
+  "executed_at": "2026-09-30",
+  "execution": {
+    "available_tools": [
+      "view",
+      "apply_patch"
+    ],
+    "completed_invocations": 6,
+    "model": "gpt-5.6-sol",
+    "model_selected_explicitly": true,
+    "retries": 0,
+    "run_order": [
+      "positive-1",
+      "negative-1",
+      "positive-2",
+      "negative-2",
+      "positive-3",
+      "negative-3"
+    ],
+    "runtime": "GitHub Copilot CLI",
+    "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+    "runtime_version": "1.0.90-5",
+    "single_shot": true
+  },
+  "frozen_inputs": {
+    "frozen_manifest_sha256": "48ed6906220b6125ba8f36bb7a582b257e411f6439cf2cba802cde1e775a2a61",
+    "negative": {
+      "fixture": "testdata/handoff-v0/brainstorming",
+      "request_id": "eb613088a5e48b03b2f1cac9c47a6a6338f02dc859e3f3e6afd0b686cb36df47",
+      "request_sha256": "45d333595c146fcd8ade578f6015258dda8c57275b75352d63ca08f8c89fb4d2"
+    },
+    "positive": {
+      "fixture": "testdata/handoff-v0/retry-policy",
+      "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+      "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38"
+    },
+    "prompt_sha256": "f348b76c98ed70a09835e17c14d9b281da113dc45ab142a1a382829899f9838d",
+    "protocol_sha256": "8d76e52cd88ee5896add3f76f9aa3afe1a9044ecf019b56a94e9fc0d35039ea5",
+    "repository_baseline": "6aaefbb53acc5cb177d617292f96cd3b87f693ba",
+    "semantic_draft_schema_sha256": "7f05117827b50c7ddec7ac33fbab9b58194aa272a698588e870f93fec34ce5a6"
+  },
+  "negative_aggregate": {
+    "byte_identical_draft_agreement": {
+      "agreeing_pairs": 1,
+      "possible_pairs": 3,
+      "rate": 0.3333333333333333
+    },
+    "candidate_id_agreement": {
+      "agreeing_pairs": 3,
+      "possible_pairs": 3,
+      "rate": 1.0
+    },
+    "compiler_successes": 3,
+    "correct_abstentions": 3,
+    "false_positive_candidates": 0,
+    "false_positive_semantic_drafts": 0,
+    "outcome_agreement": {
+      "agreeing_pairs": 3,
+      "possible_pairs": 3,
+      "rate": 1.0
+    },
+    "semantic_draft_successes": 3,
+    "verifier_successes": 3
+  },
+  "positive_aggregate": {
+    "byte_identical_draft_agreement": {
+      "agreeing_pairs": 0,
+      "possible_pairs": 3,
+      "rate": 0.0
+    },
+    "candidate_id_agreement": {
+      "agreeing_pairs": 0,
+      "possible_pairs": 3,
+      "rate": 0.0
+    },
+    "compiler_successes": 3,
+    "exact_evidence_correct": 3,
+    "expected_candidate_recoveries": 3,
+    "expected_decision_recoveries": 3,
+    "fabricated_candidates": 0,
+    "fixture_expected_quote_exact_matches": 1,
+    "operation_replacement_correct": 3,
+    "outcome_agreement": {
+      "agreeing_pairs": 3,
+      "possible_pairs": 3,
+      "rate": 1.0
+    },
+    "patch_semantically_equivalent": 3,
+    "semantic_draft_successes": 3,
+    "target_correct": 3,
+    "unsupported_claims": 0,
+    "usable_unchanged": 3,
+    "verifier_successes": 3
+  },
+  "productization_threshold": {
+    "checks": {
+      "deterministic_replay": {
+        "observed": 6,
+        "passed": true,
+        "required": 6
+      },
+      "negative_verifier_valid_abstention": {
+        "observed": 3,
+        "passed": true,
+        "required": 3
+      },
+      "no_material_cost_or_review_regression": {
+        "observed": false,
+        "passed": false,
+        "required": true
+      },
+      "positive_verifier_valid_expected_candidate": {
+        "observed": 3,
+        "passed": true,
+        "required": 2
+      },
+      "zero_fabricated_candidates": {
+        "observed": 0,
+        "passed": true,
+        "required": 0
+      },
+      "zero_mutations": {
+        "observed": 36,
+        "passed": false,
+        "required": 0
+      }
+    },
+    "disposition": "threshold_failed",
+    "overall_passed": false
+  },
+  "protocol_deviations": [
+    {
+      "deviation": "The runtime created a six-path .agent-traces tree beside request/ and output/ inside each disposable workspace, while the frozen protocol said runtime metadata would remain outside that parent.",
+      "impact": "The runtime-owned metadata contained no protected study material, was not a model output, did not alter request or output bytes, and was removed with each disposable workspace.",
+      "mutation_classification": "trust_boundary_path_additions"
+    }
+  ],
+  "publication_assessment": "useful_engineering_note",
+  "evidence_accounting_correction": {
+    "basis": "Preserve the frozen launcher's recorded .agent-traces path additions as trust-boundary mutations without changing retained trial evidence.",
+    "changed_post_study_artifacts": [
+      "README.md",
+      "SHA256SUMS",
+      "collect-results.py",
+      "results.json"
+    ],
+    "protected_trial_artifacts_changed": false
+  },
+  "runs": [
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [
+        "decision_179c38986244e95383ae56153d464e8328b2e3b55419716a1070339ac75c429f"
+      ],
+      "canonical_draft_sha256": "e7b251e8c5754637e93fd87fcba4f1056d072df3795b1efcce129361b71f9a2b",
+      "cli_elapsed_ms": 28426,
+      "compile_exit_status": 0,
+      "compile_ms": null,
+      "compile_timing_note": "unavailable after scorer interruption",
+      "condition": "positive",
+      "draft_present": true,
+      "draft_sha256": "e7b251e8c5754637e93fd87fcba4f1056d072df3795b1efcce129361b71f9a2b",
+      "end_time_utc": "2026-09-30T14:48:22.697417Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 1,
+      "ordinal": 1,
+      "output_file_count": 1,
+      "patch_sha256": [
+        "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23"
+      ],
+      "proposal_sha256": "cf2e969a9c937d3faca248be4bb9f3ae43b1db3fbb1ab47e7d3508093493b4b2",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "cf2e969a9c937d3faca248be4bb9f3ae43b1db3fbb1ab47e7d3508093493b4b2",
+        "cf2e969a9c937d3faca248be4bb9f3ae43b1db3fbb1ab47e7d3508093493b4b2"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "8e41bf4cb11d2806654624d213386d0cfb5a9a86688378535b83dca7b1cdc3ff",
+        "path": "responses/positive-1.json",
+        "raw_assistant_message_content_sha256": "ceb39e7dac4586b769ee493740a2ab2444868f846ac891b20cb89c922bf87ac7",
+        "source_event_stream_sha256": "b560963a6930b397d7849c29d9d5179e87c3c159678a9d2bff9cb3ddb508fc6c"
+      },
+      "review_duration_us": 4412,
+      "review_sha256": "c381b6f4d03cb9d215f094699d1d7f1951b57070bdf93f074c1394ad2f12f042",
+      "run": "positive-1",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.31373732376135372d306436332d3439.682eeffd95d5c9cb748e15eb2a596dea4089b18194e195f23cd5bc7d8ab3626e.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/17727a57-0d63-49/",
+          ".agent-traces/17727a57-0d63-49/events.ndjson",
+          ".agent-traces/17727a57-0d63-49/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "candidate_id_valid": true,
+        "compiler_success": true,
+        "exact_evidence_correct": true,
+        "expected_candidate_recovered": true,
+        "expected_decision_recovered": true,
+        "fabricated_candidates": 0,
+        "fixture_expected_quote_exact_match": true,
+        "operation_replacement_correct": true,
+        "patch_semantically_equivalent": true,
+        "patch_valid": true,
+        "review_disposition": "usable unchanged",
+        "semantic_draft_success": true,
+        "target_correct": true,
+        "unsupported_claims": 0,
+        "verifier_success": true
+      },
+      "session_id": "17727a57-0d63-494b-9820-a2459bd200d4",
+      "start_time_utc": "2026-09-30T14:47:54.270450Z",
+      "usage": {
+        "api_ms": 18955,
+        "cache_read_tokens": 24500,
+        "cache_write_tokens": 4700,
+        "input_tokens": 29221,
+        "model_requests": 7,
+        "monetary_cost": null,
+        "output_tokens": 692,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 153,
+        "session_ms": null,
+        "total_nano_aiu": 4722400000,
+        "uncached_input_tokens": 21,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "5b07ec68228e39822174e54a6c8c1c9806dc5bb695490e539c397747ee971496",
+      "verify_exit_status": 0,
+      "verify_ms": 81
+    },
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [],
+      "canonical_draft_sha256": "f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3",
+      "cli_elapsed_ms": 33772,
+      "compile_exit_status": 0,
+      "compile_ms": 5,
+      "compile_timing_note": null,
+      "condition": "negative",
+      "draft_present": true,
+      "draft_sha256": "f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3",
+      "end_time_utc": "2026-09-30T14:48:56.634189Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 2,
+      "ordinal": 1,
+      "output_file_count": 1,
+      "patch_sha256": [],
+      "proposal_sha256": "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7",
+        "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "d312d9f8a491ea98227fa265eceea98536c4c9bd1038c5208cd5890f078c7891",
+        "path": "responses/negative-1.json",
+        "raw_assistant_message_content_sha256": "4736e6dfc23aa456b1323c13b77b860b9472ac526dfe53a75354ea1c79d582e2",
+        "source_event_stream_sha256": "4d7549be8bd576c1a6039e4059838dd286ba8597a0ba9056728fa4b5956afc31"
+      },
+      "review_duration_us": 3156,
+      "review_sha256": "82a135ec776e68e12cab5a00c919658dbf9b0b376e07e9bb900fbbf90e49911e",
+      "run": "negative-1",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.62336564373132382d656136652d3431.15577ad8d4825f950eaee96993bc88de104c1d5276c36019eebf7f3ba65d2a8a.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/b3ed7128-ea6e-41/",
+          ".agent-traces/b3ed7128-ea6e-41/events.ndjson",
+          ".agent-traces/b3ed7128-ea6e-41/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "compiled_no_decision": true,
+        "compiler_success": true,
+        "correct_abstention": true,
+        "false_positive_candidates": 0,
+        "false_positive_semantic_drafts": 0,
+        "semantic_draft_success": true,
+        "verifier_success": true
+      },
+      "session_id": "b3ed7128-ea6e-4130-aeb9-91bd527e35a2",
+      "start_time_utc": "2026-09-30T14:48:22.861374Z",
+      "usage": {
+        "api_ms": 15915,
+        "cache_read_tokens": 15941,
+        "cache_write_tokens": 4339,
+        "input_tokens": 20295,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 381,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 106,
+        "session_ms": null,
+        "total_nano_aiu": 3575140000,
+        "uncached_input_tokens": 15,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "0ace57dde84e76b540dc2a0da1015877f067bd1c2c8cf1c6ab849cc9b135a45c",
+      "verify_exit_status": 0,
+      "verify_ms": 28
+    },
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [
+        "decision_ca5c754c61dcc9a2b18a5c5e72f5e82920746f1ddbc91d6ff88bf5fe943573e6"
+      ],
+      "canonical_draft_sha256": "fca6b008b57214404f7148c85238d0963673e9de1cc6747092923c4f0d77d6b1",
+      "cli_elapsed_ms": 41815,
+      "compile_exit_status": 0,
+      "compile_ms": 5,
+      "compile_timing_note": null,
+      "condition": "positive",
+      "draft_present": true,
+      "draft_sha256": "fca6b008b57214404f7148c85238d0963673e9de1cc6747092923c4f0d77d6b1",
+      "end_time_utc": "2026-09-30T14:49:38.616969Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 3,
+      "ordinal": 2,
+      "output_file_count": 1,
+      "patch_sha256": [
+        "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23"
+      ],
+      "proposal_sha256": "2132ea2e83f3f6cf26a2da42c99b2c8cf35ce2a0d669c2566cc6aa87497f3d22",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "2132ea2e83f3f6cf26a2da42c99b2c8cf35ce2a0d669c2566cc6aa87497f3d22",
+        "2132ea2e83f3f6cf26a2da42c99b2c8cf35ce2a0d669c2566cc6aa87497f3d22"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "e87b4ed227a6c5ca6e634c4c0b16034e8956866206d837a7ea2a16728ca14415",
+        "path": "responses/positive-2.json",
+        "raw_assistant_message_content_sha256": "4c010785d90261fe1ca5d55f3ce619a0f9410a223f3fab0563c400b002983878",
+        "source_event_stream_sha256": "098c209556be4c699803c606a990dc9fc5ae87af95c9a7b4f2bdb37937d4ed76"
+      },
+      "review_duration_us": 2562,
+      "review_sha256": "000ac124ffd191ff2d2d400195623655944c9a25537995b2cc013b3c6b5ece35",
+      "run": "positive-2",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.31633932636239622d393739342d3461.228d38c4d4c19e7578c6ec0ab80e849a15db706ab01c84dec07b6ac3160e10af.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/1c92cb9b-9794-4a/",
+          ".agent-traces/1c92cb9b-9794-4a/events.ndjson",
+          ".agent-traces/1c92cb9b-9794-4a/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "candidate_id_valid": true,
+        "compiler_success": true,
+        "exact_evidence_correct": true,
+        "expected_candidate_recovered": true,
+        "expected_decision_recovered": true,
+        "fabricated_candidates": 0,
+        "fixture_expected_quote_exact_match": false,
+        "operation_replacement_correct": true,
+        "patch_semantically_equivalent": true,
+        "patch_valid": true,
+        "review_disposition": "usable unchanged",
+        "semantic_draft_success": true,
+        "target_correct": true,
+        "unsupported_claims": 0,
+        "verifier_success": true
+      },
+      "session_id": "1c92cb9b-9794-4a88-8f9e-b2135c68238f",
+      "start_time_utc": "2026-09-30T14:48:56.801894Z",
+      "usage": {
+        "api_ms": 33808,
+        "cache_read_tokens": 24486,
+        "cache_write_tokens": 4718,
+        "input_tokens": 29225,
+        "model_requests": 7,
+        "monetary_cost": null,
+        "output_tokens": 706,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 171,
+        "session_ms": null,
+        "total_nano_aiu": 4758840000,
+        "uncached_input_tokens": 21,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "14a40f6cce570f77c6e35d46813b2d130ac2696b3e91f1d6754c4737d549856a",
+      "verify_exit_status": 0,
+      "verify_ms": 27
+    },
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [],
+      "canonical_draft_sha256": "f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3",
+      "cli_elapsed_ms": 20105,
+      "compile_exit_status": 0,
+      "compile_ms": 5,
+      "compile_timing_note": null,
+      "condition": "negative",
+      "draft_present": true,
+      "draft_sha256": "f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3",
+      "end_time_utc": "2026-09-30T14:49:58.883557Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 4,
+      "ordinal": 2,
+      "output_file_count": 1,
+      "patch_sha256": [],
+      "proposal_sha256": "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7",
+        "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "ffb59d0e5f17c097da0aace19eb6acb9a83c075e49f8aa98a0d1228216ad3613",
+        "path": "responses/negative-2.json",
+        "raw_assistant_message_content_sha256": "0391a381b6802eb0d6f37dee44c82e5c9c518cd8c68f4fbf4c1b47be819c738f",
+        "source_event_stream_sha256": "2b5987c438a65dcaa254238025f272fb9066780771081e0b99e18c1c989d1268"
+      },
+      "review_duration_us": 2269,
+      "review_sha256": "82a135ec776e68e12cab5a00c919658dbf9b0b376e07e9bb900fbbf90e49911e",
+      "run": "negative-2",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.37333665326437382d303434312d3433.12144b716d277f5136a1f5e02773d85028c03210214047e91bc26823294d79af.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/736e2d78-0441-43/",
+          ".agent-traces/736e2d78-0441-43/events.ndjson",
+          ".agent-traces/736e2d78-0441-43/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "compiled_no_decision": true,
+        "compiler_success": true,
+        "correct_abstention": true,
+        "false_positive_candidates": 0,
+        "false_positive_semantic_drafts": 0,
+        "semantic_draft_success": true,
+        "verifier_success": true
+      },
+      "session_id": "736e2d78-0441-436e-b5cb-d11ce7c9f879",
+      "start_time_utc": "2026-09-30T14:49:38.777781Z",
+      "usage": {
+        "api_ms": 11517,
+        "cache_read_tokens": 16001,
+        "cache_write_tokens": 4373,
+        "input_tokens": 20389,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 411,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 119,
+        "session_ms": null,
+        "total_nano_aiu": 3654540000,
+        "uncached_input_tokens": 15,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "0ace57dde84e76b540dc2a0da1015877f067bd1c2c8cf1c6ab849cc9b135a45c",
+      "verify_exit_status": 0,
+      "verify_ms": 24
+    },
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [
+        "decision_6c0bb5bec4490ae8972a87407345b532683d0ba4f30bf0305c3cf83657d95ed4"
+      ],
+      "canonical_draft_sha256": "1303a46824258f761d0bc85346d7eb9768effe693c0292eee85ef51028587725",
+      "cli_elapsed_ms": 24975,
+      "compile_exit_status": 0,
+      "compile_ms": 5,
+      "compile_timing_note": null,
+      "condition": "positive",
+      "draft_present": true,
+      "draft_sha256": "1303a46824258f761d0bc85346d7eb9768effe693c0292eee85ef51028587725",
+      "end_time_utc": "2026-09-30T14:50:24.019555Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 5,
+      "ordinal": 3,
+      "output_file_count": 1,
+      "patch_sha256": [
+        "645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23"
+      ],
+      "proposal_sha256": "777c3b088c44430b63c65bf2a5af34bfef37aa78c1f59a2569f3d706a0350cfb",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "777c3b088c44430b63c65bf2a5af34bfef37aa78c1f59a2569f3d706a0350cfb",
+        "777c3b088c44430b63c65bf2a5af34bfef37aa78c1f59a2569f3d706a0350cfb"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "d33cf284fbdd535a445631236b77f24f483a9f96db37e5c1cc695bbb28104f3e",
+        "path": "responses/positive-3.json",
+        "raw_assistant_message_content_sha256": "86db06700a203247535dd413dc425211cce01ec9ce9f523483f02002948c423b",
+        "source_event_stream_sha256": "f382e7a40fae7ae968f0659444ff20147b3a6d3d88b5ca94bce811af16edc701"
+      },
+      "review_duration_us": 2587,
+      "review_sha256": "f7decad61363e88b1d3d9810cac910f3362bd331ea4bdc9c098c16e0bc0817cc",
+      "run": "positive-3",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.65626136666437362d373634302d3431.6c1b2a9b6e57fe13ce37e372d2acf6b4ee7ac9d73e06de4b8ece23b26c7512d2.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/eba6fd76-7640-41/",
+          ".agent-traces/eba6fd76-7640-41/events.ndjson",
+          ".agent-traces/eba6fd76-7640-41/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "candidate_id_valid": true,
+        "compiler_success": true,
+        "exact_evidence_correct": true,
+        "expected_candidate_recovered": true,
+        "expected_decision_recovered": true,
+        "fabricated_candidates": 0,
+        "fixture_expected_quote_exact_match": false,
+        "operation_replacement_correct": true,
+        "patch_semantically_equivalent": true,
+        "patch_valid": true,
+        "review_disposition": "usable unchanged",
+        "semantic_draft_success": true,
+        "target_correct": true,
+        "unsupported_claims": 0,
+        "verifier_success": true
+      },
+      "session_id": "eba6fd76-7640-411c-9a6e-e31add31e668",
+      "start_time_utc": "2026-09-30T14:49:59.044112Z",
+      "usage": {
+        "api_ms": 16724,
+        "cache_read_tokens": 24419,
+        "cache_write_tokens": 4674,
+        "input_tokens": 29114,
+        "model_requests": 7,
+        "monetary_cost": null,
+        "output_tokens": 668,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 144,
+        "session_ms": null,
+        "total_nano_aiu": 4658160000,
+        "uncached_input_tokens": 21,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "ac6059326475dc1140a115fc328f9e7a6d302cb9ecf026818e9830809ca2f12c",
+      "verify_exit_status": 0,
+      "verify_ms": 28
+    },
+    {
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ],
+      "candidate_ids": [],
+      "canonical_draft_sha256": "5c15af8d15b9045340624ee0db956070a17b3903cced1b65362409e6e3b37510",
+      "cli_elapsed_ms": 21048,
+      "compile_exit_status": 0,
+      "compile_ms": 5,
+      "compile_timing_note": null,
+      "condition": "negative",
+      "draft_present": true,
+      "draft_sha256": "5c15af8d15b9045340624ee0db956070a17b3903cced1b65362409e6e3b37510",
+      "end_time_utc": "2026-09-30T14:50:45.202667Z",
+      "exit_status": 0,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 6
+      },
+      "order_position": 6,
+      "ordinal": 3,
+      "output_file_count": 1,
+      "patch_sha256": [],
+      "proposal_sha256": "6a0f3a996acf04ce4471f7bccd956c527668d8320dfb879f9eb18b66aa135f43",
+      "replay_byte_identical": true,
+      "replay_identities_identical": true,
+      "replay_proposal_sha256": [
+        "6a0f3a996acf04ce4471f7bccd956c527668d8320dfb879f9eb18b66aa135f43",
+        "6a0f3a996acf04ce4471f7bccd956c527668d8320dfb879f9eb18b66aa135f43"
+      ],
+      "response_evidence": {
+        "artifact_sha256": "7d116f2977c423c65ea845827c7a120e0d333a8b59b080b0ced4777cef6ae56c",
+        "path": "responses/negative-3.json",
+        "raw_assistant_message_content_sha256": "103da353ba81e2caa9492517793284af21e670fbdf3bdd2b55b564eceb723f4a",
+        "source_event_stream_sha256": "8e73bb4d2969b12d84dd7b6069dd91ebe9b6d229e1d184cbc60857070787f0be"
+      },
+      "review_duration_us": 2966,
+      "review_sha256": "3dabf7894c1ec44b96308d490af0448c0807e4f0d27d345ca5ee7eaf173e40ab",
+      "run": "negative-3",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_metadata": {
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.30613633316236372d316631332d3433.e6d881c10c185ecf798f1ce1a4240207c28da7cef2043a5b197a5a78a3acec50.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/0a631b67-1f13-43/",
+          ".agent-traces/0a631b67-1f13-43/events.ndjson",
+          ".agent-traces/0a631b67-1f13-43/meta.json"
+        ]
+      },
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "score": {
+        "compiled_no_decision": true,
+        "compiler_success": true,
+        "correct_abstention": true,
+        "false_positive_candidates": 0,
+        "false_positive_semantic_drafts": 0,
+        "semantic_draft_success": true,
+        "verifier_success": true
+      },
+      "session_id": "0a631b67-1f13-4330-9a2e-43c9507575cf",
+      "start_time_utc": "2026-09-30T14:50:24.153790Z",
+      "usage": {
+        "api_ms": 9912,
+        "cache_read_tokens": 15942,
+        "cache_write_tokens": 4323,
+        "input_tokens": 20280,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 359,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 65,
+        "session_ms": null,
+        "total_nano_aiu": 3523180000,
+        "uncached_input_tokens": 15,
+        "user_requests": 1
+      },
+      "verification_receipt_sha256": "fb6d33e3451daf7c5825524be8ab9e3e4487333185a56c3db3686bbcf5648bf0",
+      "verify_exit_status": 0,
+      "verify_ms": 25
+    }
+  ],
+  "runtime_metadata_workspace_paths": 36,
+  "schema_name": "handoff-semantic-draft-compiler-study",
+  "schema_version": 1,
+  "scoring_notes": [
+    "The pre-publication collector initially compared the positive decision text to a case-sensitive prefix-stripped fixture string. It was corrected to accept the same sentence with an initial capital before results were frozen; raw drafts, compiled proposals, and verifier outputs were unchanged."
+  ],
+  "study_status": "completed_with_runtime_metadata_trust_boundary_mutations"
+}

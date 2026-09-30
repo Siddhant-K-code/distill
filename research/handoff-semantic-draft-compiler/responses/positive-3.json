@@ -1,0 +1,27 @@
+{
+  "assistant_message_count": 7,
+  "assistant_messages": [
+    "I\u2019ll inspect only the copied request, then write the single required semantic draft.",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "raw_assistant_message_content_sha256": "86db06700a203247535dd413dc425211cce01ec9ce9f523483f02002948c423b",
+  "raw_content_hash_algorithm": "For each assistant.message in source order, hash ASCII decimal UTF-8 byte length, one colon byte, then exact UTF-8 data.content bytes.",
+  "run": "positive-3",
+  "sanitization": {
+    "assistant_message_content_modified": false,
+    "assistant_messages_omitted": 0,
+    "removed": [
+      "all non-assistant.message events",
+      "assistant message metadata outside data.content",
+      "tool requests and results",
+      "absolute paths and runtime configuration",
+      "usage, timing, opaque, and reasoning fields"
+    ]
+  },
+  "source_event_stream_sha256": "f382e7a40fae7ae968f0659444ff20147b3a6d3d88b5ca94bce811af16edc701"
+}
