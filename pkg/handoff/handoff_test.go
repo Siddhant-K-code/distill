@@ -80,6 +80,57 @@ func TestPrepareAndVerifyReviewPackage(t *testing.T) {
 	}
 }
 
+func TestVerifyCanonicalRequestWithDisposableAgentWorkspace(t *testing.T) {
+	root := copyPublicFixture(t, "brainstorming")
+	requestDirectory := filepath.Join(root, "request")
+	if _, err := Prepare(filepath.Join(root, "conversation.md"), filepath.Join(root, "docs"), requestDirectory); err != nil {
+		t.Fatal(err)
+	}
+
+	agentWorkspace := filepath.Join(root, "agent-workspace")
+	agentRequest := filepath.Join(agentWorkspace, "request")
+	copyPrivateTree(t, requestDirectory, agentRequest)
+	assertTreesEqual(t, requestDirectory, agentRequest)
+
+	traceDirectory := filepath.Join(agentWorkspace, ".agent-traces")
+	if err := os.MkdirAll(traceDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(traceDirectory, "meta.json"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	bundle, requestBytes, err := loadCurrentRequestBundle(t, filepath.Join(agentRequest, RequestFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal := Proposal{
+		SchemaVersion: ProposalSchemaVersion,
+		RequestID:     bundle.request.RequestID,
+		RequestSHA256: artifact.DigestBytes(requestBytes),
+		Outcome:       OutcomeNoDecision,
+		Route:         RequireReview,
+		Reason:        "The conversation explicitly deferred the decision.",
+		Candidates:    []Candidate{},
+	}
+	proposalDirectory := filepath.Join(agentWorkspace, "output")
+	if err := os.MkdirAll(proposalDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	proposalPath := filepath.Join(proposalDirectory, "proposal.json")
+	writeCanonical(t, proposalPath, proposal)
+
+	if _, err := verifyCurrentRequest(t,
+		filepath.Join(requestDirectory, RequestFileName),
+		proposalPath,
+		filepath.Join(root, "review"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	assertTreesEqual(t, requestDirectory, agentRequest)
+	assertPrivateArtifactTree(t, requestDirectory)
+}
+
 func TestNoDecisionProposal(t *testing.T) {
 	root := copyPublicFixture(t, "brainstorming")
 	requestDirectory := filepath.Join(root, "request")
@@ -1050,6 +1101,31 @@ func copyPublicFixture(t *testing.T, name string) string {
 		t.Fatal(err)
 	}
 	return destination
+}
+
+func copyPrivateTree(t *testing.T, source, destination string) {
+	t.Helper()
+	err := filepath.WalkDir(source, func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(source, filePath)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o700)
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o600)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func fixtureSourcePath(t *testing.T, name string) string {
