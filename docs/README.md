@@ -27,3 +27,5 @@
 
 - [Context Is a Build Artifact](../research/context-is-a-build-artifact/):
   preregistered decision-reliability design and local v2 aggregate result
+- [Handoff PR #112 repeatability](../research/handoff-repeatability-pr-112/):
+  frozen three-run internal repeatability result
