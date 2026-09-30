@@ -1,0 +1,6 @@
+{
+  "schema_version": "distill-handoff/semantic-draft-research/v1",
+  "outcome": "abstain",
+  "reason": "The conversation explicitly defers the cache decision until after benchmarking.",
+  "candidate": null
+}

@@ -1,0 +1,25 @@
+{
+  "assistant_message_count": 5,
+  "assistant_messages": [
+    "I\u2019ll inspect only the copied request, determine whether a documented decision exists, and write the single required JSON output.",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "raw_assistant_message_content_sha256": "0391a381b6802eb0d6f37dee44c82e5c9c518cd8c68f4fbf4c1b47be819c738f",
+  "raw_content_hash_algorithm": "For each assistant.message in source order, hash ASCII decimal UTF-8 byte length, one colon byte, then exact UTF-8 data.content bytes.",
+  "run": "negative-2",
+  "sanitization": {
+    "assistant_message_content_modified": false,
+    "assistant_messages_omitted": 0,
+    "removed": [
+      "all non-assistant.message events",
+      "assistant message metadata outside data.content",
+      "tool requests and results",
+      "absolute paths and runtime configuration",
+      "usage, timing, opaque, and reasoning fields"
+    ]
+  },
+  "source_event_stream_sha256": "2b5987c438a65dcaa254238025f272fb9066780771081e0b99e18c1c989d1268"
+}

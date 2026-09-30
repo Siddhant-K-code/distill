@@ -1,0 +1,17 @@
+{
+  "schema_version": "distill-handoff/receipt/v0alpha1",
+  "request_id": "eb613088a5e48b03b2f1cac9c47a6a6338f02dc859e3f3e6afd0b686cb36df47",
+  "request_sha256": "45d333595c146fcd8ade578f6015258dda8c57275b75352d63ca08f8c89fb4d2",
+  "proposal_sha256": "6e4c68db6188bbf1a3c9c42019f4bfb2acf54394193d78758fa0360c0b5e7cb7",
+  "outcome": "no_decision",
+  "route": "require_review",
+  "reason": "The conversation explicitly defers the cache decision until after benchmarking.",
+  "candidate_count": 0,
+  "candidates": [],
+  "review": {
+    "path": "review.md",
+    "sha256": "82a135ec776e68e12cab5a00c919658dbf9b0b376e07e9bb900fbbf90e49911e",
+    "bytes": 692
+  },
+  "patches": []
+}
