@@ -16,6 +16,9 @@ Handoff is currently an agent-independent CLI and file protocol. It is not an
 autonomous agent or a transparent Copilot, Claude Code, Codex, Cursor, or MCP
 integration: you run `prepare`, give its private bundle to the agent you already
 use, save that agent's `proposal.json`, and run `verify` yourself.
+Keep the prepared request immutable. If an agent writes workspace metadata, run
+it from a disposable parent containing a request copy and a separate proposal
+output, then verify the retained request against that external proposal.
 
 ```mermaid
 flowchart TD

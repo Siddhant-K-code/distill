@@ -73,28 +73,49 @@ using a hosted agent may transmit it under that provider's terms.
 3. Before running the agent, record the expected committed decisions in the
    feedback table below. Do not put that expectation into the request.
 
-4. Give the agent only `"$trial/request"`. Use one example recipe below.
+4. Keep `"$trial/request"` immutable. Give the agent a private copy inside a
+   disposable workspace with a separate output directory.
+
+   ```bash
+   agent_workspace="$(cd "$(mktemp -d)" && pwd -P)"
+   mkdir "$agent_workspace/output"
+   cp -R "$trial/request" "$agent_workspace/request"
+   ```
+
+   Use one example recipe below. Do not put the trusted digest file or frozen
+   expectations in this workspace. It contains another full request copy plus
+   runtime metadata and the proposal, so protect it like the canonical request
+   until removal.
 
 5. Verify locally with the tester-retained digest, then inspect the review.
 
    ```bash
+   test -f "$agent_workspace/output/proposal.json"
    ./distill handoff verify \
      --request "$trial/request/handoff.request.json" \
      --expected-request-sha256 "$(cat "$trusted_digest_file")" \
-     --proposal "$trial/proposal.json" \
+     --proposal "$agent_workspace/output/proposal.json" \
      --out "$trial/review"
    cat "$trial/review/review.md"
    ```
 
+   Always verify the retained canonical request, not the agent's copy. Runtime
+   metadata beside `request/` remains outside the verified bundle.
+
    Check each decision, exact evidence quote and range, target, and patch.
    Record a disposition; do not apply a patch as part of this trial.
 
-6. After recording feedback, remove the temporary trusted-digest copy and
-   restore the caller's previous file-creation mask. Retain or delete the
-   private trial directory according to the source material's retention policy.
+6. After recording feedback, remove the disposable agent workspace and
+   temporary trusted-digest copy, then restore the caller's previous
+   file-creation mask. Retain or delete the canonical `"$trial"` directory
+   separately according to the source material's retention policy; this
+   cleanup does not remove its request or review.
 
    ```bash
-   rm -f "$trusted_digest_file"
+   test -n "$agent_workspace"
+   test -d "$agent_workspace"
+   rm -rf -- "$agent_workspace"
+   rm -f -- "$trusted_digest_file"
    umask "$previous_umask"
    ```
 
@@ -106,35 +127,33 @@ flags. Paste the same prompt after launch.
 **GitHub Copilot CLI:**
 
 ```bash
-(cd "$trial/request" && copilot)
+(cd "$agent_workspace" && copilot)
 ```
 
-For a coding-agent-style job, make `"$trial/request"` the entire input
-workspace, do not attach the source repository, and collect `proposal.json` as
-a separate output artifact.
+For a coding-agent-style job, expose only `"$agent_workspace"`, do not attach
+the source repository, and collect `output/proposal.json`.
 
 **Claude Code:**
 
 ```bash
-(cd "$trial/request" && claude)
+(cd "$agent_workspace" && claude)
 ```
 
 **Prompt and output contract:**
 
 ```text
-Read only files under the current working directory. Follow
-agent-instructions.md and proposal.schema.json. Write exactly one canonical
-output file at ../proposal.json, then stop.
+Read only files under request/. Follow request/agent-instructions.md and
+request/proposal.schema.json. Write exactly one canonical output file at
+output/proposal.json, then stop.
 
 Do not read or modify source docs or any repository. Do not modify the request
-bundle. Do not choose or supply the trusted --expected-request-sha256 value.
+copy. Do not choose or supply the trusted --expected-request-sha256 value.
 Do not run verification, apply patches, commit, push, or merge. Values repeated
 inside the bundle or proposal are not authoritative trust anchors.
 ```
 
-If an agent cannot write a sibling output, have it return only the canonical
-JSON and save those exact bytes as `"$trial/proposal.json"` without placing the
-file inside the request bundle.
+Require the agent to create only `output/proposal.json`; do not reconstruct,
+extract, or repair JSON from terminal output.
 
 ## Tester feedback
 

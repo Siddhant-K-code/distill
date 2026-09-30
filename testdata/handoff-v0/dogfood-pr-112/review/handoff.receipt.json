@@ -1,0 +1,17 @@
+{
+  "schema_version": "distill-handoff/receipt/v0alpha1",
+  "request_id": "13acba266c76aaa8c9a36603ef00bbb1a043f8c052de6d97d83b0924a0828807",
+  "request_sha256": "3562acf55eb949695679e1fb7e6fd8d7809c78b342951d4563a7e7ec0f58ad35",
+  "proposal_sha256": "02984139c791fbbf70528eb754e7f29e7c1401c657e267d7b706c1c26d9aa9f9",
+  "outcome": "no_decision",
+  "route": "require_review",
+  "reason": "The conversation records a merged documentation-only change whose stated clarifications are already present in the frozen target; it contains no additional committed decision requiring a documentation patch.",
+  "candidate_count": 0,
+  "candidates": [],
+  "review": {
+    "path": "review.md",
+    "sha256": "f557065c8ca245c341219074dab9ebbf4ca3c3308339f8c4bac01dce07e79bda",
+    "bytes": 820
+  },
+  "patches": []
+}
