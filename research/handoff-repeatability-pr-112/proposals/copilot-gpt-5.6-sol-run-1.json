@@ -1,0 +1,9 @@
+{
+  "schema_version": "distill-handoff/proposal/v0alpha1",
+  "request_id": "13acba266c76aaa8c9a36603ef00bbb1a043f8c052de6d97d83b0924a0828807",
+  "request_sha256": "3562acf55eb949695679e1fb7e6fd8d7809c78b342951d4563a7e7ec0f58ad35",
+  "outcome": "no_decision",
+  "route": "require_review",
+  "reason": "The snapshot records a merged documentation-only change whose stated clarifications are already present in the frozen target; it contains no additional committed decision requiring a documentation patch.",
+  "candidates": []
+}

@@ -1,0 +1,213 @@
+{
+  "schema_name": "handoff-repeatability-pr-112",
+  "schema_version": 1,
+  "study_status": "completed_valid_negative_result",
+  "executed_at": "2026-09-30",
+  "frozen_inputs": {
+    "repository_baseline_merge": "a15a8462395cde8ea3b55dd2d367a7d89baf0497",
+    "corpus": "testdata/handoff-v0/dogfood-pr-112",
+    "request_id": "13acba266c76aaa8c9a36603ef00bbb1a043f8c052de6d97d83b0924a0828807",
+    "request_sha256": "3562acf55eb949695679e1fb7e6fd8d7809c78b342951d4563a7e7ec0f58ad35",
+    "expected_decisions": 4,
+    "expected_control_sha256": "cedf67293300b539e26ca8107f525bc0e462e53e7f2ec0697591395b4e028f0c",
+    "protocol_sha256": "d806f360fb4d844cf0257bc8d6a23398d45dbdcc7ed30d42706c3e368ac35611"
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_version": "1.0.87-0",
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "runs": 3,
+      "available_tools": [
+        "view",
+        "apply_patch"
+      ]
+    }
+  ],
+  "alternative_runtime_probe": {
+    "executed_condition": false,
+    "claude_code": {
+      "version": "2.1.222",
+      "authenticated": false
+    },
+    "ollama_installed": false,
+    "lm_studio_cli_installed": false,
+    "reason": "No genuinely available alternative met the frozen constraints."
+  },
+  "runs": [
+    {
+      "condition": "C1",
+      "run": 1,
+      "session_id": "a2fa56e2-d689-45d3-a9c6-b7ccf5c55445",
+      "start_time_utc": "2026-09-30T09:34:25Z",
+      "end_time_utc": "2026-09-30T09:35:01Z",
+      "cli_elapsed_ms": 36236,
+      "runtime_reported_session_ms": 32446,
+      "runtime_reported_api_ms": 18460,
+      "runtime_reported_output_tokens": 1220,
+      "runtime_reported_premium_requests": 0,
+      "monetary_cost": null,
+      "output_sha256": "05f0240e716bfb47d46129d8091c2f72d951f2a6b7b31cbbff761b2c5b5965fb",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "37f95436c72a2438f373ab1d54d13debeb2dc666c589eb257064f139c47f3415",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_seconds": 19,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    },
+    {
+      "condition": "C1",
+      "run": 2,
+      "session_id": "9ad26896-6832-4b13-8f9a-c3df13747c4c",
+      "start_time_utc": "2026-09-30T09:35:29Z",
+      "end_time_utc": "2026-09-30T09:36:05Z",
+      "cli_elapsed_ms": 35598,
+      "runtime_reported_session_ms": 32593,
+      "runtime_reported_api_ms": 24567,
+      "runtime_reported_output_tokens": 1280,
+      "runtime_reported_premium_requests": 0,
+      "monetary_cost": null,
+      "output_sha256": "a3049889e1412dcf77c395ee6186e4c2ab886e110482240bb86cd40db1c551d1",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "26e64165318843d005d8ab68ac6ec0287dede18f9bfc324ae3a2a204af4a259c",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_seconds": 20,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    },
+    {
+      "condition": "C1",
+      "run": 3,
+      "session_id": "9263883f-4fb6-4aea-9222-04acde3a36bb",
+      "start_time_utc": "2026-09-30T09:36:28Z",
+      "end_time_utc": "2026-09-30T09:37:12Z",
+      "cli_elapsed_ms": 44003,
+      "runtime_reported_session_ms": 40786,
+      "runtime_reported_api_ms": 28171,
+      "runtime_reported_output_tokens": 1800,
+      "runtime_reported_premium_requests": 0,
+      "monetary_cost": null,
+      "output_sha256": "c30d7777cd8462c48c875acfb483359f1f081b8081290f4ef5263ee88bcb61e8",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "097ccd244dac498b583ceea9baa50f5d1f572e29ece557a4700f3012478ceca4",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_seconds": 21,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    }
+  ],
+  "repeatability": {
+    "negative_runs": 3,
+    "invalid_runs": 0,
+    "possible_run_pairs": 3,
+    "byte_identical_output_pairs": 0,
+    "byte_identical_output_rate": 0,
+    "outcome_agreement_pairs": 3,
+    "outcome_agreement_rate": 1,
+    "candidate_set_agreement_pairs": 3,
+    "candidate_set_agreement_rate": 1,
+    "per_decision_selection_frequency": [
+      {
+        "decision": 1,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 2,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 3,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 4,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      }
+    ],
+    "verification_successes": 3,
+    "verification_success_rate": 1,
+    "review_seconds": [
+      19,
+      20,
+      21
+    ],
+    "review_seconds_median": 20,
+    "review_seconds_minimum": 19,
+    "review_seconds_maximum": 21
+  },
+  "aggregate_mutations": {
+    "scope": "proposal-agent changes during invocation; study evidence files excluded",
+    "request_copy": 0,
+    "canonical_request": 0,
+    "source_repository": 0,
+    "trust_boundary": 0
+  },
+  "claim_boundary": {
+    "descriptive_only": true,
+    "significance_claim": false,
+    "superiority_claim": false,
+    "adoption_claim": false,
+    "general_quality_claim": false
+  }
+}
