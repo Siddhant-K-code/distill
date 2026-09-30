@@ -1,11 +1,11 @@
-e0ae6caa27ed57a1d8dad1b5d10dc10623d67d0b268cf66af83063321832c4a1  ./README.md
+d137c41f5fa9bf11cea1365c4fba718fae50c0e7102638a036f070e1acceebe1  ./README.md
 f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3  ./canonical-drafts/negative-1.json
 f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3  ./canonical-drafts/negative-2.json
 5c15af8d15b9045340624ee0db956070a17b3903cced1b65362409e6e3b37510  ./canonical-drafts/negative-3.json
 e7b251e8c5754637e93fd87fcba4f1056d072df3795b1efcce129361b71f9a2b  ./canonical-drafts/positive-1.json
 fca6b008b57214404f7148c85238d0963673e9de1cc6747092923c4f0d77d6b1  ./canonical-drafts/positive-2.json
 1303a46824258f761d0bc85346d7eb9768effe693c0292eee85ef51028587725  ./canonical-drafts/positive-3.json
-a4f100c1f1291c5827f7b3f812c9722abd9528be9d6481128f0dc4eccaef0b7e  ./collect-results.py
+066e81697f9a1a5fb5d28d7ba579471882061eef4eb076e39bb45f716ef1fb49  ./collect-results.py
 fd5bd856f4bf9cdee49e2705b48fbdb369e80023cf720101457d59df9bad2311  ./compiler.go
 8ca47a0ebc9cf58cc40b9a88fbd6b8e7bd0e15a5cea982740188e50f44b85726  ./compiler_test.go
 f9623725db2902e59dcbe8dca20c19bb76bb2da5de1f01f6595016a1e6565da3  ./drafts/negative-1.json
@@ -30,7 +30,7 @@ ffb59d0e5f17c097da0aace19eb6acb9a83c075e49f8aa98a0d1228216ad3613  ./responses/ne
 8e41bf4cb11d2806654624d213386d0cfb5a9a86688378535b83dca7b1cdc3ff  ./responses/positive-1.json
 e87b4ed227a6c5ca6e634c4c0b16034e8956866206d837a7ea2a16728ca14415  ./responses/positive-2.json
 d33cf284fbdd535a445631236b77f24f483a9f96db37e5c1cc695bbb28104f3e  ./responses/positive-3.json
-fcee6b115025b0cd297c1e6b870f4cf28aaf4468cb6e043f82948fc2caa5352d  ./results.json
+119b2af941f5b3c950653fde91483faf279b8d87b75e9dc8186194a7d45bb40e  ./results.json
 0ace57dde84e76b540dc2a0da1015877f067bd1c2c8cf1c6ab849cc9b135a45c  ./reviews/negative-1/handoff.receipt.json
 491db6e59c2b44dc806f5279758bc0e5ff2e9e704aca1da7090ac264a06811f4  ./reviews/negative-1/review.md.bytes.json
 0ace57dde84e76b540dc2a0da1015877f067bd1c2c8cf1c6ab849cc9b135a45c  ./reviews/negative-2/handoff.receipt.json

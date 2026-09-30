@@ -3,7 +3,7 @@
     "canonical_request": 0,
     "request_copy": 0,
     "source_repository": 0,
-    "trust_boundary": 0
+    "trust_boundary": 36
   },
   "claim_boundary": {
     "adoption_claim": false,
@@ -195,8 +195,8 @@
         "required": 0
       },
       "zero_mutations": {
-        "observed": 0,
-        "passed": true,
+        "observed": 36,
+        "passed": false,
         "required": 0
       }
     },
@@ -207,10 +207,20 @@
     {
       "deviation": "The runtime created a six-path .agent-traces tree beside request/ and output/ inside each disposable workspace, while the frozen protocol said runtime metadata would remain outside that parent.",
       "impact": "The runtime-owned metadata contained no protected study material, was not a model output, did not alter request or output bytes, and was removed with each disposable workspace.",
-      "mutation_classification": "runtime_metadata_not_trust_boundary_mutation"
+      "mutation_classification": "trust_boundary_path_additions"
     }
   ],
   "publication_assessment": "useful_engineering_note",
+  "evidence_accounting_correction": {
+    "basis": "Preserve the frozen launcher's recorded .agent-traces path additions as trust-boundary mutations without changing retained trial evidence.",
+    "changed_post_study_artifacts": [
+      "README.md",
+      "SHA256SUMS",
+      "collect-results.py",
+      "results.json"
+    ],
+    "protected_trial_artifacts_changed": false
+  },
   "runs": [
     {
       "available_tools": [
@@ -236,7 +246,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 1,
       "ordinal": 1,
@@ -262,9 +272,17 @@
       "run": "positive-1",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.31373732376135372d306436332d3439.682eeffd95d5c9cb748e15eb2a596dea4089b18194e195f23cd5bc7d8ab3626e.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/17727a57-0d63-49/",
+          ".agent-traces/17727a57-0d63-49/events.ndjson",
+          ".agent-traces/17727a57-0d63-49/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -328,7 +346,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 2,
       "ordinal": 1,
@@ -352,9 +370,17 @@
       "run": "negative-1",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.62336564373132382d656136652d3431.15577ad8d4825f950eaee96993bc88de104c1d5276c36019eebf7f3ba65d2a8a.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/b3ed7128-ea6e-41/",
+          ".agent-traces/b3ed7128-ea6e-41/events.ndjson",
+          ".agent-traces/b3ed7128-ea6e-41/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -412,7 +438,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 3,
       "ordinal": 2,
@@ -438,9 +464,17 @@
       "run": "positive-2",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.31633932636239622d393739342d3461.228d38c4d4c19e7578c6ec0ab80e849a15db706ab01c84dec07b6ac3160e10af.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/1c92cb9b-9794-4a/",
+          ".agent-traces/1c92cb9b-9794-4a/events.ndjson",
+          ".agent-traces/1c92cb9b-9794-4a/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -504,7 +538,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 4,
       "ordinal": 2,
@@ -528,9 +562,17 @@
       "run": "negative-2",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.37333665326437382d303434312d3433.12144b716d277f5136a1f5e02773d85028c03210214047e91bc26823294d79af.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/736e2d78-0441-43/",
+          ".agent-traces/736e2d78-0441-43/events.ndjson",
+          ".agent-traces/736e2d78-0441-43/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -588,7 +630,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 5,
       "ordinal": 3,
@@ -614,9 +656,17 @@
       "run": "positive-3",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.65626136666437362d373634302d3431.6c1b2a9b6e57fe13ce37e372d2acf6b4ee7ac9d73e06de4b8ece23b26c7512d2.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/eba6fd76-7640-41/",
+          ".agent-traces/eba6fd76-7640-41/events.ndjson",
+          ".agent-traces/eba6fd76-7640-41/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -680,7 +730,7 @@
         "canonical_request": 0,
         "request_copy": 0,
         "source_repository": 0,
-        "trust_boundary": 0
+        "trust_boundary": 6
       },
       "order_position": 6,
       "ordinal": 3,
@@ -704,9 +754,17 @@
       "run": "negative-3",
       "runtime": "GitHub Copilot CLI",
       "runtime_metadata": {
-        "classified_as_mutation": false,
-        "reason": "Runtime-owned .agent-traces metadata contained no protected study material and was not a model output.",
-        "workspace_path_count": 6
+        "classified_as_mutation": true,
+        "reason": "The frozen launcher recorded these runtime-owned .agent-traces paths as trust-boundary additions. They contained no protected study material and were not model fabrication.",
+        "workspace_path_count": 6,
+        "workspace_paths": [
+          ".agent-traces/",
+          ".agent-traces/.pending-calls.v2.copilot.30613633316236372d316631332d3433.e6d881c10c185ecf798f1ce1a4240207c28da7cef2043a5b197a5a78a3acec50.json",
+          ".agent-traces/.store.lock",
+          ".agent-traces/0a631b67-1f13-43/",
+          ".agent-traces/0a631b67-1f13-43/events.ndjson",
+          ".agent-traces/0a631b67-1f13-43/meta.json"
+        ]
       },
       "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
       "runtime_version": "1.0.90-5",
@@ -747,5 +805,5 @@
   "scoring_notes": [
     "The pre-publication collector initially compared the positive decision text to a case-sensitive prefix-stripped fixture string. It was corrected to accept the same sentence with an initial capital before results were frozen; raw drafts, compiled proposals, and verifier outputs were unchanged."
   ],
-  "study_status": "completed_with_runtime_metadata_placement_deviation"
+  "study_status": "completed_with_runtime_metadata_trust_boundary_mutations"
 }

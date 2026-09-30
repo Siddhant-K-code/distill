@@ -21,23 +21,26 @@ construction gap while preserving negative abstention:
 - All 6 retained drafts replayed to byte-identical proposal bytes, candidate
   IDs, and patch identities.
 - Fabricated candidates, unsupported claims, request-copy mutations,
-  canonical-request mutations, source-repository mutations, and trust-boundary
-  mutations were all zero.
+  canonical-request mutations, and source-repository mutations were all zero.
+- The frozen launcher recorded 6 trust-boundary path additions per run, 36 in
+  aggregate, from runtime-owned `.agent-traces` metadata.
 
-The preregistered productization threshold nevertheless failed. Directly
+The preregistered productization threshold failed two gates. First, directly
 reported model requests increased from 27 in the prior capability-control study
 to 36 here, a 33.3 percent increase and more than the frozen 25 percent
-material-regression limit. The other directly comparable totals did not
-regress: input tokens fell from 150,489 to 148,524, output tokens fell from
-8,764 to 3,217, and nano-AIU fell from 41,781,200,000 to 24,892,260,000.
-The current runtime did not directly report session duration, so none is
-estimated.
+material-regression limit. Second, the frozen zero-mutations gate observed 36
+trust-boundary path additions instead of zero. The other directly comparable
+totals did not regress: input tokens fell from 150,489 to 148,524, output
+tokens fell from 8,764 to 3,217, and nano-AIU fell from 41,781,200,000 to
+24,892,260,000. The current runtime did not directly report session duration,
+so none is estimated.
 
 The strongest honest thesis is therefore narrow: for one positive and one
 negative public fixture, exact semantic quotes and a deterministic compiler
 converted a previously observed construction bottleneck into 3 of 3 valid
 positive candidates without losing 3 of 3 negative abstentions, but the
-intervention did not satisfy its own cost gate.
+intervention failed both its cost gate and its zero trust-boundary-mutation
+gate.
 
 ## Frozen design
 
@@ -76,12 +79,12 @@ canonical request, source repository, and trust boundary.
 
 | Order | Run | Semantic result | Valid | Candidate | CLI ms | Requests | Input | Output | Mutations |
 |---:|---|---|---|---|---:|---:|---:|---:|---|
-| 1 | `positive-1` | expected intent | yes | `decision_179c38986244e95383ae56153d464e8328b2e3b55419716a1070339ac75c429f` | 28,426 | 7 | 29,221 | 692 | 0/0/0/0 |
-| 2 | `negative-1` | correct abstention | yes | none | 33,772 | 5 | 20,295 | 381 | 0/0/0/0 |
-| 3 | `positive-2` | expected intent | yes | `decision_ca5c754c61dcc9a2b18a5c5e72f5e82920746f1ddbc91d6ff88bf5fe943573e6` | 41,815 | 7 | 29,225 | 706 | 0/0/0/0 |
-| 4 | `negative-2` | correct abstention | yes | none | 20,105 | 5 | 20,389 | 411 | 0/0/0/0 |
-| 5 | `positive-3` | expected intent | yes | `decision_6c0bb5bec4490ae8972a87407345b532683d0ba4f30bf0305c3cf83657d95ed4` | 24,975 | 7 | 29,114 | 668 | 0/0/0/0 |
-| 6 | `negative-3` | correct abstention | yes | none | 21,048 | 5 | 20,280 | 359 | 0/0/0/0 |
+| 1 | `positive-1` | expected intent | yes | `decision_179c38986244e95383ae56153d464e8328b2e3b55419716a1070339ac75c429f` | 28,426 | 7 | 29,221 | 692 | 0/0/0/6 |
+| 2 | `negative-1` | correct abstention | yes | none | 33,772 | 5 | 20,295 | 381 | 0/0/0/6 |
+| 3 | `positive-2` | expected intent | yes | `decision_ca5c754c61dcc9a2b18a5c5e72f5e82920746f1ddbc91d6ff88bf5fe943573e6` | 41,815 | 7 | 29,225 | 706 | 0/0/0/6 |
+| 4 | `negative-2` | correct abstention | yes | none | 20,105 | 5 | 20,389 | 411 | 0/0/0/6 |
+| 5 | `positive-3` | expected intent | yes | `decision_6c0bb5bec4490ae8972a87407345b532683d0ba4f30bf0305c3cf83657d95ed4` | 24,975 | 7 | 29,114 | 668 | 0/0/0/6 |
+| 6 | `negative-3` | correct abstention | yes | none | 21,048 | 5 | 20,280 | 359 | 0/0/0/6 |
 
 All three positive proposals used patch SHA-256
 `645e3cd036647c78073739e00b11e09e9efb34bea701dd248b6a5522e4a97f23`,
@@ -103,7 +106,8 @@ was 3 of 3.
 | Positive verifier-valid expected candidate | at least 2/3 | 3/3 | yes |
 | Negative verifier-valid abstention | 3/3 | 3/3 | yes |
 | Fabricated candidates | 0 | 0 | yes |
-| Four mutation classes | 0 | 0 | yes |
+| Request-copy, canonical-request, and source-repository mutations | 0 | 0 | yes |
+| Trust-boundary path additions | 0 | 36 | no |
 | Byte-identical replay and identities | 6/6 | 6/6 | yes |
 | No material cost or review regression | true | false | no |
 
@@ -117,11 +121,21 @@ The CLI created a six-path runtime-owned `.agent-traces` tree beside
 said runtime metadata would remain outside that parent. The trace tree
 contained no canonical request, trusted digest, source repository, other-run
 data, expected answer, compiler result, or verifier result. It did not change
-the request copy or output and was removed with the disposable workspace. It
-is recorded as a metadata-placement deviation, not a model output or
-trust-boundary mutation. The user-specified isolation pattern explicitly
-allowed runtime metadata beside the request and output, but the stricter
-protocol sentence still makes this a preregistration deviation.
+the request copy or output and was removed with the disposable workspace. The
+frozen launcher nevertheless recorded every path as a trust-boundary addition,
+so the retained accounting is 6 mutations per run and 36 in aggregate. The
+runtime ownership and harmless contents are impact analysis only: they do not
+override the mutation count or turn the paths into evidence of model
+fabrication. Removing the disposable traces after retention does not change
+the failed gate.
+
+This evidence-accounting correction changes only [this report](README.md),
+[results.json](results.json), [collect-results.py](collect-results.py), and
+[SHA256SUMS](SHA256SUMS). The protocol, prompt, semantic schema, frozen
+manifest, raw drafts, canonical drafts, compiled proposals, receipts, encoded
+reviews and patches, and response extracts remain byte-identical to the
+published trial evidence. All frozen artifact hashes listed above remain
+unchanged.
 
 The first pre-publication collector also used an overly literal
 case-sensitive comparison for the positive decision text. Before results were
@@ -173,15 +187,16 @@ path, credential, or disposable trace is committed.
    guarantee.
 4. Token and nano-AIU totals can improve while another frozen cost proxy gets
    worse. The model-request count, not tokens, caused this threshold failure.
-5. Runtime-owned trace placement needs an explicit preregistered allowlist and
-   location check even when the model tool allowlist is correct.
+5. Runtime ownership and harmless content can reduce impact without erasing a
+   preregistered trust-boundary mutation.
 
 ## What failed
 
 - The no-material-regression gate failed because 36 model requests exceeded
   the frozen maximum of 33.75.
-- Runtime trace metadata appeared inside the disposable workspace rather than
-  outside it as the frozen protocol stated.
+- The zero-mutations gate failed because runtime trace metadata added 6
+  trust-boundary paths per run, 36 in aggregate, inside the disposable
+  workspaces.
 - The first collector needed a documented pre-publication scoring correction.
 - One initial compiler timing value was lost; proposal and replay evidence were
   not lost.
@@ -195,9 +210,12 @@ fixtures, or general model quality.
 
 Frozen assessment: `useful_engineering_note`. The result meets that criterion
 because at least one verifier-valid expected positive candidate was recovered,
-all abstention and trust guarantees were preserved, and the cost failure is
-directly inspectable. It does not meet the study's `publishable_result`
-criterion because the complete productization threshold did not pass.
+and the frozen criterion does not require every productization gate to pass for
+this lower publication category. Negative abstention, request-copy integrity,
+canonical-request integrity, and source-repository integrity were preserved,
+but the trust-boundary and cost gates failed. It does not meet the study's
+`publishable_result` criterion because the complete productization threshold
+did not pass.
 
 A factual engineering-note outline:
 
@@ -207,7 +225,7 @@ A factual engineering-note outline:
    verifier.
 4. Six frozen runs: 3 of 3 positive candidates and 3 of 3 abstentions.
 5. Determinism: exact replay, stable patch outcome, and candidate identity.
-6. Failure: higher model-request count and runtime metadata placement.
+6. Failure: higher model-request count and 36 trust-boundary path additions.
 7. Next experiment: reduce request count without weakening the contract.
 
 Three factual title options:

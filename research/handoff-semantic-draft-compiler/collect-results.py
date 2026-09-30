@@ -235,6 +235,9 @@ def collect(args: argparse.Namespace) -> None:
             for path in runtime_metadata_paths
         ):
             raise RuntimeError(f"unexpected workspace additions for {name}")
+        recorded_trust_boundary_mutations = execution_run["mutations"]["trust_boundary"]
+        if recorded_trust_boundary_mutations != len(runtime_metadata_paths):
+            raise RuntimeError(f"trust-boundary mutation count mismatch for {name}")
 
         score: dict[str, Any]
         if condition == "positive":
@@ -347,14 +350,16 @@ def collect(args: argparse.Namespace) -> None:
                 "request_copy": execution_run["mutations"]["request_copy"],
                 "canonical_request": execution_run["mutations"]["canonical_request"],
                 "source_repository": execution_run["mutations"]["source_repository"],
-                "trust_boundary": 0,
+                "trust_boundary": recorded_trust_boundary_mutations,
             },
             "runtime_metadata": {
                 "workspace_path_count": len(runtime_metadata_paths),
-                "classified_as_mutation": False,
+                "workspace_paths": runtime_metadata_paths,
+                "classified_as_mutation": True,
                 "reason": (
-                    "Runtime-owned .agent-traces metadata contained no protected study "
-                    "material and was not a model output."
+                    "The frozen launcher recorded these runtime-owned .agent-traces "
+                    "paths as trust-boundary additions. They contained no protected "
+                    "study material and were not model fabrication."
                 ),
             },
             "response_evidence": {
@@ -450,7 +455,7 @@ def collect(args: argparse.Namespace) -> None:
     results = {
         "schema_name": "handoff-semantic-draft-compiler-study",
         "schema_version": 1,
-        "study_status": "completed_with_runtime_metadata_placement_deviation",
+        "study_status": "completed_with_runtime_metadata_trust_boundary_mutations",
         "executed_at": "2026-09-30",
         "frozen_inputs": {
             "repository_baseline": execution["repository_baseline"],
@@ -493,7 +498,7 @@ def collect(args: argparse.Namespace) -> None:
                     "was not a model output, did not alter request or output bytes, and "
                     "was removed with each disposable workspace."
                 ),
-                "mutation_classification": "runtime_metadata_not_trust_boundary_mutation",
+                "mutation_classification": "trust_boundary_path_additions",
             }
         ],
         "aggregate_mutations": aggregate_mutations,
@@ -589,6 +594,19 @@ def collect(args: argparse.Namespace) -> None:
             "disposition": "threshold_passed" if threshold_passed else "threshold_failed",
         },
         "publication_assessment": "useful_engineering_note",
+        "evidence_accounting_correction": {
+            "basis": (
+                "Preserve the frozen launcher's recorded .agent-traces path additions "
+                "as trust-boundary mutations without changing retained trial evidence."
+            ),
+            "changed_post_study_artifacts": [
+                "README.md",
+                "SHA256SUMS",
+                "collect-results.py",
+                "results.json",
+            ],
+            "protected_trial_artifacts_changed": False,
+        },
         "scoring_notes": [
             (
                 "The pre-publication collector initially compared the positive decision "
