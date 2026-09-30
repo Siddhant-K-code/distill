@@ -1,0 +1,304 @@
+{
+  "schema_name": "handoff-temporal-state-guard-pr-112",
+  "schema_version": 1,
+  "study_status": "completed_valid_negative_result",
+  "executed_at": "2026-09-30",
+  "frozen_inputs": {
+    "repository_baseline_merge": "151ea33828180bf4dc356f38a853deea80c25ddb",
+    "historical_control": "research/handoff-repeatability-pr-112",
+    "corpus": "testdata/handoff-v0/dogfood-pr-112",
+    "request_id": "13acba266c76aaa8c9a36603ef00bbb1a043f8c052de6d97d83b0924a0828807",
+    "request_sha256": "3562acf55eb949695679e1fb7e6fd8d7809c78b342951d4563a7e7ec0f58ad35",
+    "expected_decisions": 4,
+    "expected_control_sha256": "cedf67293300b539e26ca8107f525bc0e462e53e7f2ec0697591395b4e028f0c",
+    "source_conversation_sha256": "6b78ca03b7272dc3e204545ec87224726174a5bcf5e28f8af4e45926e633b996",
+    "target_document_sha256": "d265069feb86500a6744f2fbf2d98f6caeb2fa895f8987bcc123ee45bc80ed0e",
+    "proposal_schema_sha256": "a0cb1730ea215fa276774546f245d2994fa3d6a35879b8a806711c3ef09aea2f",
+    "protocol_sha256": "9301e0b5a74dcdd0ee4b41de4aab5900871e80abf9123d1ef6be36e4e62849ac",
+    "prompt_sha256": "7bf3411271765ac9b86c0991b8deba94b2c7700c05e2c764dccc07537fcc872d"
+  },
+  "intervention": {
+    "condition": "temporal_state_guard",
+    "sentence": "Treat the bundled target bytes as the only evidence of current document state; conversation claims that work was merged, completed, or applied do not prove the bundled target already contains it.",
+    "runs": 3,
+    "runtime": "GitHub Copilot CLI",
+    "runtime_version": "1.0.87-0",
+    "pinned_runtime_binary": {
+      "sha256": "cdfc0f52ad56e03e72f6b944ac9ee5e3a964042fc7987dadc2e5e38430c1eabd",
+      "scope": [
+        2,
+        3
+      ]
+    },
+    "model": "gpt-5.6-sol",
+    "model_selected_explicitly": true,
+    "available_tools": [
+      "view",
+      "apply_patch"
+    ],
+    "custom_instructions_disabled": true,
+    "builtin_mcp_servers_disabled": true
+  },
+  "runs": [
+    {
+      "run": 1,
+      "session_id": "25ab5953-f4d4-4e14-bd1c-f9ed7c2bcd2e",
+      "start_time_utc": "2026-09-30T10:21:48Z",
+      "end_time_utc": "2026-09-30T10:23:16Z",
+      "cli_elapsed_ms": 87846,
+      "runtime_reported_session_ms": 85193,
+      "runtime_reported_api_ms": 78586,
+      "runtime_reported_model_requests": 5,
+      "runtime_reported_user_requests": 1,
+      "runtime_reported_input_tokens": 35605,
+      "runtime_reported_uncached_input_tokens": 14101,
+      "runtime_reported_cache_read_tokens": 21504,
+      "runtime_reported_cache_write_tokens": 0,
+      "runtime_reported_output_tokens": 4866,
+      "runtime_reported_reasoning_tokens": 3960,
+      "runtime_reported_premium_request_cost": 1,
+      "runtime_reported_total_nano_aiu": 16232560000,
+      "monetary_cost": null,
+      "output_file_count": 1,
+      "output_sha256": "5e7c4c9df1fcf70e4640f4e071158b4f32d57235747edefe1ac84977f431452f",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "db31f28f15f50f5db06d2e8e9f8848f4938a072e73b969c29dc8b2ce4db83793",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "fabricated_candidates": 0,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_ms": 16266,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    },
+    {
+      "run": 2,
+      "session_id": "4ca1604f-2103-4bbf-a9b6-5d13ce3201dc",
+      "start_time_utc": "2026-09-30T10:24:47Z",
+      "end_time_utc": "2026-09-30T10:25:44Z",
+      "cli_elapsed_ms": 56696,
+      "runtime_reported_session_ms": 55416,
+      "runtime_reported_api_ms": 49067,
+      "runtime_reported_model_requests": 5,
+      "runtime_reported_user_requests": 1,
+      "runtime_reported_input_tokens": 33286,
+      "runtime_reported_uncached_input_tokens": 17926,
+      "runtime_reported_cache_read_tokens": 15360,
+      "runtime_reported_cache_write_tokens": 0,
+      "runtime_reported_output_tokens": 2500,
+      "runtime_reported_reasoning_tokens": 1576,
+      "runtime_reported_premium_request_cost": 1,
+      "runtime_reported_total_nano_aiu": 12784800000,
+      "monetary_cost": null,
+      "output_file_count": 1,
+      "output_sha256": "0c5b667bb27ddd25cdbe18621d1b5961d061b8e60221033d97ade73990944629",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "05e632794312198c1783e535ba45b08e9130a1f8ffc69c021480fda875b2ab55",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "fabricated_candidates": 0,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_ms": 18585,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    },
+    {
+      "run": 3,
+      "session_id": "5479ba23-8172-49f8-9c04-34e673bd8fdb",
+      "start_time_utc": "2026-09-30T10:25:59Z",
+      "end_time_utc": "2026-09-30T10:26:39Z",
+      "cli_elapsed_ms": 40260,
+      "runtime_reported_session_ms": 38921,
+      "runtime_reported_api_ms": 32636,
+      "runtime_reported_model_requests": 5,
+      "runtime_reported_user_requests": 1,
+      "runtime_reported_input_tokens": 32828,
+      "runtime_reported_uncached_input_tokens": 14908,
+      "runtime_reported_cache_read_tokens": 17920,
+      "runtime_reported_cache_write_tokens": 0,
+      "runtime_reported_output_tokens": 2090,
+      "runtime_reported_reasoning_tokens": 1203,
+      "runtime_reported_premium_request_cost": 1,
+      "runtime_reported_total_nano_aiu": 10860000000,
+      "monetary_cost": null,
+      "output_file_count": 1,
+      "output_sha256": "515c77ba1a4d042a90297d2e29a2bb365c0b447978ea15f0a0c30db848e07046",
+      "protocol_valid": true,
+      "verification_success": true,
+      "verification_receipt_sha256": "fd32eb41bbd1f0c4e7306174ba66c940bda2a1797707240c808eaf26a34e1da2",
+      "classification": "valid_protocol_false_negative",
+      "outcome": "no_decision",
+      "candidates": 0,
+      "candidate_ids": [],
+      "selected_expected_decisions": [],
+      "decision_recall": {
+        "selected": 0,
+        "expected": 4,
+        "rate": 0
+      },
+      "unsupported_claims": 1,
+      "fabricated_candidates": 0,
+      "exact_evidence_validity": "none_supplied",
+      "patch_disposition": "not_supplied",
+      "review_ms": 15483,
+      "mutations": {
+        "request_copy": 0,
+        "canonical_request": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      }
+    }
+  ],
+  "intervention_aggregate": {
+    "negative_runs": 3,
+    "invalid_runs": 0,
+    "runs_recovering_at_least_one_expected_decision": 0,
+    "verification_successes": 3,
+    "verification_success_rate": 1,
+    "unsupported_claims": 3,
+    "fabricated_candidates": 0,
+    "possible_run_pairs": 3,
+    "byte_identical_output_pairs": 0,
+    "byte_identical_output_rate": 0,
+    "outcome_agreement_pairs": 3,
+    "outcome_agreement_rate": 1,
+    "candidate_set_agreement_pairs": 3,
+    "candidate_set_agreement_rate": 1,
+    "per_decision_selection_frequency": [
+      {
+        "decision": 1,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 2,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 3,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      },
+      {
+        "decision": 4,
+        "selected_runs": 0,
+        "total_runs": 3,
+        "rate": 0
+      }
+    ],
+    "review_ms": [
+      16266,
+      18585,
+      15483
+    ],
+    "review_ms_median": 16266,
+    "review_ms_minimum": 15483,
+    "review_ms_maximum": 18585,
+    "runtime_reported_totals": {
+      "input_tokens": 101719,
+      "uncached_input_tokens": 46935,
+      "cache_read_tokens": 54784,
+      "cache_write_tokens": 0,
+      "output_tokens": 9456,
+      "reasoning_tokens": 6739,
+      "premium_request_cost": 3,
+      "total_nano_aiu": 39877360000,
+      "api_ms": 160289,
+      "session_ms": 179530
+    }
+  },
+  "historical_control": {
+    "runs": 3,
+    "verification_successes": 3,
+    "runs_recovering_at_least_one_expected_decision": 0,
+    "per_run_decision_recall": [
+      0,
+      0,
+      0
+    ],
+    "unsupported_claims": 3,
+    "fabricated_candidates": 0,
+    "mutations": 0,
+    "outcomes": [
+      "no_decision",
+      "no_decision",
+      "no_decision"
+    ]
+  },
+  "historical_comparison": {
+    "decision_recovery_change": "none_observed",
+    "verification_change": "none_observed",
+    "unsupported_claim_change": "none_observed",
+    "mutation_change": "none_observed",
+    "interpretation": "The guard did not change the primary decision-recovery result in this three-run corpus."
+  },
+  "productization_threshold": {
+    "at_least_two_runs_recover_a_decision": {
+      "required": 2,
+      "observed": 0,
+      "passed": false
+    },
+    "no_fabricated_candidate_or_trust_boundary_mutation": {
+      "passed": true
+    },
+    "at_least_two_proposals_verify": {
+      "required": 2,
+      "observed": 3,
+      "passed": true
+    },
+    "overall_passed": false,
+    "disposition": "no_product_change"
+  },
+  "aggregate_mutations": {
+    "request_copy": 0,
+    "canonical_request": 0,
+    "source_repository": 0,
+    "trust_boundary": 0
+  },
+  "non_run_runtime_event": {
+    "description": "After run 1, the launcher advanced to 1.0.90-5. A pre-run version gate exited before run 2 made a model call. Runs 2 and 3 used the retained 1.0.87-0 executable pinned by version and SHA-256.",
+    "model_invocation": false,
+    "counted_as_run": false
+  },
+  "claim_boundary": {
+    "descriptive_only": true,
+    "significance_claim": false,
+    "superiority_claim": false,
+    "productization_claim": false,
+    "general_quality_claim": false
+  }
+}
