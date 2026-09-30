@@ -1,0 +1,9 @@
+{
+  "schema_version": "distill-handoff/proposal/v0alpha1",
+  "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+  "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38",
+  "outcome": "no_decision",
+  "route": "require_review",
+  "reason": "No decision candidate is proposed.",
+  "candidates": []
+}
