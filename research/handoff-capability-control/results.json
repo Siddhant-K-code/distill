@@ -1,0 +1,583 @@
+{
+  "aggregate_mutations": {
+    "canonical_request": 0,
+    "request_copy": 0,
+    "source_repository": 0,
+    "trust_boundary": 0
+  },
+  "capability_threshold": {
+    "negative_verifier_valid_no_decision": {
+      "observed": 3,
+      "passed": true,
+      "required": 2
+    },
+    "overall_passed": false,
+    "positive_verifier_valid_expected_candidate": {
+      "observed": 0,
+      "passed": false,
+      "required": 2
+    },
+    "zero_fabricated_positive_candidates": {
+      "observed": 0,
+      "passed": true
+    },
+    "zero_negative_false_positive_candidates": {
+      "observed": 0,
+      "passed": true
+    },
+    "zero_trust_boundary_mutations": {
+      "observed": 0,
+      "passed": true
+    }
+  },
+  "claim_boundary": {
+    "adoption_claim": false,
+    "descriptive_only": true,
+    "general_quality_claim": false,
+    "significance_claim": false,
+    "superiority_claim": false
+  },
+  "classification_basis": {
+    "description": "Two positive CLI responses recognized the retry decision, but no positive run produced a candidate and one produced no output.",
+    "positive_extraction_text_runs": [
+      {
+        "artifact_path": "responses/positive-1.json",
+        "artifact_sha256": "ff9448fef497eac3f22f4901370f308377489dff42c116e9b94e5c4419e477dc",
+        "raw_assistant_message_content_sha256": "c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56",
+        "run": "positive-1",
+        "source_event_stream_sha256": "c941c9f812081e26922d690535996330ac4f6a8190cde8a215ba9c86905075b8",
+        "verbatim_message_ordinal": 8
+      },
+      {
+        "artifact_path": "responses/positive-3.json",
+        "artifact_sha256": "51fea31b437f358e211e82ec157529f5f6d4a1dd72c4bcca21e7e878013caed3",
+        "raw_assistant_message_content_sha256": "ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078",
+        "run": "positive-3",
+        "source_event_stream_sha256": "739d2c9737320ebc64c6e1f39dbce61a76f57c4406533e9b21f5412fbceb5e33",
+        "verbatim_message_ordinal": 3
+      }
+    ]
+  },
+  "diagnostic_classification": "construction_bottleneck_observed",
+  "executed_at": "2026-09-30",
+  "execution": {
+    "automatic_updates_disabled": true,
+    "available_tools": [
+      "view",
+      "apply_patch"
+    ],
+    "builtin_mcp_servers_disabled": true,
+    "custom_instructions_disabled": true,
+    "model": "gpt-5.6-sol",
+    "model_selected_explicitly": true,
+    "retries": 0,
+    "run_order": [
+      "positive-1",
+      "negative-1",
+      "positive-2",
+      "negative-2",
+      "positive-3",
+      "negative-3"
+    ],
+    "runs_per_condition": 3,
+    "runtime": "GitHub Copilot CLI",
+    "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+    "runtime_version": "1.0.90-5",
+    "single_shot": true
+  },
+  "frozen_inputs": {
+    "compatible_dependency_merge": "b5b246a",
+    "negative": {
+      "expected_proposal_sha256": "229cc252494de40b8135e0c94c94f6eef1002651c7357270d7901cf55e61ba46",
+      "fixture": "testdata/handoff-v0/brainstorming",
+      "request_id": "eb613088a5e48b03b2f1cac9c47a6a6338f02dc859e3f3e6afd0b686cb36df47",
+      "request_sha256": "45d333595c146fcd8ade578f6015258dda8c57275b75352d63ca08f8c89fb4d2"
+    },
+    "positive": {
+      "expected_proposal_sha256": "a1212ebc3ac7ab49a6f9695956ee7945ebd9243e6d73f87945bb7acab06605e5",
+      "fixture": "testdata/handoff-v0/retry-policy",
+      "request_id": "94730d11355f823740c1a4d9a7ff73c8841bc6c0038e8f6ac1c0d57829a75487",
+      "request_sha256": "cd32864f9e42b44e0341bb9199dabb28a032103b8e2d9e9b4f4c19d61d3aea38"
+    },
+    "prompt_sha256": "ac2d97ead6d5e97e8134477ad5e4a358a87fb12479c85846325639ea7901e25c",
+    "proposal_schema_sha256": "a0cb1730ea215fa276774546f245d2994fa3d6a35879b8a806711c3ef09aea2f",
+    "protocol_sha256": "adf2730663c1c6ecd3c0fe7a7567c886b923efa29dc8c2c3536f31089e2bd94b",
+    "repository_baseline": "167212e42e360fadc8b17e8f079a2b4f0f7e3411"
+  },
+  "missing_raw_proposals": [
+    {
+      "reason": "The invocation exited successfully without writing output/proposal.json.",
+      "run": "positive-2"
+    }
+  ],
+  "negative_aggregate": {
+    "byte_identical_output_agreement": {
+      "agreeing_pairs": 0,
+      "possible_pairs": 3,
+      "rate": 0.0
+    },
+    "candidate_set_agreement": {
+      "agreeing_pairs": 3,
+      "possible_pairs": 3,
+      "rate": 1.0
+    },
+    "correct_abstentions": 3,
+    "directly_reported_totals": {
+      "api_ms": 67260,
+      "cache_read_tokens": 61952,
+      "cache_write_tokens": 0,
+      "input_tokens": 88113,
+      "model_requests": 16,
+      "monetary_cost": null,
+      "output_tokens": 3093,
+      "premium_request_cost": 3,
+      "reasoning_tokens": 678,
+      "session_ms": 83022,
+      "total_nano_aiu": 19128480000,
+      "uncached_input_tokens": 26161,
+      "user_requests": 3
+    },
+    "false_positive_candidates": 0,
+    "invalid_runs": 0,
+    "outcome_agreement": {
+      "agreeing_pairs": 3,
+      "possible_pairs": 3,
+      "rate": 1.0
+    },
+    "review_ms": [
+      2,
+      1,
+      1
+    ],
+    "review_ms_maximum": 2,
+    "review_ms_median": 1,
+    "review_ms_minimum": 1,
+    "verification_successes": 3
+  },
+  "positive_aggregate": {
+    "byte_identical_output_agreement": {
+      "agreeing_pairs": 0,
+      "possible_pairs": 3,
+      "rate": 0.0
+    },
+    "candidate_set_agreement": {
+      "agreeing_pairs": 1,
+      "possible_pairs": 3,
+      "rate": 0.3333333333333333
+    },
+    "directly_reported_totals": {
+      "api_ms": 91546,
+      "cache_read_tokens": 37888,
+      "cache_write_tokens": 0,
+      "input_tokens": 62376,
+      "model_requests": 11,
+      "monetary_cost": null,
+      "output_tokens": 5671,
+      "premium_request_cost": 3,
+      "reasoning_tokens": 3881,
+      "session_ms": 108756,
+      "total_nano_aiu": 22652720000,
+      "uncached_input_tokens": 24488,
+      "user_requests": 3
+    },
+    "expected_retry_decision_recoveries": 0,
+    "fabricated_candidates": 0,
+    "invalid_runs": 1,
+    "outcome_agreement": {
+      "agreeing_pairs": 1,
+      "possible_pairs": 3,
+      "rate": 0.3333333333333333
+    },
+    "positive_extraction_text_runs": 2,
+    "review_ms": [
+      2,
+      1,
+      2
+    ],
+    "review_ms_maximum": 2,
+    "review_ms_median": 2,
+    "review_ms_minimum": 1,
+    "unsupported_claims": 1,
+    "verification_successes": 2
+  },
+  "retained_raw_proposals": [
+    "proposals/positive-1.json",
+    "proposals/negative-1.json",
+    "proposals/negative-2.json",
+    "proposals/positive-3.json",
+    "proposals/negative-3.json"
+  ],
+  "retained_response_artifacts": [
+    "responses/positive-1.json",
+    "responses/positive-3.json"
+  ],
+  "runs": [
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": true,
+      "cli_elapsed_ms": 56760,
+      "condition": "positive",
+      "directly_reported": {
+        "api_ms": 47122,
+        "cache_read_tokens": 17920,
+        "cache_write_tokens": 0,
+        "input_tokens": 28666,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 2991,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 2168,
+        "session_ms": 55322,
+        "total_nano_aiu": 10997200000,
+        "uncached_input_tokens": 10746,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:44:10Z",
+      "exit_status": 0,
+      "identity_valid": true,
+      "json_valid": true,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 1,
+      "ordinal": 1,
+      "outcome": "no_decision",
+      "output_file_count": 1,
+      "proposal_present": true,
+      "proposal_sha256": "a91a516a86bec61fd49b67f621b6e6f8f6b155f52b4afe03582181d1d9b4725e",
+      "review_ms": 2,
+      "run": "positive-1",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": true,
+      "score": {
+        "candidate_id_validity": "not_supplied",
+        "exact_evidence_validity": "none_supplied",
+        "expected_retry_decision_recovered": false,
+        "fabricated_candidates": 0,
+        "patch_reviewer_disposition": "not_supplied",
+        "patch_semantic_equivalence": "not_supplied",
+        "patch_validity": "not_supplied",
+        "positive_extraction_text": true,
+        "response_evidence": {
+          "artifact_path": "responses/positive-1.json",
+          "artifact_sha256": "ff9448fef497eac3f22f4901370f308377489dff42c116e9b94e5c4419e477dc",
+          "raw_assistant_message_content_sha256": "c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56",
+          "run": "positive-1",
+          "source_event_stream_sha256": "c941c9f812081e26922d690535996330ac4f6a8190cde8a215ba9c86905075b8",
+          "verbatim_message_ordinal": 8
+        },
+        "target_correctness": "not_supplied",
+        "unsupported_claims": 1
+      },
+      "session_id": "a810cde0-274e-49c2-9438-46cbdcfe9f8f",
+      "start_time_utc": "2026-09-30T10:43:13Z",
+      "verification_receipt_sha256": "96a0de8f69fbcec794134668c43ffdf55c5f2afa3bba2f9b6cea81be2109c6c7",
+      "verification_success": true
+    },
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": true,
+      "cli_elapsed_ms": 20969,
+      "condition": "negative",
+      "directly_reported": {
+        "api_ms": 13631,
+        "cache_read_tokens": 17920,
+        "cache_write_tokens": 0,
+        "input_tokens": 26673,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 924,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 152,
+        "session_ms": 18812,
+        "total_nano_aiu": 6066000000,
+        "uncached_input_tokens": 8753,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:45:20Z",
+      "exit_status": 0,
+      "identity_valid": true,
+      "json_valid": true,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 2,
+      "ordinal": 1,
+      "outcome": "no_decision",
+      "output_file_count": 1,
+      "proposal_present": true,
+      "proposal_sha256": "8d798a659e9ddd8a9918546c8bfddfb594e568034b7eb4bd66d78f62a51fea38",
+      "review_ms": 2,
+      "run": "negative-1",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": true,
+      "score": {
+        "correct_abstention": true,
+        "false_positive_candidates": 0
+      },
+      "session_id": "4706dc43-978f-4c05-aad9-28e9adc1a340",
+      "start_time_utc": "2026-09-30T10:44:59Z",
+      "verification_receipt_sha256": "bbd3e8f03c98a8d7635ba0f5c6b4045d262f236b8e0609c6532f34e6dd004697",
+      "verification_success": true
+    },
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": false,
+      "cli_elapsed_ms": 10867,
+      "condition": "positive",
+      "directly_reported": {
+        "api_ms": 5244,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "input_tokens": 3527,
+        "model_requests": 1,
+        "monetary_cost": null,
+        "output_tokens": 56,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 0,
+        "session_ms": 8845,
+        "total_nano_aiu": 1522800000,
+        "uncached_input_tokens": 3527,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:45:43Z",
+      "exit_status": 0,
+      "identity_valid": false,
+      "json_valid": false,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 3,
+      "ordinal": 2,
+      "outcome": "missing_output",
+      "output_file_count": 0,
+      "proposal_present": false,
+      "proposal_sha256": null,
+      "review_ms": 1,
+      "run": "positive-2",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": false,
+      "score": {
+        "candidate_id_validity": "not_supplied",
+        "exact_evidence_validity": "none_supplied",
+        "expected_retry_decision_recovered": false,
+        "fabricated_candidates": 0,
+        "patch_reviewer_disposition": "not_supplied",
+        "patch_semantic_equivalence": "not_supplied",
+        "patch_validity": "not_supplied",
+        "positive_extraction_text": false,
+        "target_correctness": "not_supplied",
+        "unsupported_claims": 0
+      },
+      "session_id": "ee7e0fb9-8583-4810-8c37-0825d16903bb",
+      "start_time_utc": "2026-09-30T10:45:32Z",
+      "verification_receipt_sha256": null,
+      "verification_success": false
+    },
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": true,
+      "cli_elapsed_ms": 22316,
+      "condition": "negative",
+      "directly_reported": {
+        "api_ms": 15581,
+        "cache_read_tokens": 24064,
+        "cache_write_tokens": 0,
+        "input_tokens": 32857,
+        "model_requests": 6,
+        "monetary_cost": null,
+        "output_tokens": 1061,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 280,
+        "session_ms": 20825,
+        "total_nano_aiu": 6601760000,
+        "uncached_input_tokens": 8793,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:46:11Z",
+      "exit_status": 0,
+      "identity_valid": true,
+      "json_valid": true,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 4,
+      "ordinal": 2,
+      "outcome": "no_decision",
+      "output_file_count": 1,
+      "proposal_present": true,
+      "proposal_sha256": "99c7095d0704cbdd5d30129bf2144c3da5b495ab4656838c5d47ab5ef783b5aa",
+      "review_ms": 1,
+      "run": "negative-2",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": true,
+      "score": {
+        "correct_abstention": true,
+        "false_positive_candidates": 0
+      },
+      "session_id": "04478d9f-f6cb-44d8-a9d4-6e9f100e7b91",
+      "start_time_utc": "2026-09-30T10:45:49Z",
+      "verification_receipt_sha256": "57ba29a99f345b513edc686f67b8082327ad65a8355c1f9086447699d623c121",
+      "verification_success": true
+    },
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": true,
+      "cli_elapsed_ms": 45895,
+      "condition": "positive",
+      "directly_reported": {
+        "api_ms": 39180,
+        "cache_read_tokens": 19968,
+        "cache_write_tokens": 0,
+        "input_tokens": 30183,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 2624,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 1713,
+        "session_ms": 44589,
+        "total_nano_aiu": 10132720000,
+        "uncached_input_tokens": 10215,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:47:04Z",
+      "exit_status": 0,
+      "identity_valid": true,
+      "json_valid": true,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 5,
+      "ordinal": 3,
+      "outcome": "no_decision",
+      "output_file_count": 1,
+      "proposal_present": true,
+      "proposal_sha256": "ba21081523bebfecab3ece02c725733acbff24778fc1129c77659f2c7deae770",
+      "review_ms": 2,
+      "run": "positive-3",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": true,
+      "score": {
+        "candidate_id_validity": "not_supplied",
+        "exact_evidence_validity": "none_supplied",
+        "expected_retry_decision_recovered": false,
+        "fabricated_candidates": 0,
+        "patch_reviewer_disposition": "not_supplied",
+        "patch_semantic_equivalence": "not_supplied",
+        "patch_validity": "not_supplied",
+        "positive_extraction_text": true,
+        "response_evidence": {
+          "artifact_path": "responses/positive-3.json",
+          "artifact_sha256": "51fea31b437f358e211e82ec157529f5f6d4a1dd72c4bcca21e7e878013caed3",
+          "raw_assistant_message_content_sha256": "ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078",
+          "run": "positive-3",
+          "source_event_stream_sha256": "739d2c9737320ebc64c6e1f39dbce61a76f57c4406533e9b21f5412fbceb5e33",
+          "verbatim_message_ordinal": 3
+        },
+        "target_correctness": "not_supplied",
+        "unsupported_claims": 0
+      },
+      "session_id": "ad53a13a-308c-4321-b942-f49dba9d8d86",
+      "start_time_utc": "2026-09-30T10:46:18Z",
+      "verification_receipt_sha256": "64760c64d40c6326e6dc14c9801d1b58ab3793d6ba96df5517a98cd48a3480b1",
+      "verification_success": true
+    },
+    {
+      "candidate_count": 0,
+      "candidate_ids": [],
+      "canonical_valid": true,
+      "cli_elapsed_ms": 44775,
+      "condition": "negative",
+      "directly_reported": {
+        "api_ms": 38048,
+        "cache_read_tokens": 19968,
+        "cache_write_tokens": 0,
+        "input_tokens": 28583,
+        "model_requests": 5,
+        "monetary_cost": null,
+        "output_tokens": 1108,
+        "premium_request_cost": 1,
+        "reasoning_tokens": 246,
+        "session_ms": 43385,
+        "total_nano_aiu": 6460720000,
+        "uncached_input_tokens": 8615,
+        "user_requests": 1
+      },
+      "end_time_utc": "2026-09-30T10:47:54Z",
+      "exit_status": 0,
+      "identity_valid": true,
+      "json_valid": true,
+      "model": "gpt-5.6-sol",
+      "model_selected_explicitly": true,
+      "mutations": {
+        "canonical_request": 0,
+        "request_copy": 0,
+        "source_repository": 0,
+        "trust_boundary": 0
+      },
+      "order_position": 6,
+      "ordinal": 3,
+      "outcome": "no_decision",
+      "output_file_count": 1,
+      "proposal_present": true,
+      "proposal_sha256": "2064d418cf6d13dc125d39843cc5fcdecaa2e43f1d5728ec6155fcf0b50e1fc0",
+      "review_ms": 1,
+      "run": "negative-3",
+      "runtime": "GitHub Copilot CLI",
+      "runtime_sha256": "a21a8624194aabc709cdd8ec564b653efb0d771057607b040047e9a1c569a25b",
+      "runtime_version": "1.0.90-5",
+      "schema_valid": true,
+      "score": {
+        "correct_abstention": true,
+        "false_positive_candidates": 0
+      },
+      "session_id": "9f580a4f-b256-476e-a08b-298767ec366e",
+      "start_time_utc": "2026-09-30T10:47:09Z",
+      "verification_receipt_sha256": "fc5949ef9f9d8158f3e248607b2e9d3250322dca660ac9fa5f247c9bbf5dea20",
+      "verification_success": true
+    }
+  ],
+  "schema_name": "handoff-positive-negative-capability-control",
+  "schema_version": 1,
+  "study_status": "completed_uncontaminated_with_one_invalid_run"
+}

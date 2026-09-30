@@ -31,3 +31,5 @@
   frozen three-run internal repeatability result
 - [Handoff PR #112 temporal-state guard](../research/handoff-temporal-state-guard-pr-112/):
   preregistered three-run prompt ablation
+- [Handoff capability control](../research/handoff-capability-control/):
+  preregistered positive-negative construction diagnostic

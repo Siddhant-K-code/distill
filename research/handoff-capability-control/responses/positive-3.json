@@ -1,0 +1,57 @@
+{
+  "assistant_message_count": 7,
+  "assistant_messages": [
+    {
+      "content": "I’ll inspect only the request bundle, then create the single required proposal file without running verification or touching any other material.",
+      "ordinal": 1
+    },
+    {
+      "content": "The bundle requires reviewing the frozen request, conversation, and all copied documentation; I’ll read those request-contained files in parallel before drafting the canonical JSON.",
+      "ordinal": 2
+    },
+    {
+      "content": "A committed production retry decision is present and points to the sole frozen Markdown target. I’ll read that copied target, then construct the exact evidence range, patch, and content-addressed candidate required by the schema.",
+      "ordinal": 3
+    },
+    {
+      "content": "",
+      "ordinal": 4
+    },
+    {
+      "content": "",
+      "ordinal": 5
+    },
+    {
+      "content": "The required proposal can be represented canonically without altering the immutable bundle; I’ll now write the sole output artifact and stop without verification or any additional file access.",
+      "ordinal": 6
+    },
+    {
+      "content": "Created `output/proposal.json` as the sole canonical output file.",
+      "ordinal": 7
+    }
+  ],
+  "raw_assistant_message_content_sha256": "ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078",
+  "raw_content_hash_algorithm": "For each assistant.message in source order, hash ASCII decimal UTF-8 byte length, one colon byte, then the exact UTF-8 data.content bytes.",
+  "run": "positive-3",
+  "sanitization": {
+    "artifact_is_byte_identical_to_source_event_stream": false,
+    "assistant_message_content_modified": false,
+    "assistant_messages_omitted": 0,
+    "empty_assistant_messages_retained": 2,
+    "removed_from_committed_extract": [
+      "all non-assistant.message events",
+      "assistant message metadata outside data.content",
+      "opaque and reasoning fields",
+      "tool requests and tool results, including absolute workspace paths",
+      "runtime configuration, MCP status, usage, and timing events"
+    ]
+  },
+  "schema_name": "copilot-cli-assistant-response-content-extract",
+  "schema_version": 1,
+  "session_id": "ad53a13a-308c-4321-b942-f49dba9d8d86",
+  "source_event_stream_sha256": "739d2c9737320ebc64c6e1f39dbce61a76f57c4406533e9b21f5412fbceb5e33",
+  "verbatim_classification_evidence": {
+    "message_ordinal": 3,
+    "passage": "A committed production retry decision is present and points to the sole frozen Markdown target. I’ll read that copied target, then construct the exact evidence range, patch, and content-addressed candidate required by the schema."
+  }
+}

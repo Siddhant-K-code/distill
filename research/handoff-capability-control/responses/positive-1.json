@@ -1,0 +1,65 @@
+{
+  "assistant_message_count": 9,
+  "assistant_messages": [
+    {
+      "content": "I’ll inspect the request bundle, derive the schema-compliant proposal, and write only `output/proposal.json`.",
+      "ordinal": 1
+    },
+    {
+      "content": "",
+      "ordinal": 2
+    },
+    {
+      "content": "",
+      "ordinal": 3
+    },
+    {
+      "content": "",
+      "ordinal": 4
+    },
+    {
+      "content": "",
+      "ordinal": 5
+    },
+    {
+      "content": "",
+      "ordinal": 6
+    },
+    {
+      "content": "",
+      "ordinal": 7
+    },
+    {
+      "content": "The bundle contains a clear retry-policy decision, but producing a candidate requires exact derived cryptographic digests. I’m emitting the only fully canonical proposal possible without inventing digest values.",
+      "ordinal": 8
+    },
+    {
+      "content": "",
+      "ordinal": 9
+    }
+  ],
+  "raw_assistant_message_content_sha256": "c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56",
+  "raw_content_hash_algorithm": "For each assistant.message in source order, hash ASCII decimal UTF-8 byte length, one colon byte, then the exact UTF-8 data.content bytes.",
+  "run": "positive-1",
+  "sanitization": {
+    "artifact_is_byte_identical_to_source_event_stream": false,
+    "assistant_message_content_modified": false,
+    "assistant_messages_omitted": 0,
+    "empty_assistant_messages_retained": 7,
+    "removed_from_committed_extract": [
+      "all non-assistant.message events",
+      "assistant message metadata outside data.content",
+      "opaque and reasoning fields",
+      "tool requests and tool results, including absolute workspace paths",
+      "runtime configuration, MCP status, usage, and timing events"
+    ]
+  },
+  "schema_name": "copilot-cli-assistant-response-content-extract",
+  "schema_version": 1,
+  "session_id": "a810cde0-274e-49c2-9438-46cbdcfe9f8f",
+  "source_event_stream_sha256": "c941c9f812081e26922d690535996330ac4f6a8190cde8a215ba9c86905075b8",
+  "verbatim_classification_evidence": {
+    "message_ordinal": 8,
+    "passage": "The bundle contains a clear retry-policy decision, but producing a candidate requires exact derived cryptographic digests. I’m emitting the only fully canonical proposal possible without inventing digest values."
+  }
+}
