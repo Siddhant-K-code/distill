@@ -40,8 +40,22 @@
   "classification_basis": {
     "description": "Two positive CLI responses recognized the retry decision, but no positive run produced a candidate and one produced no output.",
     "positive_extraction_text_runs": [
-      "positive-1",
-      "positive-3"
+      {
+        "artifact_path": "responses/positive-1.json",
+        "artifact_sha256": "ff9448fef497eac3f22f4901370f308377489dff42c116e9b94e5c4419e477dc",
+        "raw_assistant_message_content_sha256": "c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56",
+        "run": "positive-1",
+        "source_event_stream_sha256": "c941c9f812081e26922d690535996330ac4f6a8190cde8a215ba9c86905075b8",
+        "verbatim_message_ordinal": 8
+      },
+      {
+        "artifact_path": "responses/positive-3.json",
+        "artifact_sha256": "51fea31b437f358e211e82ec157529f5f6d4a1dd72c4bcca21e7e878013caed3",
+        "raw_assistant_message_content_sha256": "ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078",
+        "run": "positive-3",
+        "source_event_stream_sha256": "739d2c9737320ebc64c6e1f39dbce61a76f57c4406533e9b21f5412fbceb5e33",
+        "verbatim_message_ordinal": 3
+      }
     ]
   },
   "diagnostic_classification": "construction_bottleneck_observed",
@@ -193,6 +207,10 @@
     "proposals/positive-3.json",
     "proposals/negative-3.json"
   ],
+  "retained_response_artifacts": [
+    "responses/positive-1.json",
+    "responses/positive-3.json"
+  ],
   "runs": [
     {
       "candidate_count": 0,
@@ -248,6 +266,14 @@
         "patch_semantic_equivalence": "not_supplied",
         "patch_validity": "not_supplied",
         "positive_extraction_text": true,
+        "response_evidence": {
+          "artifact_path": "responses/positive-1.json",
+          "artifact_sha256": "ff9448fef497eac3f22f4901370f308377489dff42c116e9b94e5c4419e477dc",
+          "raw_assistant_message_content_sha256": "c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56",
+          "run": "positive-1",
+          "source_event_stream_sha256": "c941c9f812081e26922d690535996330ac4f6a8190cde8a215ba9c86905075b8",
+          "verbatim_message_ordinal": 8
+        },
         "target_correctness": "not_supplied",
         "unsupported_claims": 1
       },
@@ -480,6 +506,14 @@
         "patch_semantic_equivalence": "not_supplied",
         "patch_validity": "not_supplied",
         "positive_extraction_text": true,
+        "response_evidence": {
+          "artifact_path": "responses/positive-3.json",
+          "artifact_sha256": "51fea31b437f358e211e82ec157529f5f6d4a1dd72c4bcca21e7e878013caed3",
+          "raw_assistant_message_content_sha256": "ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078",
+          "run": "positive-3",
+          "source_event_stream_sha256": "739d2c9737320ebc64c6e1f39dbce61a76f57c4406533e9b21f5412fbceb5e33",
+          "verbatim_message_ordinal": 3
+        },
         "target_correctness": "not_supplied",
         "unsupported_claims": 0
       },

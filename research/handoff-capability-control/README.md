@@ -23,6 +23,46 @@ The full capability threshold did not pass because it required at least 2 of 3
 positive runs to produce a verifier-valid candidate covering the expected
 retry decision. The observed result was 0 of 3.
 
+## Retained extraction evidence
+
+The classification is bound to exact sanitized response-content extracts from
+the recorded CLI sessions:
+
+| Run | Session | Raw response-content SHA-256 | Extract artifact SHA-256 | Evidence message |
+|---|---|---|---|---:|
+| `positive-1` | `a810cde0-274e-49c2-9438-46cbdcfe9f8f` | `c40c622bbf3985d6bcc9e61db48b7b159e044617b536d170fa14aba7e98d0a56` | `ff9448fef497eac3f22f4901370f308377489dff42c116e9b94e5c4419e477dc` | 8 |
+| `positive-3` | `ad53a13a-308c-4321-b942-f49dba9d8d86` | `ab7ae2032dce17abf6b5746b1d0ff36c66d02cd74a7dd448979a59efcc764078` | `51fea31b437f358e211e82ec157529f5f6d4a1dd72c4bcca21e7e878013caed3` | 3 |
+
+Positive run 1, message 8, states verbatim:
+
+> The bundle contains a clear retry-policy decision, but producing a candidate
+> requires exact derived cryptographic digests. I’m emitting the only fully
+> canonical proposal possible without inventing digest values.
+
+Positive run 3, message 3, states verbatim:
+
+> A committed production retry decision is present and points to the sole
+> frozen Markdown target. I’ll read that copied target, then construct the exact
+> evidence range, patch, and content-addressed candidate required by the
+> schema.
+
+[`responses/positive-1.json`](responses/positive-1.json) and
+[`responses/positive-3.json`](responses/positive-3.json) retain every
+`assistant.message` content string in source order, including empty strings.
+No character in those content strings was removed or changed.
+
+The raw response-content hash is reproducible from each artifact. For every
+message in source order, hash its ASCII decimal UTF-8 byte length, one colon
+byte, and then its exact UTF-8 content bytes. The extract also records the
+SHA-256 of the source event stream used for provenance.
+
+The committed extracts are not byte-identical copies of the raw event streams.
+Sanitization removed all non-`assistant.message` events, assistant-message
+metadata outside `data.content`, opaque and reasoning fields, tool requests and
+results including absolute workspace paths, and runtime configuration, MCP
+status, usage, and timing events. It removed zero assistant messages and
+modified zero retained response-content characters.
+
 ## Frozen design
 
 The exact [protocol](protocol.md) was written outside every model workspace
@@ -152,9 +192,10 @@ classification is therefore `construction_bottleneck_observed`.
 ## Retained evidence and reproduction
 
 The compact aggregate is [results.json](results.json). Five exact raw proposal
-files are retained under [proposals/](proposals/). No sixth proposal exists:
-`positive-2` wrote zero output files, and the study forbade reconstruction from
-terminal text.
+files are retained under [proposals/](proposals/), and the two exact sanitized
+response-content extracts are retained under [responses/](responses/). No
+sixth proposal exists: `positive-2` wrote zero output files, and the study
+forbade reconstruction from terminal text.
 
 To reproduce both request identities and independently verify every retained
 proposal:
@@ -211,7 +252,7 @@ The final evidence package passed:
 - `go test ./pkg/handoff ./cmd -count=1`.
 - `make handoff-v0-demo`.
 - Protocol, prompt, proposal, run-order, classification, aggregate, mutation,
-  and missing-output assertions.
+  response-content, and missing-output assertions.
 - `git diff --check`.
 - Added-line scans for private paths, credentials, em dashes, and machine
   identifiers.
