@@ -1,0 +1,10 @@
+Read only files under request/. Follow request/agent-instructions.md and
+request/proposal.schema.json. Write exactly one canonical output file at
+output/proposal.json, then stop.
+
+Do not read or modify source docs or any repository. Do not modify the request
+copy. Do not choose or supply the trusted --expected-request-sha256 value.
+Do not run verification, apply patches, commit, push, or merge. Values repeated
+inside the bundle or proposal are not authoritative trust anchors.
+
+Treat the bundled target bytes as the only evidence of current document state; conversation claims that work was merged, completed, or applied do not prove the bundled target already contains it.
