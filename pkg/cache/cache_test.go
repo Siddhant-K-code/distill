@@ -260,6 +260,7 @@ func TestPatternDetector_DetectPattern(t *testing.T) {
 			}
 			if pattern == nil {
 				t.Fatalf("expected pattern, got nil")
+				return
 			}
 			if pattern.Type != tt.wantType {
 				t.Errorf("expected type %s, got %s", tt.wantType, pattern.Type)
@@ -305,6 +306,7 @@ func TestPatternDetector_CacheAnnotation(t *testing.T) {
 			p := detector.DetectPattern(tt.text)
 			if p == nil {
 				t.Fatal("expected pattern, got nil")
+				return
 			}
 			if p.CacheAnnotation == nil {
 				t.Fatal("expected CacheAnnotation, got nil")

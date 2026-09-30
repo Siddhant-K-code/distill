@@ -14,6 +14,7 @@ func TestTTLTracker_FirstTouch_ColdStart(t *testing.T) {
 	e := tr.Entry("hash-abc")
 	if e == nil {
 		t.Fatal("expected entry after touch")
+		return
 	}
 	if e.MissCount != 1 {
 		t.Errorf("expected MissCount=1, got %d", e.MissCount)
