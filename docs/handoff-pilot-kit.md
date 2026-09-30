@@ -83,7 +83,9 @@ using a hosted agent may transmit it under that provider's terms.
    ```
 
    Use one example recipe below. Do not put the trusted digest file or frozen
-   expectations in this workspace.
+   expectations in this workspace. It contains another full request copy plus
+   runtime metadata and the proposal, so protect it like the canonical request
+   until removal.
 
 5. Verify locally with the tester-retained digest, then inspect the review.
 
@@ -103,12 +105,17 @@ using a hosted agent may transmit it under that provider's terms.
    Check each decision, exact evidence quote and range, target, and patch.
    Record a disposition; do not apply a patch as part of this trial.
 
-6. After recording feedback, remove the temporary trusted-digest copy and
-   restore the caller's previous file-creation mask. Retain or delete the
-   private trial directory according to the source material's retention policy.
+6. After recording feedback, remove the disposable agent workspace and
+   temporary trusted-digest copy, then restore the caller's previous
+   file-creation mask. Retain or delete the canonical `"$trial"` directory
+   separately according to the source material's retention policy; this
+   cleanup does not remove its request or review.
 
    ```bash
-   rm -f "$trusted_digest_file"
+   test -n "$agent_workspace"
+   test -d "$agent_workspace"
+   rm -rf -- "$agent_workspace"
+   rm -f -- "$trusted_digest_file"
    umask "$previous_umask"
    ```
 
